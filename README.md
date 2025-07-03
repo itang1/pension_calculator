@@ -1,6 +1,8 @@
 # Pension vs. 403b Calculator
 
 ## Overview
+Retirement planning is inherently complex, and the value of a pension depends on many variables. This tool is designed to illuminate those variables and support more informed, fact-based conversations among public workers, policymakers, and the broader public.
+
 This Streamlit application is an interactive financial modeling tool designed to compare the long-term outcomes of participating in a traditional pension plan versus investing equivalent contributions into a personal retirement account, such as a 403(b). The model simulates a user-defined number of working years followed by a user-defined number of retirement years, allowing users to adjust key economic and personal assumptions to evaluate the projected financial impact of each strategy.
 
 ## Features
