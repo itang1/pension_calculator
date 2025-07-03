@@ -1,0 +1,152 @@
+import streamlit as st
+import matplotlib.pyplot as plt
+
+st.set_page_config(page_title="Pension vs. Personal Savings Calculator", layout="wide")
+st.title("Interactive Pension vs. 403b Calculator")
+
+# Input form
+with st.form("retirement_form"):
+    st.header("🌎 Market Assumptions")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        pension_tax_rate = st.number_input(
+            "Pension Tax Rate (%)",
+            value=10.0,
+            help="Percentage of your salary contributed to the pension system each year."
+        ) / 100
+        income_tax_rate = st.number_input(
+            "Income Tax Rate on Savings (%)",
+            value=100.0,
+            help="Effective rate at which your retirement savings grow (100% = tax-advantaged)."
+        ) / 100
+    with col2:
+        step_increase = st.number_input(
+            "Step Increase (%)",
+            value=5.5,
+            help="Annual raise from step progression (e.g., moving up a salary scale)."
+        ) / 100 + 1
+        inflation_increase = st.number_input(
+            "Cost of Living Adjustment (COLA) (%)",
+            value=3.0,
+            help="Annual salary adjustment announced each October, typically between 2–5%."
+        ) / 100 + 1
+    with col3:
+        promotion_increase = st.number_input(
+            "Promotion Increase (%)",
+            value=10.0,
+            help="Salary bump when you receive a promotion."
+        ) / 100 + 1
+        index_returns_rate = st.number_input(
+            "Index Returns Rate (%)",
+            value=7.0,
+            help="Annual return rate of your personal retirement investments (e.g., 403b)."
+        ) / 100 + 1
+
+    st.header("👤 Personal Assumptions")
+    col4, col5, col6 = st.columns(3)
+    with col4:
+        starting_wage = st.number_input(
+            "Starting Annual Wage ($)",
+            value=120000,
+            help="Your initial yearly salary in the year you were hired."
+        )
+    with col5:
+        retirement_years = st.slider(
+            "Years After Retirement",
+            10, 50, 30,
+            help="How many years you expect to live after retiring."
+        )
+    with col6:
+        retirement_allowance = st.number_input(
+            "Annual Pension Allowance ($)",
+            value=12 * 5871.52,
+            help="Estimate your annual pension payout. You can calculate yours using the RIS website pension calculator."
+        )
+
+    promotion_years_input = st.text_input(
+        "Promotion Years (comma-separated)",
+        "10,20",
+        help="Years in which you expect to be promoted (e.g., 10, 20)."
+    )
+
+    submitted = st.form_submit_button("Run Simulation")
+
+if submitted:
+    # Parse promotion years
+    try:
+        promotion_years = [int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit()]
+    except:
+        promotion_years = []
+
+    # Initialize variables
+    pension_tax_paid = 0
+    pension_redeemed = 0
+    personal_retirement_fund = 0
+    current_wage = starting_wage
+
+    # Tracking for visualization
+    years = []
+    pension_fund_values = []
+    personal_fund_values = []
+
+    # Work phase
+    for work_year in range(1, 31):
+        pension_tax_paid += current_wage * pension_tax_rate
+        personal_retirement_fund = (personal_retirement_fund * index_returns_rate) + current_wage * pension_tax_rate * income_tax_rate
+
+        years.append(f"W{work_year}")
+        pension_fund_values.append(0)
+        personal_fund_values.append(personal_retirement_fund)
+
+        current_wage *= inflation_increase
+        if 2 <= work_year <= 5:
+            current_wage *= step_increase
+        if work_year in promotion_years:
+            current_wage *= promotion_increase
+
+    # Retirement phase
+    for ret_year in range(1, retirement_years + 1):
+        pension_redeemed += retirement_allowance
+        personal_retirement_fund = (personal_retirement_fund - retirement_allowance) * index_returns_rate
+
+        years.append(f"R{ret_year}")
+        pension_fund_values.append(pension_redeemed)
+        personal_fund_values.append(personal_retirement_fund)
+
+    # Results
+    st.subheader("📈 Summary at Death")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Pension Tax Paid", f"${pension_tax_paid:,.0f}")
+    col2.metric("Total Pension Redeemed", f"${pension_redeemed:,.0f}")
+    col3.metric("Final Personal Fund Value", f"${personal_retirement_fund:,.0f}")
+
+    # Plot
+    st.subheader("📊 Fund Growth Over Time")
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.plot(years, pension_fund_values, label="Pension Redeemed", color="blue")
+    ax.plot(years, personal_fund_values, label="Personal Retirement Fund", color="green")
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Amount ($)")
+    ax.set_title("Retirement Fund Comparison")
+    ax.legend()
+
+    # Show only every 5th year label to reduce clutter
+    tick_interval = 5
+    visible_ticks = [i for i in range(len(years)) if i == 0 or (i + 1) % tick_interval == 0]
+    ax.set_xticks(visible_ticks)
+    ax.set_xticklabels([years[i] for i in visible_ticks], rotation=45)
+
+    st.pyplot(fig)
+
+    # Conclusion
+    st.markdown("""
+    ---
+    ### 🧾 Conclusion
+
+    This calculator compares the value of a traditional pension with a personal retirement savings strategy under your assumptions.
+
+    - If your personal fund ends with a large balance, it may offer more flexibility and inheritance potential.
+    - If your pension provides more consistent income, it may offer peace of mind and stability.
+
+    Always consult a financial advisor before making major retirement decisions.
+    """)
