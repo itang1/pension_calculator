@@ -15,12 +15,12 @@ This app provides:
 
 Install the required Python packages:
 ```
-pip install streamlit matplotlib
+$ pip install -r requirements.txt
 ```
 
 Then run:
 ```
-streamlit run pension_vs_403b_calculator.py
+$ streamlit run pension_calculator.py
 ```
 
 ## Limitations and Assumptions
