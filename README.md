@@ -1,5 +1,7 @@
 # Pension vs. 403b Calculator
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://pensioncalc.streamlit.app/)
+
 ## Overview
 Retirement planning is inherently complex, and the value of a pension depends on many variables. This tool is designed to illuminate those variables and support more informed, fact-based conversations among public workers, policymakers, and the broader public.
 
