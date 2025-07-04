@@ -2,23 +2,49 @@ import streamlit as st
 import matplotlib.pyplot as plt
 
 
-st.title("Pension vs. 403b Savings Calculator")
+st.title("Pension vs. Personal Savings Calculator")
 
+with st.expander("What This Calculator Does"):
+    st.markdown("""
+    This calculator helps you compare two different ways of saving for retirement:
 
-with st.expander("What is a pension?"):
+    - **Traditional Pension**
+        - Each year, a portion of your paycheck (e.g. 10%) goes into a pension plan.
+        - When you retire, you receive back a set amount of money (i.e. your **pension allowance**) every month or year for as long as you live.
+        - This calculator adds up how much you'd get from the pension over your retirement years.
+
+    - **Personal Retirement Account** - Like a 457(b), 403(b), or 401(k)
+        - Imagine if, instead of paying into the pension, you invested that same amount of money each year in your own personal retirement account.
+        - Your money grows over time through investment returns based on the stock market.
+        - After you retire, you take out the same yearly amount as the pension allowance you would've had.
+        - Any leftover money keeps growing (or shrinking) every year based on the stock market.
+
+    By comparing these two options side by side, you can see which one might give you more money over time, based on factors like salary, number of years you expect to work, and how long you expect to be retired.
+""")
+
+with st.expander("The Public Pension Debate"):
     st.markdown("""
-    **[From Wikipedia:](https://en.wikipedia.org/wiki/Pension)** A pension is a fund into which amounts are paid regularly during an individual's working career, and from which periodic payments are made to support the person's retirement from work. A pension may be either a "defined benefit plan", where defined periodic payments are made in retirement and the sponsor of the scheme (e.g. the employer) must make further payments into the fund if necessary to support these defined retirement payments, or a "defined contribution plan", under which defined amounts are paid in during working life, and the retirement payments are whatever can be afforded from the fund. 
+    Many public sector employees (such as teachers, law enforcement officers, and civil servants) mandatorily participate in defined-benefit pension plans. Under a pension plan, workers are required to contribute a fixed percentage of their salary throughout their working years in exchange for a guaranteed, fixed income during their retirement years. The employer bears the responsibility of paying out the pension and assumes the investment risk. By contrast, the private sector has largely shifted to defined-contribution plans such as 401(k)s and 403(b)s. In these plans, employees can voluntarily invest contributions into a range of market assets, often with some employer matching as well. Since market performance is not guaranteed, employees assume the full responsibility for managing the risks associated with thier retirement investments.
+
+    This structural difference between the two retirement systems has sparked debate and, at times, resentment and jealousy. Critics argue that pensions are financially unsustainable in the long run, especially as populations age and life expectancy increases. They contend that pensions impose an unfair burden on taxpayers, particularly in states or cities where the government pension plan is underfunded yet still obligated to conjure up funds to pay out the promised benefits. Some detractors even feel that pension benefits are overly generous compared to what private sector employees receive. On the other hand, proponents maintain that pensions encourage individuals to accept public sector jobs, which can sometimes pay less than their private sector counterparts. They also highlight that pensions help reduce elderly poverty through predictable monthly or annual payments—especially benefiting those who might not otherwise save enough or those who lack the financial literacy to manage retirement funds effectively. Ultimately, this debate involves issues of fairness, fiscal responsibility, and the government’s role in securing citizens’ retirement income.
+
+    While pensions indeed offer stability and predictability, they might not be the optimal choice for everyone—particularly for those who are disciplined, financially literate, and value the flexibility, control, and potential upside of tax-deferred personal accounts. This calculator is designed to explore the question that follows: **If the same annual contribution were made, would a traditional pension or a personal investment account yield a better outcome?**
+
+    This interactive financial modeling tool allows users to model variables such as salary growth, expected investment returns, and number of years spent in retirement. It offers a **data-driven** comparison between the long-term value of a pension vs. a hypothetical self-managed investment strategy. The goal of this calculator is to support **evidence-based dialogue** so that individuals can form fact-based opinions and make informed decisions rather than rely on emotional arguments or misinformation.
     """)
-    
-with st.expander("Purpose of this calculator"):
+
+with st.expander("What This Tool Is Not"):
     st.markdown("""
-Many civil service employees (e.g. teachers, government workers) mandatorily participate in a defined-benefit pension plan. These workers are required to contribute a portion of their salary to a pension system, and, in return, are promised a fixed income in retirement. In contrast, the private sector has largely shifted to defined-contribution plans like 401(k)s and 403(b)s, where employees voluntarily contribute a percentage of their income and bear the responsibility for managing their own retirement savings.\n
-This structural difference has fueled public debate and, in some cases, resentment. Critics argue that public pensions are outdated, fiscally unsustainable, and [overly generous](https://www.forbes.com/sites/waynewinegarden/2018/09/20/the-opportunity-created-by-californias-overly-generous-public-pensions/) when compared to the more uncertain and self-funded retirement options available to most private-sector workers. Discussion forum narratives often portray public pensions as a burden on taxpayers or as evidence of government inefficiency. In several states, unfunded pension liabilities have become [central issues](https://www.pew.org/en/research-and-analysis/articles/2022/07/07/states-unfunded-pension-liabilities-persist-as-major-long-term-challenge) in budget negotiations and political campaigns.\n
-At the same time, many public employees feel caught in a system they did not choose. Participation in the pension plan is mandatory, and workers typically have little control over how their contributions are invested. In many cases, they are also excluded from Social Security. Some view the pension as a perk, but others would prefer the flexibility and autonomy of managing their own retirement savings in a tax-deferred account, but are not given that option.\n
-I created this calculator to bring clarity to the ongoing debate about the fairness, sustainability, and value of public pension systems—specifically whether these mandatory plans provide better retirement outcomes than if employees instead invested equivalent contributions in personal, tax-deferred accounts such as 403(b) or 457(b) plans.\n
-This calculator allows users to compare the long-term value of a traditional pension with a hypothetical scenario in which the same contributions are invested in a personal, tax-deferred retirement account such as a 457(b) deferred compensation plan. By adjusting assumptions like salary growth, investment returns, and retirement duration, users can explore whether the pension system offers a better outcome for their specific circumstances, or whether self-directed savings might be more advantageous.\n
-Retirement planning is inherently complex, and the value of a pension depends on many variables. This tool is designed to illuminate those variables and support more informed, fact-based conversations among public workers, policymakers, and the broader public. 
+    This calculator is intended as an educational and exploratory tool. It is not a comprehensive actuarial model, nor does it account for all variables involved in retirement planning. Specifically:
+
+    - It does not incorporate mortality risk pooling, which can make pensions more or less valuable for those who do not live the average life expectancy.
+    - It excludes spousal benefits, survivor options, or disability protections often built into pension systems.
+    - It assumes consistent contributions and withdrawal patterns, and does not simulate market volatility, behavioral investing patterns, or tax implications.
+    - It does not predict or advise on individual financial outcomes and should not be used in place of professional financial advice.
+
+    This tool is meant to support transparent, data-informed comparisons, but real-world retirement decisions should consider institutional rules, legal constraints, personal risk tolerance, and long-term goals.
     """)
+
 
 # Input form
 with st.form("retirement_form"):
