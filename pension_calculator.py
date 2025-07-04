@@ -120,7 +120,7 @@ with st.form("retirement_form"):
 
 # Results
 st.divider()
-st.subheader("Simulation Results")
+st.header("Simulation Results")
 
 if not submitted:
     st.write("Click the **Run Simulation** button above.")
@@ -139,9 +139,9 @@ if submitted:
     current_wage = starting_wage
 
     # Tracking for visualization
-    years = []
-    pension_fund_values = []
-    personal_fund_values = []
+    years = ["W0"]
+    pension_fund_values = [0]
+    personal_fund_values = [0]
 
     # Work phase
     for work_year in range(1, int(work_years) + 1):
@@ -175,7 +175,7 @@ if submitted:
     col3.metric("Final Personal Fund Value", f"${personal_retirement_fund:,.0f}")
 
     # Plot
-    st.subheader("Fund Growth Over Time")
+    st.subheader("Pension Redeemed vs. Private Funds Over Time")
     fig, ax = plt.subplots(figsize=(12, 5))
     ax.plot(years, pension_fund_values, label="Pension Redeemed", color="blue")
     ax.plot(years, personal_fund_values, label="Personal Retirement Fund", color="green")
@@ -186,22 +186,29 @@ if submitted:
 
     # Show only every 5th year label to reduce clutter
     tick_interval = 5
-    visible_ticks = [i for i in range(len(years)) if i == 0 or (i + 1) % tick_interval == 0]
+    visible_ticks = [i for i in range(len(years)) if i % tick_interval == 0]
     ax.set_xticks(visible_ticks)
     ax.set_xticklabels([years[i] for i in visible_ticks], rotation=45)
 
     st.pyplot(fig)
 
 
-# Conclusion
-st.markdown("""
----
-### Conclusion
+st.write("---")
 
-This calculator compares the value of a traditional pension with a personal retirement savings strategy under your assumptions.
+st.header("Case Studies")
 
-- If your personal fund ends with a large balance, it may offer more flexibility and inheritance potential.
-- If your pension provides more consistent income, it may offer peace of mind and stability.
+with st.expander("Case Study A"):
+    st.markdown("""
+        Alice's starting annual wage is 120,000. She assumes a standard step increase of 5.50%, COLA of 3%, promotion increase of 10%, pension tax rate of 10%, and index returns rate of 7%. She receives a promotion in years 10 and 20. She works 30 years and lives for 30 years in retirement. Her annual pension allowance totals 70,458.24.
 
-Always consult a financial advisor before making major retirement decisions.
-""")
+        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal savings option, she would have amassed a little over 2M in savings. In her 30 years of retirement, she will have redeemed a bit over 2.1M in pension allowance. This is substantially greater than the 785k that she paid in pension tax, and a tad greater than the 2M she would have amassed through the personal savings option. So both options are roughly equivalent in terms of the total amount that got paid out to her throughout her retirement.
+
+        The difference between the two options is that at the end of her life, with the personal savings option, she ends up with over 8.1M to keep or give to whomstever she wishes, whereas with the pension option, she ends up with at most only the survivor beneifts that she elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
+
+        My recommendation is that if your situation and assumptions are similar to Alice's, then saving for retirement on your own terms is better than the pension program.
+    """)
+
+
+# A few case studies
+# Explain math
+# Improve plot
