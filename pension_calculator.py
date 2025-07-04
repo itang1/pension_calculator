@@ -1,5 +1,6 @@
 import streamlit as st
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 
 st.title("Pension vs. Personal Savings Calculator")
@@ -110,11 +111,6 @@ with st.form("retirement_form"):
             help="Annual return rate of your personal retirement investments (e.g., 403b)."
         ) / 100 + 1
 
-    # st.markdown(
-    #     "<small>You can estimate your pension using the <a href='https://wp03vm13risp1:8443/WPERP/' target='_blank'>RIS website pension calculator</a>.</small>",
-    #     unsafe_allow_html=True
-    # )
-
     submitted = st.form_submit_button("Run Simulation")
 
 
@@ -175,23 +171,48 @@ if submitted:
     col3.metric("Final Personal Fund Value", f"${personal_retirement_fund:,.0f}")
 
     # Plot
-    st.subheader("Pension Redeemed vs. Private Funds Over Time")
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.plot(years, pension_fund_values, label="Pension Redeemed", color="blue")
-    ax.plot(years, personal_fund_values, label="Personal Retirement Fund", color="green")
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Amount ($)")
-    ax.set_title("Retirement Fund Comparison")
-    ax.legend()
+    fig = go.Figure()
 
-    # Show only every 5th year label to reduce clutter
-    tick_interval = 5
-    visible_ticks = [i for i in range(len(years)) if i % tick_interval == 0]
-    ax.set_xticks(visible_ticks)
-    ax.set_xticklabels([years[i] for i in visible_ticks], rotation=45)
+    fig.add_trace(go.Scatter(
+        x=years,
+        y=pension_fund_values,
+        mode='lines+markers',
+        name='Pension Redeemed',
+        line=dict(color='blue')
+    ))
 
-    st.pyplot(fig)
+    fig.add_trace(go.Scatter(
+        x=years,
+        y=personal_fund_values,
+        mode='lines+markers',
+        name='Hypothetical Personal Retirement Fund',
+        line=dict(color='green')
+    ))
 
+    fig.update_layout(
+        title='Retirement Fund Comparison',
+        xaxis_title='Year',
+        yaxis_title='Amount ($)',
+        xaxis=dict(
+            tickangle=45,
+            tickmode='array',
+            tickvals=[years[i] for i in range(0, len(years), 5)],
+            tickfont=dict(size=10)
+        ),
+        yaxis=dict(
+            gridcolor='lightgray',
+            tickformat=',',
+            separatethousands=True
+        ),
+        plot_bgcolor='white',
+        legend=dict(x=0.01, y=0.99),
+        margin=dict(l=40, r=20, t=60, b=100)
+    )
+
+    fig.update_xaxes(showgrid=True)
+    fig.update_yaxes(showgrid=True)
+
+    st.plotly_chart(fig, use_container_width=True)
 
 st.write("---")
 
