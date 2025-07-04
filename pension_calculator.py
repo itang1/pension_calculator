@@ -26,7 +26,7 @@ with st.expander("The Public Pension Debate"):
     st.markdown("""
     Many public sector employees (such as teachers, law enforcement officers, and civil servants) mandatorily participate in defined-benefit pension plans. Under a pension plan, workers are required to contribute a fixed percentage of their salary throughout their working years in exchange for a guaranteed, fixed income during their retirement years. The employer bears the responsibility of paying out the pension and assumes the investment risk. By contrast, the private sector has largely shifted to defined-contribution plans such as 401(k)s and 403(b)s. In these plans, employees can voluntarily invest contributions into a range of market assets, often with some employer matching as well. Since market performance is not guaranteed, employees assume the full responsibility for managing the risks associated with thier retirement investments.
 
-    This structural difference between the two retirement systems has sparked debate and, at times, resentment and jealousy. Critics argue that pensions are financially unsustainable in the long run, especially as populations age and life expectancy increases. They contend that pensions impose an unfair burden on taxpayers, particularly in states or cities where the government pension plan is underfunded yet still obligated to conjure up funds to pay out the promised benefits. Some detractors even feel that pension benefits are overly generous compared to what private sector employees receive. On the other hand, proponents maintain that pensions encourage individuals to accept public sector jobs, which can sometimes pay less than their private sector counterparts. They also highlight that pensions help reduce elderly poverty through predictable monthly or annual payments—especially benefiting those who might not otherwise save enough or those who lack the financial literacy to manage retirement funds effectively. Ultimately, this debate involves issues of fairness, fiscal responsibility, and the government’s role in securing citizens’ retirement income.
+    This structural difference between the two retirement systems has sparked debate and, at times, resentment and jealousy. Critics argue that pensions are financially unsustainable in the long run, especially as populations age and life expectancy increases. They contend that pensions impose an unfair burden on taxpayers, particularly in states or cities where the government pension plan is underfunded yet still obligated to conjure up funds to pay out the promised benefits. Some detractors even feel that pension benefits are overly generous compared to what private sector employees receive. On the other hand, proponents maintain that pensions encourage individuals to accept public sector jobs, which can sometimes pay less than their equivalent private sector counterparts. They also highlight that pensions help reduce elderly poverty through predictable monthly or annual payments—especially benefiting those who might not otherwise save enough or those who lack the financial literacy to manage retirement funds effectively. Ultimately, this debate involves issues of fairness, fiscal responsibility, and the government’s role in securing citizens’ retirement income.
 
     While pensions indeed offer stability and predictability, they might not be the optimal choice for everyone—particularly for those who are disciplined, financially literate, and value the flexibility, control, and potential upside of tax-deferred personal accounts. This calculator is designed to explore the question that follows: **If the same annual contribution were made, would a traditional pension or a personal investment account yield a better outcome?**
 
@@ -48,7 +48,7 @@ with st.expander("What This Tool Is Not"):
 
 # Input form
 with st.form("retirement_form"):
-    st.header("Market Assumptions")
+    st.header("Input variable assumptions")
     col1, col2, col3 = st.columns(3)
     with col1:
         step_increase = st.number_input(
@@ -56,36 +56,10 @@ with st.form("retirement_form"):
             value=5.5,
             help="Annual raise from step progression (e.g., moving up a salary scale)."
         ) / 100 + 1
-        pension_tax_rate = st.number_input(
-            "Pension Tax Rate (%)",
-            value=10.0,
-            help="Percentage of your salary contributed to the pension system each year."
-        ) / 100
-    with col2:
-        inflation_increase = st.number_input(
-            "Cost of Living Adjustment (COLA) (%)",
-            value=3.0,
-            help="Annual salary adjustment announced each October, typically between 2–5%."
-        ) / 100 + 1
-    with col3:
-        promotion_increase = st.number_input(
-            "Promotion Increase (%)",
-            value=10.0,
-            help="Salary bump when you receive a promotion."
-        ) / 100 + 1
-        index_returns_rate = st.number_input(
-            "Index Returns Rate (%)",
-            value=7.0,
-            help="Annual return rate of your personal retirement investments (e.g., 403b)."
-        ) / 100 + 1
-
-    st.header("Personal Assumptions")
-    col4, col5, col6 = st.columns(3)
-    with col4:
         starting_wage = st.number_input(
             "Starting Annual Wage ($)",
             value=120000,
-            help="Your initial yearly salary before any raises or promotions."
+            help="Your initial salary the year you were hired."
         )
         work_years = st.number_input(
             "Years to Work",
@@ -95,7 +69,17 @@ with st.form("retirement_form"):
             step=1,
             help="Number of years you plan to work before retirement."
         )
-    with col5:
+    with col2:
+        cola_increase = st.number_input(
+            "Cost of Living Adjustment (%)",
+            value=3.0,
+            help="Annual salary adjustment announced each October, typically between 2–5%."
+        ) / 100 + 1
+        promotion_years_input = st.text_input(
+            "Promotion Years",
+            value="10, 20",
+            help="Years in which you expect to be promoted (e.g., 10, 20). Should fall within your working years."
+        )
         retirement_years = st.number_input(
             "Years After Retirement",
             value=30,
@@ -104,23 +88,32 @@ with st.form("retirement_form"):
             step=1,
             help="How many years you expect to live after retiring."
         )
-    with col6:
+    with col3:
+        promotion_increase = st.number_input(
+            "Promotion Increase (%)",
+            value=10.0,
+            help="Salary bump when you receive a promotion."
+        ) / 100 + 1
+        pension_tax_rate = st.number_input(
+            "Pension Tax Rate (%)",
+            value=10.0,
+            help="Percentage of your salary contributed to the pension system each year."
+        ) / 100
         retirement_allowance = st.number_input(
             "Annual Pension Allowance ($)",
             value=12 * 5871.52,
             help="Estimate your annual pension payout. You can calculate yours using the RIS website pension calculator."
         )
+        index_returns_rate = st.number_input(
+            "Index Returns Rate (%)",
+            value=7.0,
+            help="Annual return rate of your personal retirement investments (e.g., 403b)."
+        ) / 100 + 1
 
-    st.markdown(
-        "<small>You can estimate your pension using the <a href='https://wp03vm13risp1:8443/WPERP/' target='_blank'>RIS website pension calculator</a>.</small>",
-        unsafe_allow_html=True
-    )
-
-    promotion_years_input = st.text_input(
-        "Promotion Years (comma-separated)",
-        "10,20",
-        help="Years in which you expect to be promoted (e.g., 10, 20). Should fall within your working years."
-    )
+    # st.markdown(
+    #     "<small>You can estimate your pension using the <a href='https://wp03vm13risp1:8443/WPERP/' target='_blank'>RIS website pension calculator</a>.</small>",
+    #     unsafe_allow_html=True
+    # )
 
     submitted = st.form_submit_button("Run Simulation")
 
@@ -130,7 +123,7 @@ st.divider()
 st.subheader("Simulation Results")
 
 if not submitted:
-    st.write("Click the **Run Simulation** button above to generate the plot.")
+    st.write("Click the **Run Simulation** button above.")
 
 if submitted:
     # Parse promotion years
@@ -159,7 +152,7 @@ if submitted:
         pension_fund_values.append(0)
         personal_fund_values.append(personal_retirement_fund)
 
-        current_wage *= inflation_increase
+        current_wage *= cola_increase
         if 2 <= work_year <= 5:
             current_wage *= step_increase
         if work_year in promotion_years:
