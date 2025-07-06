@@ -1,6 +1,5 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+from plotly import graph_objects as go
 
 
 st.title("Pension vs. Personal Savings Calculator")
@@ -163,13 +162,6 @@ if submitted:
         pension_fund_values.append(pension_redeemed)
         personal_fund_values.append(personal_retirement_fund)
 
-    # Results
-    st.subheader("Summary")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Pension Tax Paid", f"${pension_tax_paid:,.0f}")
-    col2.metric("Total Pension Redeemed", f"${pension_redeemed:,.0f}")
-    col3.metric("Final Personal Fund Value", f"${personal_retirement_fund:,.0f}")
-
     # Plot
     fig = go.Figure()
 
@@ -209,10 +201,20 @@ if submitted:
         margin=dict(l=40, r=20, t=60, b=100)
     )
 
+    fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Year of Retirement",
+              annotation_position="right")
+    tick_interval = max(pension_tax_paid, pension_redeemed, personal_retirement_fund)//10
+    fig.update_yaxes(showgrid=True, dtick=tick_interval)
     fig.update_xaxes(showgrid=True)
-    fig.update_yaxes(showgrid=True)
 
     st.plotly_chart(fig, use_container_width=True)
+
+    # Results
+    st.markdown("<h3 style='font-size: 24px;'>Summary</h3>", unsafe_allow_html=True)
+    st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
+    st.write(f"**Total Pension Redeemed:** ${pension_redeemed:,.0f}")
+    st.write(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}")
+    st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
 
 st.write("---")
 
@@ -222,14 +224,12 @@ with st.expander("Case Study A"):
     st.markdown("""
         Alice's starting annual wage is 120,000. She assumes a standard step increase of 5.50%, COLA of 3%, promotion increase of 10%, pension tax rate of 10%, and index returns rate of 7%. She receives a promotion in years 10 and 20. She works 30 years and lives for 30 years in retirement. Her annual pension allowance totals 70,458.24.
 
-        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal savings option, she would have amassed a little over 2M in savings. In her 30 years of retirement, she will have redeemed a bit over 2.1M in pension allowance. This is substantially greater than the 785k that she paid in pension tax, and a tad greater than the 2M she would have amassed through the personal savings option. So both options are roughly equivalent in terms of the total amount that got paid out to her throughout her retirement.
+        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal retirement fund option, she would have amassed a little over 2M in savings and investments. In her 30 years of retirement, she will have redeemed a bit over 2.1M in pension allowance. This is substantially greater than the 785k that she paid in pension tax, and a tad greater than the 2M she would have amassed through the personal fund option. So both options are roughly equivalent in terms of the total amount that got paid out to her throughout her retirement.
 
-        The difference between the two options is that at the end of her life, with the personal savings option, she ends up with over 8.1M to keep or give to whomstever she wishes, whereas with the pension option, she ends up with at most only the survivor beneifts that she elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
+        The difference between the two options is that at the end of her life, with the personal retirement fund option, she ends up with over 8.1M to keep or give to whomstever she wishes, whereas with the pension option, she ends up with at most only the survivor beneifts that she elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
 
-        My recommendation is that if your situation and assumptions are similar to Alice's, then saving for retirement on your own terms is better than the pension program.
+        My recommendation is that if your situation and assumptions are similar to Alice's, then saving for retirement on your own terms is of better value than the pension program.
     """)
 
 
-# A few case studies
 # Explain math
-# Improve plot
