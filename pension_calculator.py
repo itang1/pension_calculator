@@ -100,10 +100,10 @@ with st.form("retirement_form"):
             value=10.0,
             help="Percentage of your salary contributed to the pension system each year."
         ) / 100
-        retirement_allowance = st.number_input(
+        starting_allowance = st.number_input(
             "Annual Pension Allowance ($)",
             value=12 * 5871.52,
-            help="Estimate your annual pension payout. You can calculate yours using the RIS website pension calculator."
+            help="Estimate your annual pension payout in your first year of retirement, before COLA adjustments. You can calculate yours using the RIS website pension calculator."
         )
         index_returns_rate = st.number_input(
             "Index Returns Rate (%)",
@@ -133,6 +133,7 @@ if submitted:
     pension_redeemed = 0
     personal_retirement_fund = 0
     current_wage = starting_wage
+    current_allowance = starting_allowance
 
     # Tracking for visualization
     years = ["W0"]
@@ -156,12 +157,14 @@ if submitted:
 
     # Retirement phase
     for ret_year in range(1, retirement_years + 1):
-        pension_redeemed += retirement_allowance
-        personal_retirement_fund = (personal_retirement_fund - retirement_allowance) * index_returns_rate
+        pension_redeemed += current_allowance
+        personal_retirement_fund = (personal_retirement_fund - current_allowance) * index_returns_rate
 
         years.append(f"R{ret_year}")
         pension_fund_values.append(pension_redeemed)
         personal_fund_values.append(personal_retirement_fund)
+
+        current_allowance *= cola_increase
 
     # Plot
     fig = go.Figure()
@@ -248,4 +251,3 @@ with st.expander("Case Study A"):
 
 
 # Explain math
-# Adjust allowance for inflation
