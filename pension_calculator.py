@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from plotly import graph_objects as go
 
 
@@ -209,12 +210,26 @@ if submitted:
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # Results
+    # Results Section
     st.markdown("<h3 style='font-size: 24px;'>Summary</h3>", unsafe_allow_html=True)
-    st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
-    st.write(f"**Total Pension Redeemed:** ${pension_redeemed:,.0f}")
-    st.write(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}")
-    st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
+        st.write(f"**Total Pension Redeemed:** ${pension_redeemed:,.0f}")
+        st.write(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}")
+        st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
+
+    with col2:
+        st.markdown(f"""
+        The total amount you paid into the pension system through automatic deductions over the course of your working years.
+
+        The total amount you received from the fixed, predictable disbursements based on your retirement allowance throughout your retirement years.
+
+        The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.
+
+        The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.
+        """)
 
 st.write("---")
 
@@ -233,3 +248,4 @@ with st.expander("Case Study A"):
 
 
 # Explain math
+# Adjust allowance for inflation
