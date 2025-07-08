@@ -5,6 +5,8 @@ from plotly import graph_objects as go
 
 st.title("Pension vs. Personal Savings Calculator")
 
+st.divider()
+
 with st.expander("What This Calculator Does"):
     st.markdown("""
     This calculator helps you compare two different ways of saving for retirement:
@@ -48,6 +50,7 @@ with st.expander("What This Tool Is Not"):
 
 
 # Input form
+st.divider()
 with st.form("retirement_form"):
     st.header("Input variable assumptions")
     col1, col2, col3 = st.columns(3)
@@ -226,7 +229,7 @@ if submitted:
     )
 
     fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Year of Retirement",
-              annotation_position="top right")
+              annotation_position="right")
     tick_interval = max(pension_tax_paid, pension_redeemed, personal_retirement_fund)//10
     fig.update_yaxes(showgrid=True, dtick=tick_interval)
     fig.update_xaxes(showgrid=True)
@@ -235,57 +238,49 @@ if submitted:
 
     # Results Section
     st.markdown("<h3 style='font-size: 24px;'>Summary</h3>", unsafe_allow_html=True)
-    col1, col2 = st.columns([1, 2])
 
-    with col1:
-        st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
-        st.write(f"**Total Pension Redeemed:** ${pension_redeemed:,.0f}")
-        st.write(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}")
-        st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
+    st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
+    st.write("The total amount you paid into the pension system through automatic deductions over the course of your working years.")
 
-    with col2:
-        st.markdown(f"""
-        The total amount you paid into the pension system through automatic deductions over the course of your working years.
+    st.write(f"**Total Pension Redeemed:** ${pension_redeemed:,.0f}")
+    st.write("The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
 
-        The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.
+    st.write(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}")
+    st.write("The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
 
-        The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.
+    st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
+    st.write("The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
 
-        The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.
-        """)
+    # # Display the table
+    # yearly_df = pd.DataFrame(yearly_data)
+    # st.dataframe(yearly_df)
 
-    # Display the table
-    yearly_df = pd.DataFrame(yearly_data)
-    st.dataframe(yearly_df)
-
-
-st.write("---")
 
 # Explain math
+st.divider()
+st.header("How the Math Works")
 st.markdown(f"""
-    ### How the Math Works
-
     This calculator models the working years followed by the retirement years.
 
     **Working Years**
-    - **Salary progression:**
+    - **Salary progression**
       - Starts at the starting wage: `salary = ${starting_wage:,.0f}`
-      - Increases by the COLA every year:  `salary = salary × {(cola_increase):.2f}`
-      - Increases by the Step Raise in years 2–5: `salary = salary × {(step_increase):.2f}`
-      - Increases by the Promotion Raise at year(s) {promotion_years_input}): `salary = salary × {(promotion_increase):.2f}`
-    - **Pension contribution every year**:
+      - Increases by the COLA:  `salary = salary × {(cola_increase):.2f}`
+      - Increases by the Step Raise [Years 2-5 only]: `salary = salary × {(step_increase):.2f}`
+      - Increases by the Promotion Raise [Promotional years only]: `salary = salary × {(promotion_increase):.2f}`
+    - **Pension contribution**
         - The pension tax is: `contribution = salary ×  {pension_tax_rate:.1f}`
         - Pay the pension tax: `total_pension_tax_paid += contribution`
-    - **Hypothetical personal fund value every year**:
+    - **Hypothetical personal fund value**:
         - Increases with projected market returns: `personal_fund = personal_fund × {(index_returns_rate):.2f}`
         - Deposit the equivalent of the pension contribution: `personal_fund += contribution`
 
     **Retirement Years**
-    - **Pension disbursements every year**:
+    - **Pension disbursements**
         - Pension allowance starts at the starting allowance: `allowance = ${starting_allowance:,.0f}`
         - Increases by by the COLA increase each year: `allowance = allowance × {(cola_increase):.2f}`
         - Redeem the pension allowance: `total_pension_redeemed += allowance`
-    - **Hypothetical personal fund disbursements**:
+    - **Hypothetical personal fund disbursements**
       - Withdraw the equivalent of the pension allowance: `personal_fund = personal_fund - allowance`
       - The remainder of the fund increases with the projected market returns: `personal_fund = personal_fund × {index_returns_rate}`
 
@@ -293,7 +288,8 @@ st.markdown(f"""
     """)
 
 
-st.write("---")
+# Case Studies
+st.divider()
 st.header("Case Studies")
 
 with st.expander("Case Study A"):
@@ -308,7 +304,6 @@ with st.expander("Case Study A"):
     """)
 
 
-# Explain math
 # Get table to work
 # Fix requirements issue
 # Automatically submit form
