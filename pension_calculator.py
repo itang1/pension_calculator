@@ -112,6 +112,7 @@ with st.form("retirement_form"):
         ) / 100 + 1
 
     submitted = st.form_submit_button("Run Simulation")
+    # submitted = True
 
 
 # Results
@@ -139,8 +140,9 @@ if submitted:
     years = ["W0"]
     pension_fund_values = [0]
     personal_fund_values = [0]
+    yearly_data = []
 
-    # Work phase
+    # Work phase - Loop through the work years
     for work_year in range(1, int(work_years) + 1):
         pension_tax_paid += current_wage * pension_tax_rate
         personal_retirement_fund = (personal_retirement_fund * index_returns_rate) + current_wage * pension_tax_rate
@@ -149,13 +151,22 @@ if submitted:
         pension_fund_values.append(0)
         personal_fund_values.append(personal_retirement_fund)
 
+        # Store data for the table
+        yearly_data.append({
+            "Year": f"W{work_year}",
+            "Pension Tax Paid": f"${pension_tax_paid:,.0f}",
+            "Pension Redeemed": "$0",  # No pension redeemed during work years
+            "Personal Fund Value": f"${personal_retirement_fund:,.0f}"
+        })
+
+        # Update salary for next year
         current_wage *= cola_increase
         if 2 <= work_year <= 5:
             current_wage *= step_increase
         if work_year in promotion_years:
             current_wage *= promotion_increase
 
-    # Retirement phase
+    # Retirement phase - Loop through the retirement years
     for ret_year in range(1, retirement_years + 1):
         pension_redeemed += current_allowance
         personal_retirement_fund = (personal_retirement_fund - current_allowance) * index_returns_rate
@@ -164,6 +175,15 @@ if submitted:
         pension_fund_values.append(pension_redeemed)
         personal_fund_values.append(personal_retirement_fund)
 
+        # Store data for the table
+        yearly_data.append({
+            "Year": f"R{ret_year}",
+            "Pension Tax Paid": "$0",  # No pension tax paid during retirement years
+            "Pension Redeemed": f"${pension_redeemed:,.0f}",
+            "Personal Fund Value": f"${personal_retirement_fund:,.0f}"
+        })
+
+        # Update allowance for next year
         current_allowance *= cola_increase
 
     # Plot
@@ -206,7 +226,7 @@ if submitted:
     )
 
     fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Year of Retirement",
-              annotation_position="right")
+              annotation_position="top right")
     tick_interval = max(pension_tax_paid, pension_redeemed, personal_retirement_fund)//10
     fig.update_yaxes(showgrid=True, dtick=tick_interval)
     fig.update_xaxes(showgrid=True)
@@ -227,27 +247,68 @@ if submitted:
         st.markdown(f"""
         The total amount you paid into the pension system through automatic deductions over the course of your working years.
 
-        The total amount you received from the fixed, predictable disbursements based on your retirement allowance throughout your retirement years.
+        The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.
 
         The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.
 
         The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.
         """)
 
+    # Display the table
+    yearly_df = pd.DataFrame(yearly_data)
+    st.dataframe(yearly_df)
+
+
 st.write("---")
 
+# Explain math
+st.markdown(f"""
+    ### How the Math Works
+
+    This calculator models the working years followed by the retirement years.
+
+    **Working Years**
+    - **Salary progression:**
+      - Starts at the starting wage: `salary = ${starting_wage:,.0f}`
+      - Increases by the COLA every year:  `salary = salary × {(cola_increase):.2f}`
+      - Increases by the Step Raise in years 2–5: `salary = salary × {(step_increase):.2f}`
+      - Increases by the Promotion Raise at year(s) {promotion_years_input}): `salary = salary × {(promotion_increase):.2f}`
+    - **Pension contribution every year**:
+        - The pension tax is: `contribution = salary ×  {pension_tax_rate:.1f}`
+        - Pay the pension tax: `total_pension_tax_paid += contribution`
+    - **Hypothetical personal fund value every year**:
+        - Increases with projected market returns: `personal_fund = personal_fund × {(index_returns_rate):.2f}`
+        - Deposit the equivalent of the pension contribution: `personal_fund += contribution`
+
+    **Retirement Years**
+    - **Pension disbursements every year**:
+        - Pension allowance starts at the starting allowance: `allowance = ${starting_allowance:,.0f}`
+        - Increases by by the COLA increase each year: `allowance = allowance × {(cola_increase):.2f}`
+        - Redeem the pension allowance: `total_pension_redeemed += allowance`
+    - **Hypothetical personal fund disbursements**:
+      - Withdraw the equivalent of the pension allowance: `personal_fund = personal_fund - allowance`
+      - The remainder of the fund increases with the projected market returns: `personal_fund = personal_fund × {index_returns_rate}`
+
+    The sequence of steps above calculates the Total Pension Tax Paid, Total Pension Redeemed, Personal Fund Value at Retirement, and Personal Fund Value at Death.
+    """)
+
+
+st.write("---")
 st.header("Case Studies")
 
 with st.expander("Case Study A"):
     st.markdown("""
         Alice's starting annual wage is 120,000. She assumes a standard step increase of 5.50%, COLA of 3%, promotion increase of 10%, pension tax rate of 10%, and index returns rate of 7%. She receives a promotion in years 10 and 20. She works 30 years and lives for 30 years in retirement. Her annual pension allowance totals 70,458.24.
 
-        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal retirement fund option, she would have amassed a little over 2M in savings and investments. In her 30 years of retirement, she will have redeemed a bit over 2.1M in pension allowance. This is substantially greater than the 785k that she paid in pension tax, and a tad greater than the 2M she would have amassed through the personal fund option. So both options are roughly equivalent in terms of the total amount that got paid out to her throughout her retirement.
+        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal retirement fund option, she would have amassed a little over 2M in savings and investments. In her 30 years of retirement, she will have redeemed a bit over 3.35M in pension allowance. This amount is substantially greater than the 785k that she paid in pension tax, and greater than the 2M she would have amassed through the personal fund option at the time of retirement.
 
-        The difference between the two options is that at the end of her life, with the personal retirement fund option, she ends up with over 8.1M to keep or give to whomstever she wishes, whereas with the pension option, she ends up with at most only the survivor beneifts that she elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
+        The notable difference between the two options is that at the end of her life, with the personal retirement fund option, she ends up a lump sum worth over 5.5M to keep or give to whomstever she wishes, whereas with the pension option, she ends up with at most only the survivor beneift disbursements that she elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
 
         My recommendation is that if your situation and assumptions are similar to Alice's, then saving for retirement on your own terms is of better value than the pension program.
     """)
 
 
 # Explain math
+# Get table to work
+# Fix requirements issue
+# Automatically submit form
