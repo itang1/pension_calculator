@@ -143,7 +143,10 @@ if submitted:
     years = ["W0"]
     pension_fund_values = [0]
     personal_fund_values = [0]
-    yearly_data = []
+    yearly_data = pd.DataFrame({'Year': [],
+                                'Pension Tax Paid': [],
+                                'Pension Redeemed': [],
+                                'Personal Fund Value': []})
 
     # Work phase - Loop through the work years
     for work_year in range(1, int(work_years) + 1):
@@ -155,12 +158,13 @@ if submitted:
         personal_fund_values.append(personal_retirement_fund)
 
         # Store data for the table
-        yearly_data.append({
+        new_row = {
             "Year": f"W{work_year}",
             "Pension Tax Paid": f"${pension_tax_paid:,.0f}",
             "Pension Redeemed": "$0",  # No pension redeemed during work years
             "Personal Fund Value": f"${personal_retirement_fund:,.0f}"
-        })
+        }
+        yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
         # Update salary for next year
         current_wage *= cola_increase
@@ -179,12 +183,12 @@ if submitted:
         personal_fund_values.append(personal_retirement_fund)
 
         # Store data for the table
-        yearly_data.append({
-            "Year": f"R{ret_year}",
+        new_row = {"Year": f"R{ret_year}",
             "Pension Tax Paid": "$0",  # No pension tax paid during retirement years
             "Pension Redeemed": f"${pension_redeemed:,.0f}",
             "Personal Fund Value": f"${personal_retirement_fund:,.0f}"
-        })
+        }
+        yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
         # Update allowance for next year
         current_allowance *= cola_increase
@@ -237,7 +241,7 @@ if submitted:
     st.plotly_chart(fig, use_container_width=True)
 
     # Results Section
-    st.markdown("<h3 style='font-size: 24px;'>Summary</h3>", unsafe_allow_html=True)
+    st.markdown("**<h3 style='font-size: 20px;'>Summary</h3>**", unsafe_allow_html=True)
 
     st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
     st.write("The total amount you paid into the pension system through automatic deductions over the course of your working years.")
@@ -251,41 +255,40 @@ if submitted:
     st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
     st.write("The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
 
-    # # Display the table
-    # yearly_df = pd.DataFrame(yearly_data)
-    # st.dataframe(yearly_df)
+    # Display the table
+    with st.expander("Year Over Year Breakdown"):
+        st.write("Cumulative summation")
+        st.dataframe(yearly_data, hide_index=True)
 
+    # Explain math
+    with st.expander("How the Math Works"):
+        st.markdown(f"""
+            This calculator models the working years followed by the retirement years.
 
-# Explain math
-st.divider()
-st.header("How the Math Works")
-st.markdown(f"""
-    This calculator models the working years followed by the retirement years.
+            **Working Years**
+            - **Salary progression**
+              - Starts at the starting wage: `salary = ${starting_wage:,.0f}`
+              - Increases by the COLA:  `salary = salary × {(cola_increase):.2f}`
+              - Increases by the Step Raise [Years 2-5 only]: `salary = salary × {(step_increase):.2f}`
+              - Increases by the Promotion Raise [Promotional years only]: `salary = salary × {(promotion_increase):.2f}`
+            - **Pension contribution**
+                - The pension tax is: `contribution = salary ×  {pension_tax_rate:.1f}`
+                - Pay the pension tax: `total_pension_tax_paid += contribution`
+            - **Hypothetical personal fund value**:
+                - Increases with projected market returns: `personal_fund = personal_fund × {(index_returns_rate):.2f}`
+                - Deposit the equivalent of the pension contribution: `personal_fund += contribution`
 
-    **Working Years**
-    - **Salary progression**
-      - Starts at the starting wage: `salary = ${starting_wage:,.0f}`
-      - Increases by the COLA:  `salary = salary × {(cola_increase):.2f}`
-      - Increases by the Step Raise [Years 2-5 only]: `salary = salary × {(step_increase):.2f}`
-      - Increases by the Promotion Raise [Promotional years only]: `salary = salary × {(promotion_increase):.2f}`
-    - **Pension contribution**
-        - The pension tax is: `contribution = salary ×  {pension_tax_rate:.1f}`
-        - Pay the pension tax: `total_pension_tax_paid += contribution`
-    - **Hypothetical personal fund value**:
-        - Increases with projected market returns: `personal_fund = personal_fund × {(index_returns_rate):.2f}`
-        - Deposit the equivalent of the pension contribution: `personal_fund += contribution`
+            **Retirement Years**
+            - **Pension disbursements**
+                - Pension allowance starts at the starting allowance: `allowance = ${starting_allowance:,.0f}`
+                - Increases by by the COLA increase each year: `allowance = allowance × {(cola_increase):.2f}`
+                - Redeem the pension allowance: `total_pension_redeemed += allowance`
+            - **Hypothetical personal fund disbursements**
+              - Withdraw the equivalent of the pension allowance: `personal_fund = personal_fund - allowance`
+              - The remainder of the fund increases with the projected market returns: `personal_fund = personal_fund × {index_returns_rate}`
 
-    **Retirement Years**
-    - **Pension disbursements**
-        - Pension allowance starts at the starting allowance: `allowance = ${starting_allowance:,.0f}`
-        - Increases by by the COLA increase each year: `allowance = allowance × {(cola_increase):.2f}`
-        - Redeem the pension allowance: `total_pension_redeemed += allowance`
-    - **Hypothetical personal fund disbursements**
-      - Withdraw the equivalent of the pension allowance: `personal_fund = personal_fund - allowance`
-      - The remainder of the fund increases with the projected market returns: `personal_fund = personal_fund × {index_returns_rate}`
-
-    The sequence of steps above calculates the Total Pension Tax Paid, Total Pension Redeemed, Personal Fund Value at Retirement, and Personal Fund Value at Death.
-    """)
+            The sequence of steps above calculates the values computed in the Summary section.
+            """)
 
 
 # Case Studies
@@ -304,6 +307,5 @@ with st.expander("Case Study A"):
     """)
 
 
-# Get table to work
 # Fix requirements issue
 # Automatically submit form

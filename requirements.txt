@@ -1,3 +1,2 @@
 streamlit
 plotly
-plotly==4.14.3
