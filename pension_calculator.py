@@ -274,23 +274,11 @@ st.subheader("Year Over Year Breakdown")
 st.markdown("**Working Years**")
 working_df = yearly_data[["Year", "Pension Taxed - This Year", "Pension Taxed - Cumulative", "Personal Fund - Market Returns This Year", "Personal Fund - Cumulative"]]
 working_df = working_df[working_df['Year'].str.startswith('W')]
-working_df = working_df.rename(columns={
-    "Pension Taxed - This Year": "Pension Taxed<br>This Year",
-    "Pension Taxed - Cumulative": "Pension Taxed<br>Cumulative",
-    "Personal Fund - Market Returns This Year": "Personal Fund<br>Market Returns<br>This Year",
-    "Personal Fund - Cumulative": "Personal Fund<br>Market Returns<br>Cumulative"
-})
 st.dataframe(working_df, hide_index=True)
 
 st.markdown("**Retirement Years**")
 retirement_df = yearly_data[["Year", "Pension Redeemed - This Year", "Pension Redeemed - Cumulative", "Personal Fund - Market Returns This Year", "Personal Fund - Cumulative"]]
 retirement_df = retirement_df[retirement_df['Year'].str.startswith('R')]
-retirement_df = retirement_df.rename(columns={
-    "Pension Redeemed - This Year": "Pension Redeemed<br>This Year",
-    "Pension Redeemed - Cumulative": "Pension Redeemed<br>Cumulative",
-    "Personal Fund - Market Returns This Year": "Personal Fund<br>Market Returns<br>This Year",
-    "Personal Fund - Cumulative": "Personal Fund<br>Market Returns<br>Cumulative"
-})
 st.dataframe(retirement_df, hide_index=True)
 
 
