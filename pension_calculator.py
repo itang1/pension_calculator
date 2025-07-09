@@ -255,26 +255,21 @@ tick_interval = max(pension_tax_cumulative, pension_redeemed_cumulative, persona
 fig.update_yaxes(showgrid=True, dtick=tick_interval)
 fig.update_xaxes(showgrid=True)
 
-st.plotly_chart(fig, use_container_width=True)
 
-# Results Section
-st.divider()
-st.subheader("Summary")
+# Display Plot + Summary
+col1, col2 = st.columns(2)
 
-st.write(f"**Total Pension Tax Paid:** ${pension_tax_cumulative:,.0f}")
-st.write("The total amount you paid into the pension system through automatic deductions over the course of your working years.")
+with col1:
+    st.plotly_chart(fig, use_container_width=True)
+with col2:
+    st.subheader("Summary")
 
-st.write(f"**Total Pension Redeemed:** ${pension_redeemed_cumulative:,.0f}")
-st.write("The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
-
-st.write(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}")
-st.write("The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
-
-st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
-st.write("The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
+    st.markdown(f"**Total Pension Tax Paid:** ${pension_tax_cumulative:,.0f}", help="The total amount you paid into the pension system through automatic deductions over the course of your working years.")
+    st.markdown(f"**Total Pension Redeemed:** ${pension_redeemed_cumulative:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
+    st.markdown(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
+    st.markdown(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
 
 # Display the table
-st.divider()
 st.subheader("Year Over Year Breakdown")
 st.dataframe(yearly_data, hide_index=True)
 
