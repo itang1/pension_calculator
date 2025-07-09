@@ -57,18 +57,21 @@ with col1:
     step_increase = st.number_input(
         "Step Increase (%)",
         value=5.5,
+        min_value=0.,
+        step=0.1,
         help="Annual raise from step progression (e.g., moving up a salary scale)."
     ) / 100 + 1
     starting_wage = st.number_input(
         "Starting Annual Wage ($)",
         value=120000,
+        min_value=0,
+        step=500,
         help="Your initial salary the year you were hired."
     )
     work_years = st.number_input(
         "Years to Work",
         value=30,
         min_value=1,
-        max_value=60,
         step=1,
         help="Number of years you plan to work before retirement."
     )
@@ -76,6 +79,9 @@ with col2:
     cola_increase = st.number_input(
         "Cost of Living Adjustment (%)",
         value=3.0,
+        min_value=2.5,
+        max_value=5.5,
+        step=0.1,
         help="Annual salary adjustment announced each October, typically between 2–5%."
     ) / 100 + 1
     promotion_years_input = st.text_input(
@@ -95,21 +101,25 @@ with col3:
     promotion_increase = st.number_input(
         "Promotion Increase (%)",
         value=10.0,
+        step=1.,
         help="Salary bump when you receive a promotion."
     ) / 100 + 1
     pension_tax_rate = st.number_input(
         "Pension Tax Rate (%)",
         value=10.0,
+        step=1.,
         help="Percentage of your salary contributed to the pension system each year."
     ) / 100
     starting_allowance = st.number_input(
         "Annual Pension Allowance ($)",
         value=12 * 5871.52,
+        step=500.,
         help="Estimate your annual pension payout in your first year of retirement, before COLA adjustments. You can calculate yours using the RIS website pension calculator."
     )
     index_returns_rate = st.number_input(
         "Index Returns Rate (%)",
         value=7.0,
+        step=0.1,
         help="Annual return rate of your personal retirement investments (e.g., 403b)."
     ) / 100 + 1
 
@@ -226,7 +236,7 @@ fig.update_layout(
 )
 
 fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Year of Retirement",
-          annotation_position="right")
+          annotation_position="top right")
 tick_interval = max(pension_tax_paid, pension_redeemed, personal_retirement_fund)//10
 fig.update_yaxes(showgrid=True, dtick=tick_interval)
 fig.update_xaxes(showgrid=True)
@@ -234,7 +244,8 @@ fig.update_xaxes(showgrid=True)
 st.plotly_chart(fig, use_container_width=True)
 
 # Results Section
-st.markdown("**<h3 style='font-size: 20px;'>Summary</h3>**", unsafe_allow_html=True)
+st.divider()
+st.subheader("Summary")
 
 st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
 st.write("The total amount you paid into the pension system through automatic deductions over the course of your working years.")
@@ -249,39 +260,41 @@ st.write(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}")
 st.write("The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
 
 # Display the table
-with st.expander("Year Over Year Breakdown"):
-    st.write("Cumulative summation")
-    st.dataframe(yearly_data, hide_index=True)
+st.divider()
+st.subheader("Year Over Year Breakdown")
+st.write("**Cumulative summation**")
+st.dataframe(yearly_data, hide_index=True)
 
 # Explain math
-with st.expander("How the Math Works"):
-    st.markdown(f"""
-        This calculator models the working years followed by the retirement years.
+st.divider()
+st.subheader("How the Math Works")
+st.markdown(f"""
+    This calculator models the working years followed by the retirement years.
 
-        **Working Years**
-        - **Salary progression**
-          - Starts at the starting wage: `salary = ${starting_wage:,.0f}`
-          - Increases by the COLA:  `salary = salary × {(cola_increase):.2f}`
-          - Increases by the Step Raise [Years 2-5 only]: `salary = salary × {(step_increase):.2f}`
-          - Increases by the Promotion Raise [Promotional years only]: `salary = salary × {(promotion_increase):.2f}`
-        - **Pension contribution**
-            - The pension tax is: `contribution = salary ×  {pension_tax_rate:.1f}`
-            - Pay the pension tax: `total_pension_tax_paid += contribution`
-        - **Hypothetical personal fund value**:
-            - Increases with projected market returns: `personal_fund = personal_fund × {(index_returns_rate):.2f}`
-            - Deposit the equivalent of the pension contribution: `personal_fund += contribution`
+    **Working Years**
+    - **Salary progression**
+      - Starts at the starting wage: `salary = ${starting_wage:,.0f}`
+      - Increases by the COLA:  `salary = salary × {(cola_increase):.2f}`
+      - Increases by the Step Raise [Years 2-5 only]: `salary = salary × {(step_increase):.2f}`
+      - Increases by the Promotion Raise [Promotional years only]: `salary = salary × {(promotion_increase):.2f}`
+    - **Pension contribution**
+        - The pension tax is: `contribution = salary ×  {pension_tax_rate:.1f}`
+        - Pay the pension tax: `total_pension_tax_paid += contribution`
+    - **Hypothetical personal fund value**:
+        - Increases with projected market returns: `personal_fund = personal_fund × {(index_returns_rate):.2f}`
+        - Deposit the equivalent of the pension contribution: `personal_fund += contribution`
 
-        **Retirement Years**
-        - **Pension disbursements**
-            - Pension allowance starts at the starting allowance: `allowance = ${starting_allowance:,.0f}`
-            - Increases by by the COLA increase each year: `allowance = allowance × {(cola_increase):.2f}`
-            - Redeem the pension allowance: `total_pension_redeemed += allowance`
-        - **Hypothetical personal fund disbursements**
-          - Withdraw the equivalent of the pension allowance: `personal_fund = personal_fund - allowance`
-          - The remainder of the fund increases with the projected market returns: `personal_fund = personal_fund × {index_returns_rate}`
+    **Retirement Years**
+    - **Pension disbursements**
+        - Pension allowance starts at the starting allowance: `allowance = ${starting_allowance:,.0f}`
+        - Increases by by the COLA increase each year: `allowance = allowance × {(cola_increase):.2f}`
+        - Redeem the pension allowance: `total_pension_redeemed += allowance`
+    - **Hypothetical personal fund disbursements**
+      - Withdraw the equivalent of the pension allowance: `personal_fund = personal_fund - allowance`
+      - The remainder of the fund increases with the projected market returns: `personal_fund = personal_fund × {index_returns_rate}`
 
-        The sequence of steps above calculates the values computed in the Summary section.
-        """)
+    The sequence of steps above calculates the values computed in the Summary section.
+    """)
 
 
 # Case Studies
@@ -298,6 +311,3 @@ with st.expander("Case Study A"):
 
         My recommendation is that if your situation and assumptions are similar to Alice's, then saving for retirement on your own terms is of better value than the pension program.
     """)
-
-
-# Fix requirements issue
