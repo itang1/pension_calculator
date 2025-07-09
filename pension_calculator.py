@@ -136,8 +136,8 @@ except:
     promotion_years = []
 
 # Initialize variables
-pension_tax_paid = 0
-pension_redeemed = 0
+pension_tax_cumulative = 0
+pension_redeemed_cumulative = 0
 personal_retirement_fund = 0
 current_wage = starting_wage
 current_allowance = starting_allowance
@@ -147,14 +147,19 @@ years = ["W0"]
 pension_fund_values = [0]
 personal_fund_values = [0]
 yearly_data = pd.DataFrame({'Year': [],
-                            'Pension Tax Paid': [],
-                            'Pension Redeemed': [],
-                            'Personal Fund Value': []})
+                            'Pension Taxed - This Year': [],
+                            'Pension Taxed - Cumulative': [],
+                            'Pension Redeemed - This Year': [],
+                            'Pension Redeemed - Cumulative': [],
+                            'Personal Fund - Market Returns This Year': [],
+                            'Personal Fund - Cumulative': []})
 
 # Work phase - Loop through the work years
 for work_year in range(1, int(work_years) + 1):
-    pension_tax_paid += current_wage * pension_tax_rate
-    personal_retirement_fund = (personal_retirement_fund * index_returns_rate) + current_wage * pension_tax_rate
+    pension_tax_this_year = current_wage * pension_tax_rate
+    pension_tax_cumulative += pension_tax_this_year
+    market_returns = personal_retirement_fund * (index_returns_rate-1)
+    personal_retirement_fund = personal_retirement_fund + market_returns + pension_tax_this_year
 
     years.append(f"W{work_year}")
     pension_fund_values.append(0)
@@ -163,9 +168,12 @@ for work_year in range(1, int(work_years) + 1):
     # Store data for the table
     new_row = {
         "Year": f"W{work_year}",
-        "Pension Tax Paid": f"${pension_tax_paid:,.0f}",
-        "Pension Redeemed": "$0",  # No pension redeemed during work years
-        "Personal Fund Value": f"${personal_retirement_fund:,.0f}"
+        "Pension Taxed - This Year": f"${pension_tax_this_year:,.0f}",
+        "Pension Taxed - Cumulative": f"${pension_tax_cumulative:,.0f}",
+        "Pension Redeemed - This Year": "$0",  # No pension redeemed during work years
+        "Pension Redeemed - Cumulative": "$0",  # No pension redeemed during work years
+        "Personal Fund - Market Returns This Year": f"${market_returns:,.0f}",
+        "Personal Fund - Cumulative": f"${personal_retirement_fund:,.0f}"
     }
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
@@ -178,19 +186,25 @@ for work_year in range(1, int(work_years) + 1):
 
 # Retirement phase - Loop through the retirement years
 for ret_year in range(1, retirement_years + 1):
-    pension_redeemed += current_allowance
-    personal_retirement_fund = (personal_retirement_fund - current_allowance) * index_returns_rate
+    pension_redeemed_cumulative += current_allowance
+    personal_retirement_fund = personal_retirement_fund - current_allowance
+    market_returns = personal_retirement_fund * (index_returns_rate-1)
+    personal_retirement_fund = personal_retirement_fund + market_returns
 
     years.append(f"R{ret_year}")
-    pension_fund_values.append(pension_redeemed)
+    pension_fund_values.append(pension_redeemed_cumulative)
     personal_fund_values.append(personal_retirement_fund)
 
     # Store data for the table
     new_row = {"Year": f"R{ret_year}",
-        "Pension Tax Paid": "$0",  # No pension tax paid during retirement years
-        "Pension Redeemed": f"${pension_redeemed:,.0f}",
-        "Personal Fund Value": f"${personal_retirement_fund:,.0f}"
+        "Pension Taxed - This Year": "$0",  # No pension tax paid during retirement years
+        "Pension Taxed - Cumulative": "$0",  # No pension tax paid during retirement years
+        "Pension Redeemed - This Year": f"${current_allowance:,.0f}",
+        "Pension Redeemed - Cumulative": f"${pension_redeemed_cumulative:,.0f}",
+        "Personal Fund - Market Returns This Year": f"${market_returns:,.0f}",
+        "Personal Fund - Cumulative": f"${personal_retirement_fund:,.0f}"
     }
+
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
     # Update allowance for next year
@@ -237,7 +251,7 @@ fig.update_layout(
 
 fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Year of Retirement",
           annotation_position="top right")
-tick_interval = max(pension_tax_paid, pension_redeemed, personal_retirement_fund)//10
+tick_interval = max(pension_tax_cumulative, pension_redeemed_cumulative, personal_retirement_fund)//10
 fig.update_yaxes(showgrid=True, dtick=tick_interval)
 fig.update_xaxes(showgrid=True)
 
@@ -247,10 +261,10 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 st.subheader("Summary")
 
-st.write(f"**Total Pension Tax Paid:** ${pension_tax_paid:,.0f}")
+st.write(f"**Total Pension Tax Paid:** ${pension_tax_cumulative:,.0f}")
 st.write("The total amount you paid into the pension system through automatic deductions over the course of your working years.")
 
-st.write(f"**Total Pension Redeemed:** ${pension_redeemed:,.0f}")
+st.write(f"**Total Pension Redeemed:** ${pension_redeemed_cumulative:,.0f}")
 st.write("The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
 
 st.write(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}")
@@ -262,7 +276,6 @@ st.write("The remaining balance in your hypothetical personal retirement fund af
 # Display the table
 st.divider()
 st.subheader("Year Over Year Breakdown")
-st.write("**Cumulative summation**")
 st.dataframe(yearly_data, hide_index=True)
 
 # Explain math
