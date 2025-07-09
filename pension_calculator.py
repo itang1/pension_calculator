@@ -147,12 +147,12 @@ years = ["W0"]
 pension_fund_values = [0]
 personal_fund_values = [0]
 yearly_data = pd.DataFrame({'Year': [],
-                            'Pension Taxed - This Year': [],
-                            'Pension Taxed - Cumulative': [],
-                            'Pension Redeemed - This Year': [],
-                            'Pension Redeemed - Cumulative': [],
-                            'Personal Fund - Market Returns This Year': [],
-                            'Personal Fund - Cumulative': []})
+                            'Pension Taxed': [],
+                            'Pension Taxed Total': [],
+                            'Pension': [],
+                            'Pension Total': [],
+                            'Personal Fund Market Returns': [],
+                            'Personal Fund Total': []})
 
 # Work phase - Loop through the work years
 for work_year in range(1, int(work_years) + 1):
@@ -168,12 +168,12 @@ for work_year in range(1, int(work_years) + 1):
     # Store data for the table
     new_row = {
         "Year": f"W{work_year}",
-        "Pension Taxed - This Year": f"${pension_tax_this_year:,.0f}",
-        "Pension Taxed - Cumulative": f"${pension_tax_cumulative:,.0f}",
-        "Pension Redeemed - This Year": "$0",  # No pension redeemed during work years
-        "Pension Redeemed - Cumulative": "$0",  # No pension redeemed during work years
-        "Personal Fund - Market Returns This Year": f"${market_returns:,.0f}",
-        "Personal Fund - Cumulative": f"${personal_retirement_fund:,.0f}"
+        "Pension Taxed": f"${pension_tax_this_year:,.0f}",
+        "Pension Taxed Total": f"${pension_tax_cumulative:,.0f}",
+        "Pension": "$0",  # No pension redeemed during work years
+        "Pension Total": "$0",  # No pension redeemed during work years
+        "Personal Fund Market Returns": f"${market_returns:,.0f}",
+        "Personal Fund Total": f"${personal_retirement_fund:,.0f}"
     }
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
@@ -197,12 +197,12 @@ for ret_year in range(1, retirement_years + 1):
 
     # Store data for the table
     new_row = {"Year": f"R{ret_year}",
-        "Pension Taxed - This Year": "$0",  # No pension tax paid during retirement years
-        "Pension Taxed - Cumulative": "$0",  # No pension tax paid during retirement years
-        "Pension Redeemed - This Year": f"${current_allowance:,.0f}",
-        "Pension Redeemed - Cumulative": f"${pension_redeemed_cumulative:,.0f}",
-        "Personal Fund - Market Returns This Year": f"${market_returns:,.0f}",
-        "Personal Fund - Cumulative": f"${personal_retirement_fund:,.0f}"
+        "Pension Taxed": "$0",  # No pension tax paid during retirement years
+        "Pension Taxed Total": "$0",  # No pension tax paid during retirement years
+        "Pension": f"${current_allowance:,.0f}",
+        "Pension Total": f"${pension_redeemed_cumulative:,.0f}",
+        "Personal Fund Market Returns": f"${market_returns:,.0f}",
+        "Personal Fund Total": f"${personal_retirement_fund:,.0f}"
     }
 
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
@@ -272,12 +272,12 @@ st.subheader("Year Over Year Breakdown")
 
 
 st.markdown("**Working Years**")
-working_df = yearly_data[["Year", "Pension Taxed - This Year", "Pension Taxed - Cumulative", "Personal Fund - Market Returns This Year", "Personal Fund - Cumulative"]]
+working_df = yearly_data[["Year", "Pension Taxed", "Pension Taxed Total", "Personal Fund Market Returns", "Personal Fund Total"]]
 working_df = working_df[working_df['Year'].str.startswith('W')]
 st.dataframe(working_df, hide_index=True)
 
 st.markdown("**Retirement Years**")
-retirement_df = yearly_data[["Year", "Pension Redeemed - This Year", "Pension Redeemed - Cumulative", "Personal Fund - Market Returns This Year", "Personal Fund - Cumulative"]]
+retirement_df = yearly_data[["Year", "Pension", "Pension Total", "Personal Fund Market Returns", "Personal Fund Total"]]
 retirement_df = retirement_df[retirement_df['Year'].str.startswith('R')]
 st.dataframe(retirement_df, hide_index=True)
 
