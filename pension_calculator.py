@@ -188,8 +188,8 @@ for work_year in range(1, int(work_years) + 1):
 for ret_year in range(1, retirement_years + 1):
     pension_redeemed_cumulative += current_allowance
     personal_retirement_fund = personal_retirement_fund - current_allowance
-    market_returns = personal_retirement_fund * (index_returns_rate-1)
-    personal_retirement_fund = personal_retirement_fund + market_returns
+    market_returns = max(0, personal_retirement_fund * (index_returns_rate-1))
+    personal_retirement_fund = max(0, personal_retirement_fund + market_returns)
 
     years.append(f"R{ret_year}")
     pension_fund_values.append(pension_redeemed_cumulative)
