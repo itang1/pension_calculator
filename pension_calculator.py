@@ -169,7 +169,7 @@ for work_year in range(1, int(work_years) + 1):
     # Store data for the table
     new_row = {
         "Year": f"W{work_year}",
-        "Salary": current_wage,
+        "Salary": f"${current_wage:,.0f}",
         "Pension Taxed": f"${pension_tax_this_year:,.0f}",
         "Pension Taxed Total": f"${pension_tax_cumulative:,.0f}",
         "Withdraw Amt": "$0",  # No pension redeemed during work years
@@ -279,7 +279,7 @@ working_df = working_df[working_df['Year'].str.startswith('W')]
 st.dataframe(working_df, hide_index=True)
 
 st.markdown("**Retirement Years**")
-retirement_df = yearly_data[["Year", "Pension", "Withdrawn Total", "Personal Fund Market Returns", "Personal Fund Balance"]]
+retirement_df = yearly_data[["Year", "Withdraw Amt", "Withdrawn Total", "Personal Fund Market Returns", "Personal Fund Balance"]]
 retirement_df = retirement_df[retirement_df['Year'].str.startswith('R')]
 st.dataframe(retirement_df, hide_index=True)
 
