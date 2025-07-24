@@ -136,11 +136,11 @@ except:
     promotion_years = []
 
 # Initialize variables
-pension_tax_cumulative = 0
-pension_redeemed_cumulative = 0
-personal_retirement_fund = 0
-current_wage = starting_wage
-current_allowance = starting_allowance
+pension_taxed_total = 0
+pension_redeemed_total = 0
+personal_balance = 0
+salary = starting_wage
+pension_redeemed = starting_allowance
 
 # Tracking for visualization
 years = ["W0"]
@@ -157,60 +157,64 @@ yearly_data = pd.DataFrame({'Year': [],
 
 # Work phase - Loop through the work years
 for work_year in range(1, int(work_years) + 1):
-    pension_tax_this_year = current_wage * pension_tax_rate
-    pension_tax_cumulative += pension_tax_this_year
-    market_returns = personal_retirement_fund * (index_returns_rate-1)
-    personal_retirement_fund = personal_retirement_fund + market_returns + pension_tax_this_year
+    # Compute pension tax
+    pension_tax_this_year = salary * pension_tax_rate
+    pension_taxed_total += pension_tax_this_year
+
+    # Compute personal balance
+    market_returns = personal_balance * (index_returns_rate-1)
+    personal_balance = personal_balance + market_returns + pension_tax_this_year
 
     years.append(f"W{work_year}")
     pension_fund_values.append(0)
-    personal_fund_values.append(personal_retirement_fund)
+    personal_fund_values.append(personal_balance)
 
     # Store data for the table
     new_row = {
         "Year": f"W{work_year}",
-        "Salary": f"${current_wage:,.0f}",
+        "Salary": f"${salary:,.0f}",
         "Pension Taxed": f"${pension_tax_this_year:,.0f}",
-        "Pension Taxed Total": f"${pension_tax_cumulative:,.0f}",
+        "Pension Taxed Total": f"${pension_taxed_total:,.0f}",
         "Pension Redeemed": "$0",  # No pension redeemed during work years
         "Pension Redeemed Total": "$0",  # No pension redeemed during work years
         "Market Returns": f"${market_returns:,.0f}",
-        "Balance": f"${personal_retirement_fund:,.0f}"
+        "Balance": f"${personal_balance:,.0f}"
     }
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
     # Update salary for next year
-    current_wage *= cola_increase
+    salary *= cola_increase
     if 2 <= work_year <= 5:
-        current_wage *= step_increase
+        salary *= step_increase
     if work_year in promotion_years:
-        current_wage *= promotion_increase
+        salary *= promotion_increase
 
 # Retirement phase - Loop through the retirement years
 for ret_year in range(1, retirement_years + 1):
-    pension_redeemed_cumulative += current_allowance
-    personal_retirement_fund = personal_retirement_fund - current_allowance
-    market_returns = max(0, personal_retirement_fund * (index_returns_rate-1))
-    personal_retirement_fund = max(0, personal_retirement_fund + market_returns)
+    # Pension redemptions
+    pension_redeemed_total += pension_redeemed
+
+    # Personal fund
+    market_returns = personal_balance * (index_returns_rate-1)
+    personal_balance = personal_balance - pension_redeemed + market_returns
 
     years.append(f"R{ret_year}")
-    pension_fund_values.append(pension_redeemed_cumulative)
-    personal_fund_values.append(personal_retirement_fund)
+    pension_fund_values.append(pension_redeemed_total)
+    personal_fund_values.append(personal_balance)
 
     # Store data for the table
     new_row = {"Year": f"R{ret_year}",
         "Pension Taxed": "$0",  # No pension tax paid during retirement years
         "Pension Taxed Total": "$0",  # No pension tax paid during retirement years
-        "Pension Redeemed": f"${current_allowance:,.0f}",
-        "Pension Redeemed Total": f"${pension_redeemed_cumulative:,.0f}",
+        "Pension Redeemed": f"${pension_redeemed:,.0f}",
+        "Pension Redeemed Total": f"${pension_redeemed_total:,.0f}",
         "Market Returns": f"${market_returns:,.0f}",
-        "Balance": f"${personal_retirement_fund:,.0f}"
+        "Balance": f"${personal_balance:,.0f}"
     }
-
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
     # Update allowance for next year
-    current_allowance *= cola_increase
+    pension_redeemed *= cola_increase
 
 # Plot
 fig = go.Figure()
@@ -253,7 +257,7 @@ fig.update_layout(
 
 fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Year of Retirement",
           annotation_position="top right")
-tick_interval = max(pension_tax_cumulative, pension_redeemed_cumulative, personal_retirement_fund)//10
+tick_interval = max(pension_taxed_total, pension_redeemed_total, personal_balance)//10
 fig.update_yaxes(showgrid=True, dtick=tick_interval)
 fig.update_xaxes(showgrid=True)
 
@@ -263,94 +267,87 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 st.subheader("Summary")
 
-st.markdown(f"**Total Pension Tax Paid:** ${pension_tax_cumulative:,.0f}", help="The total amount you paid into the pension system through automatic deductions over the course of your working years.")
-st.markdown(f"**Total Pension Pension Redeemed:** ${pension_redeemed_cumulative:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
+st.markdown(f"**Total Pension Tax Paid:** ${pension_taxed_total:,.0f}", help="The total amount you paid into the pension system through automatic deductions over the course of your working years.")
+st.markdown(f"**Total Pension Pension Redeemed:** ${pension_redeemed_total:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
 st.markdown(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
-st.markdown(f"**Personal Fund Value at Death:** ${personal_retirement_fund:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
+st.markdown(f"**Personal Fund Value at Death:** ${personal_balance:,.0f}", help="The remaining personal_balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
 
 # Display the table
 st.divider()
 st.subheader("Year Over Year Breakdown")
 
 
-st.markdown("**Working Years**")
+st.markdown("#### Working Years")
 
+# Explanations
 col1, col2 = st.columns(2)
-
 with col1:
     st.markdown("**Pension Taxings**")
-    st.write(f"Salary = Previous year's salary × {cola_increase:,.2f} COLA. Plus consideration for the step increase and promotion estimates set above")
-    st.write(f"Pension Taxed = Salary × {pension_tax_rate}")
-    st.write(f"Pension Taxed Total = Total from the previous year + Pension Taxed this year")
 
+    st.markdown(f"""
+        - `Salary = Previous year's salary × {cola_increase:,.2f} COLA`
+            - Also adjusts for Step Increase of {(step_increase):.2f} [Years 2-5] and Promotion of {(promotion_increase):.2f} [Years {str(promotion_years).strip("[]")}]
+        - `Pension Taxed = Salary × {pension_tax_rate}`
+        - `Pension Taxed Total = Total from the previous year + Pension Taxed this year`
+        """)
+
+with col2:
+    st.markdown("**Hypothetical Personal Fund**")
+    st.markdown(f"""
+        - `Deposit = same amount as Pension Taxed`
+        - `Market Returns = Previous year's personal_balance × {(index_returns_rate - 1):,.2f}`
+        - `Balance = Previous year's personal_balance + Deposit + Market Returns`
+        """)
+    
+
+
+# Tables
+col1, col2 = st.columns(2)
+with col1:
     working_pension_df = yearly_data[["Year", "Salary", "Pension Taxed", "Pension Taxed Total"]]
     working_pension_df = working_pension_df[working_pension_df['Year'].str.startswith('W')]
     st.dataframe(working_pension_df, hide_index=True)
 
 with col2:
-    st.markdown("**Hypothetical Personal Fund**")
-    st.write(f"Deposit = same amount as Pension Taxed")
-    st.write(f"Market Returns = Previous year's balance × {(index_returns_rate - 1):,.2f}")
-    st.write("Balance = Previous year's balance + Deposit + Market Returns")
     working_personal_df = yearly_data[["Year", "Pension Taxed", "Market Returns", "Balance"]]
     working_personal_df = working_personal_df.rename(columns={"Pension Taxed": "Deposit"})
     working_personal_df = working_personal_df[working_personal_df['Year'].str.startswith('W')]
     st.dataframe(working_personal_df, hide_index=True)
     
 
-st.markdown("**Retirement Years**")
+st.markdown("#### Retirement Years")
 
+# Explanations
 col1, col2 = st.columns(2)
-
 with col1:
     st.markdown("**Pension Redemptions**")
-    st.write(f"Pension Redeemed = Previous year's redemption allowance × {cola_increase:,.2f} COLA")
-    st.write("Pension Redeemed Total = Previous year's total + Pension Redeemed")
+    st.markdown(f"""
+    - `Pension Redeemed = Previous year's redemption allowance × {(cola_increase):.2f} COLA`
+    - `Pension Redeemed Total = Previous year's total + Pension Redeemed`
+    """)
+
+with col2:
+    st.markdown("**Hypothetical Personal Fund**")
+    st.markdown(f"""
+    - `Withdrawn = same as Pension Redeemed`
+    - `Market Returns = Previous year's Balance × {(index_returns_rate - 1):,.2f}`
+    - `Balance = Previous year's personal_balance - Withdrawn + Market Returns`
+    """)
+
+
+
+# Tables
+col1, col2 = st.columns(2)
+with col1:
     retirement_pension_df = yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]]
     retirement_pension_df = retirement_pension_df[retirement_pension_df['Year'].str.startswith('R')]
     st.dataframe(retirement_pension_df, hide_index=True)
 
 with col2:
-    st.markdown("**Hypothetical Personal Fund**")
-    st.write("Withdrawn = same as Pension Redeemed")
-    st.write(f"Market Returns = Previous year's Balance × {(index_returns_rate - 1):,.2f}")
-    st.write("Balance = Previous year's balance - Withdrawn + Market Returns")
     retirement_personal_df = yearly_data[["Year", "Pension Redeemed", "Market Returns", "Balance"]]
     retirement_personal_df = retirement_personal_df.rename(columns={"Pension Redeemed": "Withdrawn"})
     retirement_personal_df = retirement_personal_df[retirement_personal_df['Year'].str.startswith('R')]
     st.dataframe(retirement_personal_df, hide_index=True)
-
-
-# Explain math
-st.divider()
-st.subheader("How the Math Works")
-st.markdown(f"""
-    This calculator models the working years followed by the retirement years.
-
-    **Working Years**
-    - **Salary progression**
-      - Starts at the starting wage: `salary = ${starting_wage:,.0f}`
-      - Increases by the COLA:  `salary = salary × {(cola_increase):.2f}`
-      - Increases by the Step Raise [Years 2-5 only]: `salary = salary × {(step_increase):.2f}`
-      - Increases by the Promotion Raise [Promotional years only]: `salary = salary × {(promotion_increase):.2f}`
-    - **Pension contribution**
-        - The pension tax is: `contribution = salary ×  {pension_tax_rate:.1f}`
-        - Pay the pension tax: `total_pension_tax_paid += contribution`
-    - **Hypothetical personal fund value**:
-        - Increases with projected market returns: `personal_fund = personal_fund × {(index_returns_rate):.2f}`
-        - Deposit the equivalent of the pension contribution: `personal_fund += contribution`
-
-    **Retirement Years**
-    - **Pension disbursements**
-        - Pension allowance starts at the starting allowance: `allowance = ${starting_allowance:,.0f}`
-        - Increases by by the COLA increase each year: `allowance = allowance × {(cola_increase):.2f}`
-        - Redeem the pension allowance: `total_pension_redeemed += allowance`
-    - **Hypothetical personal fund disbursements**
-      - Withdraw the equivalent of the pension allowance: `personal_fund = personal_fund - allowance`
-      - The remainder of the fund increases with the projected market returns: `personal_fund = personal_fund × {index_returns_rate}`
-
-    The sequence of steps above calculates the values computed in the Summary section.
-    """)
 
 
 # Case Studies
