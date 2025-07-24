@@ -123,7 +123,7 @@ with col3:
         help="Annual return rate of your personal retirement investments (e.g., 403b)."
     ) / 100 + 1
 
-
+st.write("We also assume that deposits and withdrawals are made at the end of the year, thus not affecting the market returns of the present year.")
 
 # Results
 st.divider()
