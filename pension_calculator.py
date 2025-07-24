@@ -276,7 +276,6 @@ st.markdown(f"**Personal Fund Value at Death:** ${personal_balance:,.0f}", help=
 st.divider()
 st.subheader("Year Over Year Breakdown")
 
-
 st.markdown("#### Working Years")
 
 # Explanations
@@ -286,7 +285,8 @@ with col1:
 
     st.markdown(f"""
         - `Salary = Previous year's salary × {cola_increase:,.2f} COLA`
-            - Also adjusts for Step Increase of {(step_increase):.2f} [Years 2-5] and Promotion of {(promotion_increase):.2f} [Years {str(promotion_years).strip("[]")}]
+            - Years 2-5: Additional  `Salary *= {(step_increase):.2f} Step Increase`
+            - Years {str(promotion_years).strip("[]")}: Additional `Salary *= {(promotion_increase):.2f} Promotion Increase`
         - `Pension Taxed = Salary × {pension_tax_rate}`
         - `Pension Taxed Total = Total from the previous year + Pension Taxed this year`
         """)
@@ -358,9 +358,9 @@ with st.expander("Case Study A"):
     st.markdown("""
         Alice's starting annual wage is 120,000. She assumes a standard step increase of 5.50%, COLA of 3%, promotion increase of 10%, pension tax rate of 10%, and index returns rate of 7%. She receives a promotion in years 10 and 20. She works 30 years and lives for 30 years in retirement. Her annual pension allowance totals 70,458.24.
 
-        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal retirement fund option, she would have amassed a little over 2M in savings and investments. In her 30 years of retirement, she will have redeemed a bit over 3.35M in pension allowance. This amount is substantially greater than the 785k that she paid in pension tax, and greater than the 2M she would have amassed through the personal fund option at the time of retirement.
+        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal retirement fund, she would have amassed over 2.02M in savings and investments. In her 30 years of retirement before she dies, she will have redeemed over 3.35M in pension allowance. This amount is substantially greater than the 785k that she paid in pension tax, and greater than the 2.02M she would have amassed through the personal fund option at the time of retirement.
 
-        The notable difference between the two options is that at the end of her life, with the personal retirement fund option, she ends up a lump sum worth over 5.5M to keep or give to whomstever she wishes, whereas with the pension option, she ends up with at most only the survivor beneift disbursements that she elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
+        The notable difference between the two options is that at the end of her life, with the personal retirement fund option, she ends up a lump sum worth over 6.28M to keep or donate to whomstever she wishes; whereas with the pension option, she ends up with at most only the survivor beneift disbursements that she had elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
 
-        My recommendation is that if your situation and assumptions are similar to Alice's, then saving for retirement on your own terms is of better value than the pension program.
+        My recommendation is that if your situation and assumptions are similar to Alice's, and if you are ever given the opportunity to choose between the two, then saving for retirement on your own terms is of better value than the pension program.
     """)
