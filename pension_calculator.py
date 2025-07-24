@@ -184,7 +184,7 @@ for work_year in range(1, int(work_years) + 1):
 
     # Update salary for next year
     salary *= cola_increase
-    if 2 <= work_year <= 5:
+    if 1 <= work_year < 5:
         salary *= step_increase
     if work_year in promotion_years:
         salary *= promotion_increase
