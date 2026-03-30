@@ -3,87 +3,92 @@ import pandas as pd
 from plotly import graph_objects as go
 
 
-st.title("Pension vs. Personal Savings Calculator")
+st.title("Is Your Pension Worth It?")
 
 st.markdown("""
-This calculator helps you compare two different ways of saving for retirement. Many public employees — teachers, law enforcement officers, civil servants — are required to contribute a portion of every paycheck into a pension plan. The question this tool tries to answer is simple: **what if you had kept that money and invested it yourself instead?**
+Many public employees — teachers, law enforcement officers, civil servants — are required to contribute a portion of every paycheck into a pension plan, with no say in the matter. But is the pension actually worth it? **What if you had instead kept that money and invested it yourself?**
 """)
+
+st.markdown("This calculator compares two options side by side:")
 
 col_a, col_b = st.columns(2)
 with col_a:
     st.info("""
-**Traditional Pension**
+**Option A: Traditional Pension**
 
-Each year, a fixed percentage of your paycheck (e.g. 10%) is automatically deducted and paid into the pension system. You don't control this money or decide how it's invested. In exchange, when you retire, the pension pays you a guaranteed fixed amount every year for the rest of your life — no matter how long you live or how the stock market performs.
+Each year, a fixed percentage of your paycheck is automatically deducted and paid into the pension system. You don't control this money or decide how it's invested. In exchange, when you retire, the pension pays you a guaranteed fixed amount every year for the rest of your life — no matter how long you live or how the stock market performs.
 """)
 with col_b:
     st.info("""
-**Hypothetical Personal Retirement Account**
+**Option B: Personal Retirement Account**
 
-This calculator asks: what if, instead of contributing to the pension, you had deposited that same amount each year into your own investment account (like a 403(b) or 457(b))? Your money would grow over time through market returns. After retiring, you would withdraw the same annual amount as your pension allowance would have been — and whatever is left over keeps growing.
+What if, instead of contributing to the pension, you deposited that same amount each year into your own investment account? Your money would grow over time through market returns, and you'd own it outright. After retiring, you withdraw the same annual amount as your pension would have paid — and whatever is left over stays in your account and keeps growing.
 """)
 
 st.markdown("""
-By running both scenarios side by side with the same inputs, you can see which approach might leave you better off — and under what conditions.
+By running both scenarios with the same inputs — your salary, contribution rate, investment return, and retirement timeline — you can see which option comes out ahead, and by how much.
 """)
 
-st.divider()
+st.markdown("""
+---
+**What's on this page:**
 
-with st.expander("Background: Why This Calculator Exists"):
+1. **Background & context** — the pension debate, and what this calculator does and doesn't model *(expandable sections below)*
+2. **Input assumptions** — enter your salary, career details, and retirement estimates
+3. **Simulation results** — a side-by-side chart and numeric summary comparing both options
+4. **Year over year breakdown** — detailed tables showing how every number was calculated, year by year
+5. **Case studies** — three worked examples illustrating when each option wins
+---
+""")
+
+with st.expander("The Pension Debate: Arguments For, Against, and Why It Depends"):
     st.markdown("""
-    ### The Question Behind This Tool
+### The Case Against Pensions
 
-    If you work in the public sector, you probably didn't choose to participate in a pension — it was mandatory. A fixed slice of every paycheck has gone into the pension system, whether you thought it was a good deal or not. And at some point, you might have asked yourself: *is this actually worth it? Would I have been better off just investing that money myself?*
+Pension systems were designed for a different era — one where people worked a single job for 30 years, life expectancy was shorter, and personal investing was difficult and expensive. Today, those conditions largely no longer hold.
 
-    That question is harder to answer than it sounds. The pension provides something genuinely valuable: a guaranteed income that lasts as long as you do, regardless of market conditions. But the money you put in is gone — you can't pass it on, you can't access it early, and you have no control over it. Meanwhile, a personal investment account gives you full ownership. If your investments do well, you can end up with far more. If you die early, your heirs inherit the balance. But if your investments underperform, or you live longer than expected, you could run short.
+Critics argue that pensions are financially unsustainable. Many public pension funds are underfunded, meaning they owe more in future benefits than they currently hold in assets. When that gap widens, taxpayers bear the cost. Critics also point to structural flaws: pensions disproportionately reward employees who stay for decades, while those who leave before vesting — sometimes after 5 or 10 years — walk away with nothing or very little. In a workforce where job-hopping is common, that's a serious penalty for mobility.
 
-    This tool was built to take some of the guesswork out of that comparison. By plugging in your own salary, contribution rate, expected investment return, and retirement timeline, you can see a data-driven side-by-side estimate of how the two paths compare for your specific situation.
+There's also the matter of control. Pension contributions are gone the moment they leave your paycheck. You can't invest them, access them early in an emergency, or pass them to your family if you die before retirement. A personal investment account, by contrast, is your money — it grows on your terms, you can leave it to heirs, and you're not dependent on a government agency to remain solvent for the next 30 years.
 
-    ---
+### The Case For Pensions
 
-    ### What the Research and Debate Says
+On the other side, defenders of pensions make a compelling argument: guaranteed income for life is genuinely hard to replicate on your own. A pension pays no matter how long you live, regardless of whether the market crashes the year you retire. A personal investment account has no such guarantee. If your investments perform poorly — or if you simply live longer than expected — you can run out of money.
 
-    Pension systems were designed for a different era. When life expectancy was shorter and most people stayed in the same job for decades, a defined-benefit pension made enormous sense. Today, with people living longer, changing jobs more frequently, and having access to low-cost index funds, the calculus is less clear.
+Pensions also provide a kind of collective insurance. When a large pool of workers all contribute together, those who live longest are effectively subsidized by those who don't. An individual investor can't access this "mortality pooling" in a personal account.
 
-    Critics of pensions argue that they are financially unsustainable — many public pension funds are underfunded, meaning they owe more in future benefits than they currently hold in assets. Taxpayers ultimately bear the risk of covering those gaps. Critics also argue that the pension structure disproportionately rewards long-tenured employees at the expense of those who leave before vesting, and that the lack of portability is a serious drawback in a world where people change careers.
+Defenders also note that many public sector jobs pay less than their private sector equivalents. The pension is often part of the total compensation package that makes those jobs attractive — remove it, and you'd need to raise salaries to compensate.
 
-    Defenders of pensions counter that guaranteed income in retirement is a powerful protection against poverty — especially for workers who might not otherwise save enough, or who lack the financial knowledge to manage their own investments. They also note that public sector workers often earn less than their private sector counterparts, and the pension is part of how that gap is compensated.
+### The Honest Answer
 
-    Both sides have a point. The honest answer is: *it depends.* It depends on how long you work, how long you live, what the market does, and what you value.
+Both sides have a point, and the research reflects that. Whether a pension is "worth it" for a given individual depends on a web of factors: how long you work and whether you vest fully, how the market performs over your career, how long you live in retirement, whether you have heirs you want to provide for, and how much you value certainty versus upside potential.
 
-    ---
+This calculator doesn't resolve that debate — it just makes the comparison concrete and transparent. Plug in your own numbers and see for yourself.
+""")
 
-    ### What This Calculator Does Not Account For — And Why It Matters
-
-    One important factor this tool simplifies is **taxes**. In reality, pension contributions come out of your paycheck before taxes are applied — meaning you don't pay income tax on that money now (you pay later, when you receive your pension payments in retirement). This is a meaningful benefit.
-
-    By contrast, if you tried to save that same amount yourself in a taxable brokerage account, you'd be investing after-tax dollars — money you've already paid income tax on. That puts the personal savings scenario at a disadvantage that this calculator does not model.
-
-    However, there is an important counterpoint: many public employees have access to a **457(b) deferred compensation plan**, which is a tax-advantaged retirement account with its own separate contribution limit (currently $24,500/year as of 2026, and separate from your pension). If you are already maxing out your 457(b), then the pension contribution is genuinely competing with after-tax savings — because there is no additional tax-sheltered space to redirect it. In that scenario, the tax advantage of the pension becomes more significant.
-
-    If you are *not* maxing out your 457(b), the comparison is more nuanced: you could theoretically redirect the pension contribution into your 457(b) and still enjoy pre-tax treatment, which would make the personal fund scenario more competitive than this calculator suggests.
-
-    **Bottom line on taxes:** This calculator treats both options as if taxes don't exist. In practice, the pension has a tax advantage — but how much that matters depends on your individual situation, whether you're already maxing your 457(b), and what tax bracket you're in during retirement. This is one of the reasons this tool is a starting point, not a final answer.
-    """)
-
-with st.expander("Limitations of This Tool"):
+with st.expander("Limitations & Assumptions"):
     st.markdown("""
-    This calculator is intended as an educational and exploratory tool. It is not a comprehensive actuarial model, nor does it account for all variables involved in retirement planning. Specifically:
+This calculator is an educational tool, not a comprehensive financial model. Several important factors are simplified or omitted:
 
-    - **No tax modeling.** Pension contributions are pre-tax; personal savings may be post-tax depending on your situation. See the background essay above for details.
-    - **No market volatility.** The calculator assumes a fixed annual return every year. Real markets go up and down, and a bad sequence of returns early in retirement can have an outsized negative effect on a personal fund — even if the long-run average is the same.
-    - **No mortality risk pooling.** Pensions are designed so that people who live longer effectively subsidize people who don't. If you live well past average life expectancy, the pension becomes an especially good deal — and vice versa.
-    - **No spousal, survivor, or disability benefits.** Most pension systems offer options like survivor benefits for a spouse or payments in the event of disability. These are real forms of insurance value that are not modeled here.
-    - **No employer matching.** Some personal retirement accounts include employer contributions. This calculator only models the employee contribution side.
-    - **Fixed contribution patterns.** The calculator assumes you contribute steadily every year and withdraw a set amount in retirement. Real behavior varies.
+**Tax treatment.** This calculator assumes the personal savings option has the same pre-tax advantages as the pension — meaning contributions reduce your taxable income now, and you pay taxes later. In practice, this assumption holds best for someone who has available space in a 457(b) plan: a 457(b) accepts pre-tax contributions with its own contribution limit separate from your pension. If you aren't yet maxing out your 457(b), redirecting pension-equivalent contributions there would give you the same pre-tax treatment modeled here. If you have no tax-advantaged space available, the personal savings option would be at a disadvantage not captured by this calculator.
 
-    This tool is meant to support transparent, data-informed comparisons. Real-world retirement decisions should involve a licensed financial planner who can account for your full situation.
-    """)
+**No market volatility.** The calculator uses a fixed annual return every year. Real markets fluctuate, and a string of bad years early in retirement can be far more damaging than the average return would suggest — a phenomenon called "sequence of returns risk."
+
+**No mortality risk pooling.** Because everyone in a pension pool contributes together, those who live longer are subsidized by those who don't. An individual account can't replicate this, which means the pension becomes especially valuable for people who live well past average life expectancy.
+
+**No spousal, survivor, or disability benefits.** Pensions often include options for survivor payments to a spouse, or benefits in the event of disability. These are real forms of insurance value not modeled here.
+
+**No employer contributions.** Some personal retirement accounts include employer matching. This calculator only models the employee contribution side.
+
+**Fixed contribution and withdrawal patterns.** Contributions are assumed to be steady throughout your career, and withdrawals are assumed to start at a fixed amount (growing with COLA). Real behavior varies.
+
+*Real-world retirement decisions should involve a licensed financial planner who can account for your full situation.*
+""")
 
 
 # Input form
 st.divider()
-st.header("Input variable assumptions")
+st.header("Input Assumptions")
 col1, col2, col3 = st.columns(3)
 with col1:
     step_increase = st.number_input(
@@ -223,8 +228,8 @@ for work_year in range(1, int(work_years) + 1):
         "Salary": f"${effective_salary:,.0f}",
         "Pension Contribution": f"${pension_contribution_this_year:,.0f}",
         "Pension Contribution Total": f"${pension_contribution_total:,.0f}",
-        "Pension Redeemed": "$0",  # No pension redeemed during work years
-        "Pension Redeemed Total": "$0",  # No pension redeemed during work years
+        "Pension Redeemed": "$0",
+        "Pension Redeemed Total": "$0",
         "Market Returns": f"${market_returns:,.0f}",
         "Balance": f"${personal_balance:,.0f}"
     }
@@ -252,8 +257,8 @@ for ret_year in range(1, retirement_years + 1):
 
     # Store data for the table
     new_row = {"Year": f"R{ret_year}",
-        "Pension Contribution": "$0",  # No pension contribution paid during retirement years
-        "Pension Contribution Total": "$0",  # No pension contribution paid during retirement years
+        "Pension Contribution": "$0",
+        "Pension Contribution Total": "$0",
         "Pension Redeemed": f"${pension_redeemed:,.0f}",
         "Pension Redeemed Total": f"${pension_redeemed_total:,.0f}",
         "Market Returns": f"${market_returns:,.0f}",
@@ -266,13 +271,20 @@ for ret_year in range(1, retirement_years + 1):
 
 # Chart explanation
 st.markdown("""
-The chart below shows how both options — the **pension** and the **personal retirement fund** — compare over your entire career and retirement.
+The chart below tracks both options across your full career and retirement.
 
-- The **green line** shows the value of your hypothetical personal retirement fund. During your working years, it grows as you make annual contributions and earn investment returns. During retirement, you withdraw from it each year to cover living expenses. The line will rise or fall depending on whether your investment returns outpace your withdrawals.
-- The **blue line** shows the total amount of money you've received from your pension. It's zero during your working years (the pension hasn't paid out yet), then rises steadily once you retire as you collect your annual allowance.
-- The **red dashed line** marks the year you retire — where your working years end and your retirement years begin.
+**What each line represents:**
+- The **green line** is the balance of your hypothetical personal retirement fund. Before retirement, it grows as you make contributions and earn investment returns. After retirement, you withdraw from it each year — the same amount as your pension would have paid — and the balance either keeps growing or gradually shrinks depending on your returns vs. withdrawal rate.
+- The **blue line** is the cumulative total you've received from the pension — the sum of all annual payments so far. It's zero during working years, then rises steadily once retirement begins.
+- The **red dashed line** marks the moment retirement begins.
 
-**How to read this chart:** Before the red line, watch the green line climb — that's your personal fund growing. After the red line, the blue line starts rising (your pension paying out), and the green line either keeps growing or starts declining depending on how well your investments do. The higher the green line is at the end, the more money is left over in your personal fund.
+**How to tell who's winning:**
+- **Pension is the better deal** when the blue line climbs above the green line — meaning the total income received from the pension has surpassed whatever remains in the personal fund. If the green line drops to zero, the personal fund ran out of money entirely.
+- **Personal fund is the better deal** when the green line stays higher than the blue line throughout retirement, and especially if it's still growing. This means your investments outpaced your withdrawals — you got the same retirement income *and* still have money left over.
+
+**What you leave behind:**
+- With the **personal fund**, the value shown on the green line at the very end of the chart is money you still own. You could leave it to heirs, spend it, or donate it.
+- With the **pension**, payments stop when you die. Your pension may include a *survivor benefit* — a reduced annual payment to a spouse or dependent after your death — but that is elected at retirement and typically reduces your annual allowance. This calculator does not model survivor benefits.
 """)
 
 # Plot
@@ -331,55 +343,58 @@ st.subheader("Summary")
 st.markdown(f"**Total Pension Contributions:** ${pension_contribution_total:,.0f}", help="The total amount automatically deducted from your paychecks and contributed to the pension system over the course of your working years.")
 st.markdown(f"**Total Pension Received:** ${pension_redeemed_total:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
 st.markdown(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
-st.markdown(f"**Personal Fund Value at End of Retirement:** ${personal_balance:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you've withdrawn your annual allowance for each year of retirement.")
+st.markdown(f"**Personal Fund Value at End of Retirement:** ${personal_balance:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you've withdrawn your annual allowance for each year of retirement. This is money you'd still own — it could be left to heirs or used however you choose.")
 
 # Display the table
 st.divider()
 st.subheader("Year Over Year Breakdown")
 
 st.markdown("""
-The tables below walk through every year of your career and retirement, showing exactly where the numbers come from. Each row is one year. The left table tracks the **pension side**, and the right table tracks the **personal retirement fund side** — using the same contribution amounts so the comparison is apples-to-apples.
+The tables below walk through every year of your career and retirement, showing exactly where the numbers come from. Each row is one year. The left table tracks the **pension side**, and the right table tracks the **personal retirement fund side** — using the same dollar amounts contributed each year so the comparison is apples-to-apples.
 """)
 
 st.markdown("#### Working Years")
 
 st.markdown("""
-During your working years, a fixed percentage of your salary is contributed each year — either into the pension system, or (hypothetically) into your own personal investment account. Your salary grows each year from Cost of Living Adjustments (COLA), step increases, and any promotions you receive.
+During your working years, a fixed percentage of your salary is contributed annually — either into the pension system, or (hypothetically) into your own personal investment account. Your salary grows each year from Cost of Living Adjustments (COLA), step increases, and any promotions.
 """)
 
 # Explanations
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("**Pension Contributions**")
+    st.markdown("**Pension Side**")
     st.markdown(f"""
-Each year, {pension_contribution_rate*100:.0f}% of your salary is automatically contributed to the pension system. You don't get to keep or invest this money — it goes into the pension pool.
+Each year, {pension_contribution_rate*100:.0f}% of your salary is deducted and paid into the pension. The **Contribution** column shows that deduction. The **Total Contributed** column is a running sum of all contributions to date.
 
-- **Salary** grows each year by your COLA ({(cola_increase-1)*100:.1f}%). In your first 4 years, it also grows by your step increase ({(step_increase-1)*100:.1f}%). In promotion years ({str(promotion_years).strip("[]") if promotion_years else "none entered"}), it gets an additional {(promotion_increase-1)*100:.0f}% bump. *(Special case: Year 1 averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months into the job.)*
-- **Pension Contribution** is {pension_contribution_rate*100:.0f}% of that year's salary — the amount deducted from your paycheck.
-- **Pension Contribution Total** is a running tally of everything you've contributed so far across all working years.
-    """)
+Salary grows each year by your COLA ({(cola_increase-1)*100:.1f}%), plus a step increase ({(step_increase-1)*100:.1f}%) in your first 4 years, plus a {(promotion_increase-1)*100:.0f}% bump in any promotion years ({str(promotion_years).strip("[]") if promotion_years else "none entered"}). Year 1 is a special case: it averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months in.
+""")
 
 with col2:
-    st.markdown("**Hypothetical Personal Fund**")
+    st.markdown("**Personal Fund Side**")
     st.markdown(f"""
-Instead of paying into the pension, imagine you deposited that same amount into your own investment account (like a 403b or 401k) each year. Your money would grow through investment returns.
+Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: **+ Deposit** (same as the pension contribution) and **+ Returns** (investment growth on your existing balance at {(index_returns_rate-1)*100:.1f}%/year) add together to produce **= Balance** at year-end.
 
-- **Deposit** is the same dollar amount as your pension contribution that year — the comparison is kept equal so it's fair.
-- **Market Returns** is the growth your existing balance earned that year, based on a {(index_returns_rate-1)*100:.1f}% annual return. *(Returns are calculated on the balance at the start of the year, before that year's deposit is added.)*
-- **Balance** is what your account is worth at the end of the year: last year's balance, plus market returns, plus this year's deposit.
-    """)
-
+Returns are calculated on the balance at the *start* of the year, before that year's deposit is added.
+""")
 
 # Tables
 col1, col2 = st.columns(2)
 with col1:
     working_pension_df = yearly_data[["Year", "Salary", "Pension Contribution", "Pension Contribution Total"]]
     working_pension_df = working_pension_df[working_pension_df['Year'].str.startswith('W')]
+    working_pension_df = working_pension_df.rename(columns={
+        "Pension Contribution": "Contribution",
+        "Pension Contribution Total": "Total Contributed"
+    })
     st.dataframe(working_pension_df, hide_index=True)
 
 with col2:
     working_personal_df = yearly_data[["Year", "Pension Contribution", "Market Returns", "Balance"]]
-    working_personal_df = working_personal_df.rename(columns={"Pension Contribution": "Deposit"})
+    working_personal_df = working_personal_df.rename(columns={
+        "Pension Contribution": "+ Deposit",
+        "Market Returns": "+ Returns",
+        "Balance": "= Balance"
+    })
     working_personal_df = working_personal_df[working_personal_df['Year'].str.startswith('W')]
     st.dataframe(working_personal_df, hide_index=True)
 
@@ -387,43 +402,41 @@ with col2:
 st.markdown("#### Retirement Years")
 
 st.markdown("""
-Once you retire, you stop contributing to either account. The pension begins paying you a fixed annual allowance (which increases each year with COLA). The personal fund is drawn down by that same amount each year — but it continues to earn investment returns on whatever is left.
+Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year — but it continues earning investment returns on whatever balance remains.
 """)
 
 # Explanations
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("**Pension Disbursements**")
+    st.markdown("**Pension Side**")
     st.markdown(f"""
-The pension pays you a set amount every year for the rest of your life. That amount increases slightly each year to keep up with inflation (COLA).
-
-- **Pension Received** is the amount paid to you that year. It increases each year by {(cola_increase-1)*100:.1f}% (COLA).
-- **Pension Received Total** is a running tally of all pension payments you've received so far across retirement.
-    """)
+The pension pays a set annual amount, growing by {(cola_increase-1)*100:.1f}% each year (COLA). **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
+""")
 
 with col2:
-    st.markdown("**Hypothetical Personal Fund**")
+    st.markdown("**Personal Fund Side**")
     st.markdown(f"""
-Your personal fund keeps earning returns even in retirement. Each year, you withdraw the same amount as the pension would have paid — then your remaining balance earns market returns.
-
-- **Withdrawn** is the same dollar amount as the pension payout that year — keeping the comparison fair.
-- **Market Returns** is the growth earned on your remaining balance before the withdrawal, at a {(index_returns_rate-1)*100:.1f}% annual return.
-- **Balance** is what's left at the end of the year: last year's balance, plus market returns, minus the withdrawal. If your returns exceed your withdrawal, the balance grows. If not, it shrinks.
-    """)
-
-
+Each year, you withdraw the same dollar amount as the pension would have paid — so the comparison stays fair. The column headers show the formula: the previous balance earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
+""")
 
 # Tables
 col1, col2 = st.columns(2)
 with col1:
     retirement_pension_df = yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]]
-    retirement_pension_df = retirement_pension_df.rename(columns={"Pension Redeemed": "Pension Received", "Pension Redeemed Total": "Pension Received Total"})
+    retirement_pension_df = retirement_pension_df.rename(columns={
+        "Pension Redeemed": "Pension Received",
+        "Pension Redeemed Total": "Total Received"
+    })
     retirement_pension_df = retirement_pension_df[retirement_pension_df['Year'].str.startswith('R')]
     st.dataframe(retirement_pension_df, hide_index=True)
 
 with col2:
     retirement_personal_df = yearly_data[["Year", "Pension Redeemed", "Market Returns", "Balance"]]
-    retirement_personal_df = retirement_personal_df.rename(columns={"Pension Redeemed": "Withdrawn"})
+    retirement_personal_df = retirement_personal_df.rename(columns={
+        "Pension Redeemed": "− Withdrawal",
+        "Market Returns": "+ Returns",
+        "Balance": "= Balance"
+    })
     retirement_personal_df = retirement_personal_df[retirement_personal_df['Year'].str.startswith('R')]
     st.dataframe(retirement_personal_df, hide_index=True)
 
@@ -433,59 +446,56 @@ st.divider()
 st.header("Case Studies")
 
 st.markdown("""
-The three case studies below illustrate how the outcome can swing dramatically depending on your assumptions. Try plugging each set of inputs into the calculator above to see the charts and full year-by-year breakdown for yourself.
+The three examples below show how the outcome shifts depending on your circumstances. To see the full charts and tables for any of these, enter the listed settings into the calculator above.
 """)
 
-with st.expander("Case Study A — It's Complicated"):
+with st.expander("Case Study A — No Clear Winner: Pension Pays More, But Personal Fund Has More Left Over"):
     st.markdown("""
-    **Settings to enter:**
-    Starting wage: $120,000 · Step increase: 5.5% · COLA: 3% · Promotion increase: 10% · Promotion years: 10, 20 · Pension contribution rate: 10% · Index returns: 7% · Work years: 30 · Retirement years: 30 · First-year pension allowance: $70,458.24
+**Settings:** Starting wage $120,000 · Step increase 5.5% · COLA 3% · Promotions at years 10 and 20 (10% each) · Pension contribution rate 10% · Index returns 7% · Work years 30 · Retirement years 30 · First-year pension allowance $70,458
 
-    ---
+---
 
-    Alice is a public school administrator who earns $120,000 to start. Over her 30-year career, her salary grows steadily through step increases, annual cost-of-living adjustments, and two promotions. Each year, 10% of her salary goes into the pension — money she never sees or invests herself.
+Alice is a public school administrator who earns $120,000 to start. Over her 30-year career, her salary grows steadily through step increases, COLA adjustments, and two promotions. Each year, 10% of her salary goes into the pension.
 
-    **What the pension gives her:** By retirement, Alice has paid roughly **$785,000** into the pension system over 30 years. In exchange, she receives a pension allowance that starts at about $70,458 per year — and grows by 3% every year to keep pace with inflation. Over 30 years of retirement, her total pension income adds up to roughly **$3.35 million**. That's more than four times what she put in.
+**The pension:** By retirement, Alice has paid roughly **$785,000** into the pension over 30 years. In exchange, she receives an allowance starting at about $70,458 per year, growing 3% annually. Over 30 years of retirement, her total pension income adds up to roughly **$3.35 million** — more than four times what she contributed.
 
-    **What a personal fund would have looked like:** If Alice had instead deposited those same annual contributions into her own investment account earning 7% per year, she would have built up roughly **$2.02 million by retirement**. She would then withdraw her pension-equivalent amount each year. Because her investment returns (7%) comfortably exceed her withdrawal rate, her account keeps growing even in retirement — ending up at over **$6.28 million** by the end of her 30-year retirement.
+**The personal fund:** If Alice had deposited those same contributions into an account earning 7% per year, she would have built up roughly **$2.02 million by retirement**. She then withdraws her pension-equivalent amount each year. Because her 7% returns comfortably exceed her withdrawal rate, her account keeps growing even in retirement — ending at over **$6.28 million**.
 
-    **Verdict:** This is the most common and interesting scenario — there's no clean winner. The pension pays out more total income over the course of retirement ($3.35M vs. the $2.02M the personal fund held at the time of retirement). But the personal fund ends with a dramatically larger balance ($6.28M) that Alice could pass on to her family or use however she chooses. The pension stops when she dies.
+**Verdict:** There's no clean winner. The pension delivers more total income over retirement ($3.35M vs. $2.02M at retirement start). But the personal fund ends retirement with a far larger balance ($6.28M) that Alice could leave to her family. With the pension, payments stop at her death — whatever survivor benefit she elected when she retired is all that remains.
 
-    *This case illustrates the core trade-off: guaranteed income for life vs. ownership, flexibility, and wealth transfer.*
-    """)
+The core trade-off: guaranteed income for life, versus ownership, flexibility, and the ability to pass wealth to heirs.
+""")
 
-with st.expander("Case Study B — Pension Wins"):
+with st.expander("Case Study B — Pension Wins: Long Retirement, Modest Investment Returns"):
     st.markdown("""
-    **Settings to enter:**
-    Starting wage: $65,000 · Step increase: 5.5% · COLA: 3% · Promotion increase: 10% · Promotion years: *(leave blank)* · Pension contribution rate: 10% · Index returns: 5% · Work years: 20 · Retirement years: 40 · First-year pension allowance: $27,000
+**Settings:** Starting wage $65,000 · Step increase 5.5% · COLA 3% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retirement years 40 · First-year pension allowance $27,000
 
-    ---
+---
 
-    Bob is a civil servant who starts at $65,000 and works a steady 20-year career without promotions. He retires at a relatively young age and lives a long life — 40 years in retirement. The stock market during his lifetime delivers modest but not spectacular returns of about 5% per year.
+Bob is a civil servant who starts at $65,000 and works a steady 20-year career without promotions. He retires relatively early and lives a long life — 40 years in retirement. The stock market delivers modest returns of about 5% per year over his lifetime.
 
-    **What the pension gives him:** Over 20 years of work, Bob contributes roughly **$175,000** to the pension. In retirement, he receives about $27,000 in his first year, growing by 3% annually. Over 40 years, that adds up to approximately **$2 million** in total pension income — more than 11 times what he put in.
+**The pension:** Over 20 years of work, Bob contributes roughly **$175,000** to the pension. In retirement, he receives about $27,000 in year one, growing 3% annually. Over 40 years, that adds up to approximately **$2 million** in total pension income — more than 11 times what he put in.
 
-    **What a personal fund would have looked like:** Bob's 20 working years of contributions at 5% annual returns would have grown to roughly **$265,000 by retirement**. In retirement, he begins withdrawing $27,000 per year (growing 3% annually with COLA). At 5% returns, his investment growth cannot keep pace with his withdrawals. His personal fund is **depleted within about 13 years** — leaving him with nothing for the final 27 years of retirement.
+**The personal fund:** Bob's 20 years of contributions at 5% annual returns would have grown to roughly **$265,000 by retirement**. Once he begins withdrawing $27,000 per year (growing 3% annually), his investment growth cannot keep pace with the withdrawals. His personal fund is **depleted within about 13 years**, leaving him with nothing for the remaining 27 years of retirement.
 
-    **Verdict:** The pension wins decisively. Bob lives too long and earns too little on his investments for the personal fund to sustain him. The pension's guarantee — that it pays no matter how long he lives — is exactly the protection he needs. Without it, he runs out of money in his mid-70s.
+**Verdict:** The pension wins decisively. At 5% returns, Bob's personal fund can't sustain 40 years of withdrawals. The pension's guarantee — that it pays no matter how long he lives — is exactly what he needs. Without it, he runs out of money in his early 70s.
 
-    *This case illustrates why pensions are particularly valuable for people who live long lives, retire early, or are in a low-return market environment. The pension's "mortality pooling" — where everyone's contributions collectively fund benefits for those who live longest — is a feature that a personal account simply cannot replicate.*
-    """)
+Pensions are particularly valuable for people who live long lives, retire early, or face a low-return market environment. The built-in longevity protection is something a personal account simply cannot replicate.
+""")
 
-with st.expander("Case Study C — Personal Fund Wins"):
+with st.expander("Case Study C — Personal Fund Wins: High Returns, High Salary, Shorter Retirement"):
     st.markdown("""
-    **Settings to enter:**
-    Starting wage: $150,000 · Step increase: 5.5% · COLA: 3% · Promotion increase: 10% · Promotion years: 15, 25 · Pension contribution rate: 10% · Index returns: 9% · Work years: 35 · Retirement years: 20 · First-year pension allowance: $120,000
+**Settings:** Starting wage $150,000 · Step increase 5.5% · COLA 3% · Promotions at years 15 and 25 (10% each) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retirement years 20 · First-year pension allowance $120,000
 
-    ---
+---
 
-    Carol is a senior public official who earns $150,000 to start, receives two promotions over a 35-year career, and retires with a generous pension allowance. She is financially sophisticated, invests in a diversified index fund portfolio, and benefits from a strong long-run market — averaging about 9% annually. She plans conservatively for 20 years in retirement.
+Carol is a senior public official who earns $150,000 to start, receives two promotions over a 35-year career, and retires with a generous allowance. She invests in a diversified index fund portfolio and benefits from strong long-run market performance — averaging about 9% annually. She plans for 20 years of retirement.
 
-    **What the pension gives her:** Carol contributes roughly **$1.4 million** to the pension over her career. In retirement, she receives approximately $120,000 in the first year, growing 3% annually. Over 20 years, her total pension income is roughly **$3.2 million**.
+**The pension:** Carol contributes roughly **$1.4 million** to the pension over her career. In retirement, she receives approximately $120,000 in year one, growing 3% annually. Over 20 years, her total pension income is roughly **$3.2 million**.
 
-    **What a personal fund would have looked like:** Carol's 35 years of contributions growing at 9% annually compound dramatically — she would have accumulated roughly **$5.5 million by retirement**. Even after withdrawing $120,000+ per year in retirement, her 9% annual returns far exceed what she's taking out. Her fund continues growing throughout retirement, ending at well over **$18 million**.
+**The personal fund:** Carol's 35 years of contributions compounding at 9% annually would have grown to roughly **$5.5 million by retirement**. Even after withdrawing $120,000+ per year, her 9% annual returns far outpace her withdrawals. Her fund keeps growing throughout retirement, ending at well over **$18 million**.
 
-    **Verdict:** The personal fund wins by a wide margin. Carol's high salary means her contributions are large in dollar terms, and 9% compounding over 35 years creates an enormous amount of wealth. The pension's $3.2M total payout looks modest by comparison — and she has nothing left to show for it at the end, while her personal fund leaves a multi-million dollar estate.
+**Verdict:** The personal fund wins by a wide margin. Carol's high salary means large annual contributions, and 9% compounding over 35 years creates an enormous amount of wealth. The pension's $3.2M total payout looks modest by comparison — and at death, the pension payments simply stop, while her personal fund would leave a substantial estate.
 
-    *This case illustrates why the personal fund is often the better choice for high earners with long careers in strong market conditions — especially those who want to build generational wealth or have heirs they want to provide for. However, it relies on favorable market returns that are not guaranteed.*
-    """)
+The personal fund tends to win for high earners with long careers in strong market conditions — especially those who value wealth accumulation and inheritance over longevity protection. The key caveat: this result depends on sustained high returns that are not guaranteed.
+""")
