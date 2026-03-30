@@ -27,7 +27,7 @@ with st.expander("What This Calculator Does"):
 
 with st.expander("The Public Pension Debate"):
     st.markdown("""
-    Many public sector employees (such as teachers, law enforcement officers, and civil servants) mandatorily participate in defined-benefit pension plans. Under a pension plan, workers are required to contribute a fixed percentage of their salary throughout their working years in exchange for a guaranteed, fixed income during their retirement years. The employer bears the responsibility of paying out the pension and assumes the investment risk. By contrast, the private sector has largely shifted to defined-contribution plans such as 401(k)s and 403(b)s. In these plans, employees can voluntarily invest contributions into a range of market assets, often with some employer matching as well. Since market performance is not guaranteed, employees assume the full responsibility for managing the risks associated with thier retirement investments.
+    Many public sector employees (such as teachers, law enforcement officers, and civil servants) mandatorily participate in defined-benefit pension plans. Under a pension plan, workers are required to contribute a fixed percentage of their salary throughout their working years in exchange for a guaranteed, fixed income during their retirement years. The employer bears the responsibility of paying out the pension and assumes the investment risk. By contrast, the private sector has largely shifted to defined-contribution plans such as 401(k)s and 403(b)s. In these plans, employees can voluntarily invest contributions into a range of market assets, often with some employer matching as well. Since market performance is not guaranteed, employees assume the full responsibility for managing the risks associated with their retirement investments.
 
     This structural difference between the two retirement systems has sparked debate and, at times, resentment and jealousy. Critics argue that pensions are financially unsustainable in the long run, especially as populations age and life expectancy increases. They contend that pensions impose an unfair burden on taxpayers, particularly in states or cities where the government pension plan is underfunded yet still obligated to conjure up funds to pay out the promised benefits. Some detractors even feel that pension benefits are overly generous compared to what private sector employees receive. On the other hand, proponents maintain that pensions encourage individuals to accept public sector jobs, which can sometimes pay less than their equivalent private sector counterparts. They also highlight that pensions help reduce elderly poverty through predictable monthly or annual payments—especially benefiting those who might not otherwise save enough or those who lack the financial literacy to manage retirement funds effectively. Ultimately, this debate involves issues of fairness, fiscal responsibility, and the government’s role in securing citizens’ retirement income.
 
@@ -123,7 +123,17 @@ with col3:
         help="Annual return rate of your personal retirement investments (e.g., 403b)."
     ) / 100 + 1
 
-st.write("We also assume that deposits and withdrawals are made at the end of the year, thus not affecting the market returns of the present year.")
+st.info("""
+**Timing Assumptions**
+
+This calculator operates in annual periods. Within each year:
+- **Contributions & deposits**: made at the end of the year.
+- **Withdrawals**: made at the end of the year.
+- **Market returns**: earned on the balance at the *start* of the year — before that year's deposit or withdrawal.
+- **COLA**: applied to salary at the end of each working year, taking effect the following year. In retirement, applied to the pension allowance at the end of each year, taking effect the following year.
+- **Step increases**: The Step 1 → Step 2 raise occurs 6 months after hire. Since the calculator uses annual periods, Year 1 contributions are averaged over 6 months at Step 1 and 6 months at Step 2. Steps 2 → 3, 3 → 4, and 4 → 5 each take one full year and take effect at the start of Years 2, 3, and 4 respectively.
+- **Promotions**: applied at the end of the year you specify, taking effect the following year.
+""")
 
 # Results
 st.divider()
@@ -157,8 +167,14 @@ yearly_data = pd.DataFrame({'Year': [],
 
 # Work phase - Loop through the work years
 for work_year in range(1, int(work_years) + 1):
+    # Year 1: Step 1→2 occurs at 6 months, so average Step 1 and Step 2 salaries
+    if work_year == 1:
+        effective_salary = salary * (1 + step_increase) / 2
+    else:
+        effective_salary = salary
+
     # Compute pension tax
-    pension_tax_this_year = salary * pension_tax_rate
+    pension_tax_this_year = effective_salary * pension_tax_rate
     pension_taxed_total += pension_tax_this_year
 
     # Compute personal balance
@@ -172,7 +188,7 @@ for work_year in range(1, int(work_years) + 1):
     # Store data for the table
     new_row = {
         "Year": f"W{work_year}",
-        "Salary": f"${salary:,.0f}",
+        "Salary": f"${effective_salary:,.0f}",
         "Pension Taxed": f"${pension_tax_this_year:,.0f}",
         "Pension Taxed Total": f"${pension_taxed_total:,.0f}",
         "Pension Redeemed": "$0",  # No pension redeemed during work years
@@ -223,7 +239,7 @@ fig.add_trace(go.Scatter(
     x=years,
     y=pension_fund_values,
     mode='lines+markers',
-    name='Pension Pension Redeemed',
+    name='Cumulative Pension Received',
     line=dict(color='blue')
 ))
 
@@ -267,10 +283,10 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 st.subheader("Summary")
 
-st.markdown(f"**Total Pension Tax Paid:** ${pension_taxed_total:,.0f}", help="The total amount you paid into the pension system through automatic deductions over the course of your working years.")
-st.markdown(f"**Total Pension Pension Redeemed:** ${pension_redeemed_total:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
+st.markdown(f"**Total Pension Contributions:** ${pension_taxed_total:,.0f}", help="The total amount you paid into the pension system through automatic deductions over the course of your working years.")
+st.markdown(f"**Total Pension Received:** ${pension_redeemed_total:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
 st.markdown(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
-st.markdown(f"**Personal Fund Value at Death:** ${personal_balance:,.0f}", help="The remaining personal_balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
+st.markdown(f"**Personal Fund Value at End of Retirement:** ${personal_balance:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
 
 # Display the table
 st.divider()
@@ -281,22 +297,23 @@ st.markdown("#### Working Years")
 # Explanations
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("**Pension Taxings**")
+    st.markdown("**Pension Contributions**")
 
     st.markdown(f"""
         - `Salary = Previous year's salary × {cola_increase:,.2f} COLA`
-            - Years 2-5: Additional  `Salary *= {(step_increase):.2f} Step Increase`
+            - Years 2–5: Additional `Salary *= {(step_increase):.3f} Step Increase`
             - Years {str(promotion_years).strip("[]")}: Additional `Salary *= {(promotion_increase):.2f} Promotion Increase`
-        - `Pension Taxed = Salary × {pension_tax_rate}`
-        - `Pension Taxed Total = Total from the previous year + Pension Taxed this year`
+        - **Year 1 only**: `Salary = (Step 1 salary + Step 2 salary) / 2` — Step 1→2 occurs at 6 months, so Year 1 averages both halves
+        - `Pension Contribution = Salary × {pension_tax_rate}`
+        - `Pension Contribution Total = Previous total + Pension Contribution this year`
         """)
 
 with col2:
     st.markdown("**Hypothetical Personal Fund**")
     st.markdown(f"""
-        - `Deposit = same amount as Pension Taxed`
-        - `Market Returns = Previous year's personal_balance × {(index_returns_rate - 1):,.2f}`
-        - `Balance = Previous year's personal_balance + Deposit + Market Returns`
+        - `Deposit = same amount as Pension Contribution`
+        - `Market Returns = Previous year's Balance × {(index_returns_rate - 1):,.2f}`
+        - `Balance = Previous year's Balance + Deposit + Market Returns`
         """)
     
 
@@ -320,7 +337,7 @@ st.markdown("#### Retirement Years")
 # Explanations
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("**Pension Redemptions**")
+    st.markdown("**Pension Disbursements**")
     st.markdown(f"""
     - `Pension Redeemed = Previous year's redemption allowance × {(cola_increase):.2f} COLA`
     - `Pension Redeemed Total = Previous year's total + Pension Redeemed`
@@ -331,7 +348,7 @@ with col2:
     st.markdown(f"""
     - `Withdrawn = same as Pension Redeemed`
     - `Market Returns = Previous year's Balance × {(index_returns_rate - 1):,.2f}`
-    - `Balance = Previous year's personal_balance - Withdrawn + Market Returns`
+    - `Balance = Previous year's Balance - Withdrawn + Market Returns`
     """)
 
 
@@ -356,11 +373,11 @@ st.header("Case Studies")
 
 with st.expander("Case Study A"):
     st.markdown("""
-        Alice's starting annual wage is 120,000. She assumes a standard step increase of 5.50%, COLA of 3%, promotion increase of 10%, pension tax rate of 10%, and index returns rate of 7%. She receives a promotion in years 10 and 20. She works 30 years and lives for 30 years in retirement. Her annual pension allowance totals 70,458.24.
+        Alice's starting annual wage is $120,000. She assumes a standard step increase of 5.50%, COLA of 3%, promotion increase of 10%, pension contribution rate of 10%, and index returns rate of 7%. She receives a promotion in years 10 and 20. She works 30 years and expects to live 30 years in retirement. Her estimated first-year annual pension allowance is $70,458.24.
 
-        According to the calculator, at the end of Alice's 30 years of working, she will have paid about 785k in pension tax. If instead she had deposited the same amount as her pension tax into a tax-advantaged personal retirement fund, she would have amassed over 2.02M in savings and investments. In her 30 years of retirement before she dies, she will have redeemed over 3.35M in pension allowance. This amount is substantially greater than the 785k that she paid in pension tax, and greater than the 2.02M she would have amassed through the personal fund option at the time of retirement.
+        According to the calculator, by the end of Alice's 30 working years, she will have contributed about $785k to the pension system. If she had instead deposited that same amount into a tax-advantaged personal retirement fund, she would have accumulated over $2.02M by retirement. Over her 30 years of retirement, she will receive over $3.35M in total pension allowance (accounting for annual COLA increases). This substantially exceeds both her $785k in contributions and the $2.02M she would have accumulated in a personal fund by retirement.
 
-        The notable difference between the two options is that at the end of her life, with the personal retirement fund option, she ends up a lump sum worth over 6.28M to keep or donate to whomstever she wishes; whereas with the pension option, she ends up with at most only the survivor beneift disbursements that she had elected at the time of her departure from DWP (Options A-E; see RIS website for the specific details regarding the different Options.)
+        However, the key difference between the two options appears at the end of retirement: with the personal fund, Alice would have a remaining balance of over $6.28M to keep or leave to whomever she wishes. With the pension, the payments stop at death — the only remaining value is whatever survivor benefit she elected when she left the pension system.
 
-        My recommendation is that if your situation and assumptions are similar to Alice's, and if you are ever given the opportunity to choose between the two, then saving for retirement on your own terms is of better value than the pension program.
+        Under these assumptions, the pension pays out more total income over retirement, but the personal fund leaves a substantial estate. Which option is "better" depends on individual priorities: guaranteed lifetime income versus flexibility and wealth transfer.
     """)
