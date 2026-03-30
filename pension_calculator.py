@@ -93,6 +93,19 @@ This calculator is an educational tool, not a comprehensive financial model. Sev
 # Input form
 st.divider()
 st.header("Input Assumptions")
+
+st.info("""
+**Timing Assumptions**
+
+This calculator operates in annual periods. Within each year:
+- **Contributions & deposits**: Made at the end of the year.
+- **Withdrawals**: Made at the end of the year.
+- **Market returns**: Earned on the balance at the *start* of the year — before that year's deposit or withdrawal.
+- **COLA**: Applied to salary at the end of each working year, taking effect the following year. In retirement, applied to the pension allowance at the end of each year, taking effect the following year.
+- **Step increases**: The Step 1 → Step 2 raise occurs 6 months after hire. Since the calculator uses annual periods, Year 1 contributions are averaged over 6 months at Step 1 and 6 months at Step 2. The Steps 2 → 3, 3 → 4, and 4 → 5 raises each take effect at the start of Years 3, 4, and 5 respectively.
+- **Promotions**: Applied at the end of the year you specify, taking effect the following year.
+""")
+
 col1, col2, col3 = st.columns(3)
 with col1:
     step_increase = st.number_input(
@@ -163,18 +176,6 @@ with col3:
         step=0.1,
         help="Expected annual return rate of your hypothetical personal retirement investments."
     ) / 100 + 1
-
-st.info("""
-**Timing Assumptions**
-
-This calculator operates in annual periods. Within each year:
-- **Contributions & deposits**: Made at the end of the year.
-- **Withdrawals**: Made at the end of the year.
-- **Market returns**: Earned on the balance at the *start* of the year — before that year's deposit or withdrawal.
-- **COLA**: Applied to salary at the end of each working year, taking effect the following year. In retirement, applied to the pension allowance at the end of each year, taking effect the following year.
-- **Step increases**: The Step 1 → Step 2 raise occurs 6 months after hire. Since the calculator uses annual periods, Year 1 contributions are averaged over 6 months at Step 1 and 6 months at Step 2. The Steps 2 → 3, 3 → 4, and 4 → 5 raises each take effect at the start of Years 3, 4, and 5 respectively.
-- **Promotions**: Applied at the end of the year you specify, taking effect the following year.
-""")
 
 # Results
 st.divider()
@@ -273,31 +274,6 @@ for ret_year in range(1, retirement_years + 1):
     # Update allowance for next year
     pension_redeemed *= cola_increase
 
-# Chart explanation
-st.markdown("""
-The chart below tracks both options across your full career and retirement.
-
-**What each line represents:**
-- The **green line** is the balance of your hypothetical personal retirement fund. Before retirement, it grows as you make contributions and earn investment returns. After retirement, you withdraw from it each year — the same amount as your pension would have paid out — and the balance either keeps growing or shrinks depending on your returns vs. withdrawal rate.
-- The **blue line** is the cumulative total you've received from the pension — the sum of all annual payments so far. It's zero during working years, then rises steadily once retirement begins.
-- The **red dashed line** marks the moment retirement begins.
-
-**An important note on how this comparison works:** Both options pay you the *same annual income* in retirement. The personal fund withdraws the exact same amount each year as the pension would have paid. So the green line balance is what's left *on top of* having already received that income — it's the leftover, not the total.
-
-**How to tell which option is better:**
-
-The only question that matters is: **does the personal fund run out of money before your retirement years are up?**
-
-- **Personal fund wins** if the green line stays above zero through all your retirement years. This means you received the same income as the pension *and* still have money left over when you die. The higher the green line at the end, the larger that leftover.
-- **Pension wins** if the green line drops to zero before retirement ends. This means the personal fund ran dry, and the pension's guarantee — that it pays no matter how long you live — is what would have kept you afloat.
-
-The blue line (cumulative pension income) is useful context for scale, but **don't compare the green and blue lines directly** to judge a winner — they measure different things. Green is a remaining account balance; blue is a running total of income received.
-
-**What you leave behind:**
-- With the **personal fund**, whatever the green line shows at the end of your retirement is money you still own — you could leave it to heirs, donate it, or spend it.
-- With the **pension**, payments stop when you die. That being said, your pension may include a *survivor benefit* (a reduced annual payment to a spouse or dependent after your death) if you choose to select that option at the time of your retirement. This calculator does not model survivor benefits.
-""")
-
 # Plot
 fig = go.Figure()
 
@@ -347,9 +323,19 @@ fig.update_xaxes(showgrid=True)
 
 st.plotly_chart(fig, use_container_width=True)
 
-# Results Section
-st.divider()
-st.subheader("Summary")
+# Dynamic verdict based on user's inputs
+if personal_balance > 0:
+    st.success(f"""
+**Based on your inputs, the personal fund is viable.**
+
+After {int(retirement_years)} years of retirement, your personal fund would still have **\\${personal_balance:,.0f}** remaining — on top of having already paid out the same income as the pension every single year. That leftover balance is money you'd still own at death. The pension would leave nothing equivalent.
+""")
+else:
+    st.warning(f"""
+**Based on your inputs, the pension wins.**
+
+Your personal fund would have run dry before your {int(retirement_years)}-year retirement was over, while the pension would have kept paying regardless. The lifetime guarantee is the decisive advantage here — the personal fund simply can't sustain the withdrawal rate with these investment returns over this retirement length.
+""")
 
 st.markdown(f"**Total Pension Contributed at Time of Retirement:** ${pension_contribution_total:,.0f}", help="The total amount automatically deducted from your paychecks and contributed to the pension system over the course of your working years.")
 st.markdown(f"**Total Pension Received At Death:** ${pension_redeemed_total:,.0f}", help="The total amount you would have received from the pension over all retirement years, accounting for annual COLA increases.")
@@ -359,6 +345,30 @@ if personal_balance > 0:
     st.markdown(f"**Personal Fund Balance at Death:** ${personal_balance:,.0f} — *personal fund is viable* ✓", help="The personal fund still has money left after paying out the same income as the pension for every year of retirement. This leftover balance is money you'd still own at death — the pension option leaves nothing equivalent.")
 else:
     st.markdown(f"**Personal Fund Balance at Death:** ${personal_balance:,.0f} — *personal fund ran out* ✗", help="The personal fund was depleted before the end of your retirement years. The pension would have continued paying regardless — this is where the pension's lifetime guarantee has real value.")
+
+st.markdown("""
+The chart above tracks both options across your full career and retirement, using your current input variables.
+
+**What each line represents:**
+- The **green line** is the balance of your hypothetical personal retirement fund. Before retirement, it grows as you make contributions and earn investment returns. After retirement, you withdraw from it each year — the same amount as your pension would have paid out — and the balance either keeps growing or shrinks depending on your returns vs. withdrawal rate.
+- The **blue line** is the cumulative total you've received from the pension — the sum of all annual payments so far. It's zero during working years, then rises steadily once retirement begins.
+- The **red dashed line** marks the moment retirement begins.
+
+**An important note on how this comparison works:** Both options pay you the *same annual income* in retirement. The personal fund withdraws the exact same amount each year as the pension would have paid. So the green line balance is what's left *on top of* having already received that income — it's the leftover, not the total.
+
+**How to tell which option is better:**
+
+The only question that matters is: **does the personal fund run out of money before your retirement years are up?**
+
+- **Personal fund wins** if the green line stays above zero through all your retirement years. This means you received the same income as the pension *and* still have money left over when you die. The higher the green line at the end, the larger that leftover.
+- **Pension wins** if the green line drops to zero before retirement ends. This means the personal fund ran dry, and the pension's guarantee — that it pays no matter how long you live — is what would have kept you afloat.
+
+The blue line (cumulative pension income) is useful context for scale, but **don't compare the green and blue lines directly** to judge a winner — they measure different things. Green is a remaining account balance; blue is a running total of income received.
+
+**What you leave behind:**
+- With the **personal fund**, whatever the green line shows at the end of your retirement is money you still own — you could leave it to heirs, donate it, or spend it.
+- With the **pension**, payments stop when you die. That being said, your pension may include a *survivor benefit* (a reduced annual payment to a spouse or dependent after your death) if you choose to select that option at the time of your retirement. This calculator does not model survivor benefits.
+""")
 
 # Display the table
 st.divider()
@@ -466,32 +476,32 @@ The three examples below show how the outcome shifts depending on your circumsta
 
 with st.expander("Case Study A — No Clear Winner: Pension Pays More, But Personal Fund Has More Left Over"):
     st.markdown("""
-**Settings:** Starting wage $120,000 · Step increase 5.5% · COLA 3% · Promotions at years 10 and 20 (10% each) · Pension contribution rate 10% · Index returns 7% · Work years 30 · Retirement years 30 · First-year pension allowance $70,458
+**Settings:** Starting wage \\$120,000 · Step increase 5.5% · COLA 3% · Promotions at years 10 and 20 (10% each) · Pension contribution rate 10% · Index returns 7% · Work years 30 · Retirement years 30 · First-year pension allowance \\$70,458
 
 ---
 
-Alice is a public school administrator who earns $120,000 to start. Over her 30-year career, her salary grows steadily through step increases, COLA adjustments, and two promotions. Each year, 10% of her salary goes into the pension.
+Alice is a public school administrator who earns \\$120,000 to start. Over her 30-year career, her salary grows steadily through step increases, COLA adjustments, and two promotions. Each year, 10% of her salary goes into the pension.
 
-**The pension:** By retirement, Alice has paid roughly **$785,000** into the pension over 30 years. In exchange, she receives an allowance starting at about $70,458 per year, growing 3% annually. Over 30 years of retirement, her total pension income adds up to roughly **$3.35 million** — more than four times what she contributed.
+**The pension:** By retirement, Alice has paid roughly **\\$785,000** into the pension over 30 years. In exchange, she receives an allowance starting at about \\$70,458 per year, growing 3% annually. Over 30 years of retirement, her total pension income adds up to roughly **\\$3.35 million** — more than four times what she contributed.
 
-**The personal fund:** If Alice had deposited those same contributions into an account earning 7% per year, she would have built up roughly **$2.02 million by retirement**. She then withdraws her pension-equivalent amount each year. Because her 7% returns comfortably exceed her withdrawal rate, her account keeps growing even in retirement — ending at over **$6.28 million**.
+**The personal fund:** If Alice had deposited those same contributions into an account earning 7% per year, she would have built up roughly **\\$2.02 million by retirement**. She then withdraws her pension-equivalent amount each year. Because her 7% returns comfortably exceed her withdrawal rate, her account keeps growing even in retirement — ending at over **\\$6.28 million**.
 
-**Verdict:** There's no clean winner. The pension delivers more total income over retirement ($3.35M vs. $2.02M at retirement start). But the personal fund ends retirement with a far larger balance ($6.28M) that Alice could leave to her family. With the pension, payments stop at her death — whatever survivor benefit she elected when she retired is all that remains.
+**Verdict:** There's no clean winner. The pension delivers more total income over retirement (\\$3.35M vs. \\$2.02M at retirement start). But the personal fund ends retirement with a far larger balance (\\$6.28M) that Alice could leave to her family. With the pension, payments stop at her death — whatever survivor benefit she elected when she retired is all that remains.
 
 The core trade-off: guaranteed income for life, versus ownership, flexibility, and the ability to pass wealth to heirs.
 """)
 
 with st.expander("Case Study B — Pension Wins: Long Retirement, Modest Investment Returns"):
     st.markdown("""
-**Settings:** Starting wage $65,000 · Step increase 5.5% · COLA 3% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retirement years 40 · First-year pension allowance $27,000
+**Settings:** Starting wage \\$65,000 · Step increase 5.5% · COLA 3% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retirement years 40 · First-year pension allowance \\$27,000
 
 ---
 
-Bob is a civil servant who starts at $65,000 and works a steady 20-year career without promotions. He retires relatively early and lives a long life — 40 years in retirement. The stock market delivers modest returns of about 5% per year over his lifetime.
+Bob is a civil servant who starts at \\$65,000 and works a steady 20-year career without promotions. He retires relatively early and lives a long life — 40 years in retirement. The stock market delivers modest returns of about 5% per year over his lifetime.
 
-**The pension:** Over 20 years of work, Bob contributes roughly **$175,000** to the pension. In retirement, he receives about $27,000 in year one, growing 3% annually. Over 40 years, that adds up to approximately **$2 million** in total pension income — more than 11 times what he put in.
+**The pension:** Over 20 years of work, Bob contributes roughly **\\$175,000** to the pension. In retirement, he receives about \\$27,000 in year one, growing 3% annually. Over 40 years, that adds up to approximately **\\$2 million** in total pension income — more than 11 times what he put in.
 
-**The personal fund:** Bob's 20 years of contributions at 5% annual returns would have grown to roughly **$265,000 by retirement**. Once he begins withdrawing $27,000 per year (growing 3% annually), his investment growth cannot keep pace with the withdrawals. His personal fund is **depleted within about 13 years**, leaving him with nothing for the remaining 27 years of retirement.
+**The personal fund:** Bob's 20 years of contributions at 5% annual returns would have grown to roughly **\\$265,000 by retirement**. Once he begins withdrawing \\$27,000 per year (growing 3% annually), his investment growth cannot keep pace with the withdrawals. His personal fund is **depleted within about 13 years**, leaving him with nothing for the remaining 27 years of retirement.
 
 **Verdict:** The pension wins decisively. At 5% returns, Bob's personal fund can't sustain 40 years of withdrawals. The pension's guarantee — that it pays no matter how long he lives — is exactly what he needs. Without it, he runs out of money in his early 70s.
 
@@ -500,17 +510,17 @@ Pensions are particularly valuable for people who live long lives, retire early,
 
 with st.expander("Case Study C — Personal Fund Wins: High Returns, High Salary, Shorter Retirement"):
     st.markdown("""
-**Settings:** Starting wage $150,000 · Step increase 5.5% · COLA 3% · Promotions at years 15 and 25 (10% each) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retirement years 20 · First-year pension allowance $120,000
+**Settings:** Starting wage \\$150,000 · Step increase 5.5% · COLA 3% · Promotions at years 15 and 25 (10% each) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retirement years 20 · First-year pension allowance \\$120,000
 
 ---
 
-Carol is a senior public official who earns $150,000 to start, receives two promotions over a 35-year career, and retires with a generous allowance. She invests in a diversified index fund portfolio and benefits from strong long-run market performance — averaging about 9% annually. She plans for 20 years of retirement.
+Carol is a senior public official who earns \\$150,000 to start, receives two promotions over a 35-year career, and retires with a generous allowance. She invests in a diversified index fund portfolio and benefits from strong long-run market performance — averaging about 9% annually. She plans for 20 years of retirement.
 
-**The pension:** Carol contributes roughly **$1.4 million** to the pension over her career. In retirement, she receives approximately $120,000 in year one, growing 3% annually. Over 20 years, her total pension income is roughly **$3.2 million**.
+**The pension:** Carol contributes roughly **\\$1.4 million** to the pension over her career. In retirement, she receives approximately \\$120,000 in year one, growing 3% annually. Over 20 years, her total pension income is roughly **\\$3.2 million**.
 
-**The personal fund:** Carol's 35 years of contributions compounding at 9% annually would have grown to roughly **$5.5 million by retirement**. Even after withdrawing $120,000+ per year, her 9% annual returns far outpace her withdrawals. Her fund keeps growing throughout retirement, ending at well over **$18 million**.
+**The personal fund:** Carol's 35 years of contributions compounding at 9% annually would have grown to roughly **\\$5.5 million by retirement**. Even after withdrawing \\$120,000+ per year, her 9% annual returns far outpace her withdrawals. Her fund keeps growing throughout retirement, ending at well over **\\$18 million**.
 
-**Verdict:** The personal fund wins by a wide margin. Carol's high salary means large annual contributions, and 9% compounding over 35 years creates an enormous amount of wealth. The pension's $3.2M total payout looks modest by comparison — and at death, the pension payments simply stop, while her personal fund would leave a substantial estate.
+**Verdict:** The personal fund wins by a wide margin. Carol's high salary means large annual contributions, and 9% compounding over 35 years creates an enormous amount of wealth. The pension's \\$3.2M total payout looks modest by comparison — and at death, the pension payments simply stop, while her personal fund would leave a substantial estate.
 
 The personal fund tends to win for high earners with long careers in strong market conditions — especially those who value wealth accumulation and inheritance over longevity protection. The key caveat: this result depends on sustained high returns that are not guaranteed.
 """)
