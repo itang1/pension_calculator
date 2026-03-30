@@ -33,15 +33,19 @@ st.markdown("""
 ---
 **What's on this page:**
 
-1. **Background & context** — the pension debate, and what this calculator does and doesn't model *(expandable sections below)*
-2. **Input assumptions** — enter your salary, career details, and retirement estimates
-3. **Simulation results** — a side-by-side chart and numeric summary comparing both options
-4. **Year over year breakdown** — detailed tables showing how every number was calculated, year by year
-5. **Case studies** — three worked examples illustrating when each option wins
----
+1. **Background:** The pension debate, and what this calculator does and doesn't model**
+2. **Input assumptions:** Enter your salary, career details, and retirement estimates
+3. **Simulation results:** — A side-by-side chart and numeric summary comparing both options
+4. **Year over year breakdown:** — Detailed tables showing how every number was calculated, year by year
+5. **Case studies:** — Three worked examples illustrating when each option wins
 """)
 
-with st.expander("The Pension Debate: Arguments For, Against, and Why It Depends"):
+
+st.divider()
+st.header("Background")
+
+
+with st.expander("The Pension Debate"):
     st.markdown("""
 ### The Case Against Pensions
 
@@ -103,14 +107,14 @@ with col1:
         value=120000,
         min_value=0,
         step=500,
-        help="Your initial salary the year you were hired."
+        help="Your initial salary the first year you were hired."
     )
     work_years = st.number_input(
         "Years to Work",
         value=30,
         min_value=1,
         step=1,
-        help="Number of years you plan to work before retirement."
+        help="How many years you plan to work before retirement."
     )
 with col2:
     cola_increase = st.number_input(
@@ -119,12 +123,12 @@ with col2:
         min_value=2.5,
         max_value=5.5,
         step=0.1,
-        help="Annual salary adjustment announced each October, typically between 2–5%."
+        help="Annual salary adjustment announced each October, typically between 2–3.5%."
     ) / 100 + 1
     promotion_years_input = st.text_input(
         "Promotion Years",
         value="10, 20",
-        help="Years in which you expect to be promoted (e.g., 10, 20). Should fall within your working years."
+        help="Year numbers in which you expect to be promoted (e.g., 10, 20). Should fall within your working years."
     )
     retirement_years = st.number_input(
         "Years After Retirement",
@@ -157,19 +161,19 @@ with col3:
         "Index Returns Rate (%)",
         value=7.0,
         step=0.1,
-        help="Annual return rate of your personal retirement investments (e.g., 403b)."
+        help="Expected annual return rate of your hypothetical personal retirement investments."
     ) / 100 + 1
 
 st.info("""
 **Timing Assumptions**
 
 This calculator operates in annual periods. Within each year:
-- **Contributions & deposits**: made at the end of the year.
-- **Withdrawals**: made at the end of the year.
-- **Market returns**: earned on the balance at the *start* of the year — before that year's deposit or withdrawal.
-- **COLA**: applied to salary at the end of each working year, taking effect the following year. In retirement, applied to the pension allowance at the end of each year, taking effect the following year.
-- **Step increases**: The Step 1 → Step 2 raise occurs 6 months after hire. Since the calculator uses annual periods, Year 1 contributions are averaged over 6 months at Step 1 and 6 months at Step 2. Steps 2 → 3, 3 → 4, and 4 → 5 each take one full year and take effect at the start of Years 2, 3, and 4 respectively.
-- **Promotions**: applied at the end of the year you specify, taking effect the following year.
+- **Contributions & deposits**: Made at the end of the year.
+- **Withdrawals**: Made at the end of the year.
+- **Market returns**: Earned on the balance at the *start* of the year — before that year's deposit or withdrawal.
+- **COLA**: Applied to salary at the end of each working year, taking effect the following year. In retirement, applied to the pension allowance at the end of each year, taking effect the following year.
+- **Step increases**: The Step 1 → Step 2 raise occurs 6 months after hire. Since the calculator uses annual periods, Year 1 contributions are averaged over 6 months at Step 1 and 6 months at Step 2. The Steps 2 → 3, 3 → 4, and 4 → 5 raises each take effect at the start of Years 3, 4, and 5 respectively.
+- **Promotions**: Applied at the end of the year you specify, taking effect the following year.
 """)
 
 # Results
@@ -274,17 +278,24 @@ st.markdown("""
 The chart below tracks both options across your full career and retirement.
 
 **What each line represents:**
-- The **green line** is the balance of your hypothetical personal retirement fund. Before retirement, it grows as you make contributions and earn investment returns. After retirement, you withdraw from it each year — the same amount as your pension would have paid — and the balance either keeps growing or gradually shrinks depending on your returns vs. withdrawal rate.
+- The **green line** is the balance of your hypothetical personal retirement fund. Before retirement, it grows as you make contributions and earn investment returns. After retirement, you withdraw from it each year — the same amount as your pension would have paid out — and the balance either keeps growing or shrinks depending on your returns vs. withdrawal rate.
 - The **blue line** is the cumulative total you've received from the pension — the sum of all annual payments so far. It's zero during working years, then rises steadily once retirement begins.
 - The **red dashed line** marks the moment retirement begins.
 
-**How to tell who's winning:**
-- **Pension is the better deal** when the blue line climbs above the green line — meaning the total income received from the pension has surpassed whatever remains in the personal fund. If the green line drops to zero, the personal fund ran out of money entirely.
-- **Personal fund is the better deal** when the green line stays higher than the blue line throughout retirement, and especially if it's still growing. This means your investments outpaced your withdrawals — you got the same retirement income *and* still have money left over.
+**An important note on how this comparison works:** Both options pay you the *same annual income* in retirement. The personal fund withdraws the exact same amount each year as the pension would have paid. So the green line balance is what's left *on top of* having already received that income — it's the leftover, not the total.
+
+**How to tell which option is better:**
+
+The only question that matters is: **does the personal fund run out of money before your retirement years are up?**
+
+- **Personal fund wins** if the green line stays above zero through all your retirement years. This means you received the same income as the pension *and* still have money left over when you die. The higher the green line at the end, the larger that leftover.
+- **Pension wins** if the green line drops to zero before retirement ends. This means the personal fund ran dry, and the pension's guarantee — that it pays no matter how long you live — is what would have kept you afloat.
+
+The blue line (cumulative pension income) is useful context for scale, but **don't compare the green and blue lines directly** to judge a winner — they measure different things. Green is a remaining account balance; blue is a running total of income received.
 
 **What you leave behind:**
-- With the **personal fund**, the value shown on the green line at the very end of the chart is money you still own. You could leave it to heirs, spend it, or donate it.
-- With the **pension**, payments stop when you die. Your pension may include a *survivor benefit* — a reduced annual payment to a spouse or dependent after your death — but that is elected at retirement and typically reduces your annual allowance. This calculator does not model survivor benefits.
+- With the **personal fund**, whatever the green line shows at the end of your retirement is money you still own — you could leave it to heirs, donate it, or spend it.
+- With the **pension**, payments stop when you die. That being said, your pension may include a *survivor benefit* (a reduced annual payment to a spouse or dependent after your death) if you choose to select that option at the time of your retirement. This calculator does not model survivor benefits.
 """)
 
 # Plot
@@ -340,10 +351,14 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 st.subheader("Summary")
 
-st.markdown(f"**Total Pension Contributions:** ${pension_contribution_total:,.0f}", help="The total amount automatically deducted from your paychecks and contributed to the pension system over the course of your working years.")
-st.markdown(f"**Total Pension Received:** ${pension_redeemed_total:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
-st.markdown(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
-st.markdown(f"**Personal Fund Value at End of Retirement:** ${personal_balance:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you've withdrawn your annual allowance for each year of retirement. This is money you'd still own — it could be left to heirs or used however you choose.")
+st.markdown(f"**Total Pension Contributed at Time of Retirement:** ${pension_contribution_total:,.0f}", help="The total amount automatically deducted from your paychecks and contributed to the pension system over the course of your working years.")
+st.markdown(f"**Total Pension Received At Death:** ${pension_redeemed_total:,.0f}", help="The total amount you would have received from the pension over all retirement years, accounting for annual COLA increases.")
+st.markdown(f"**Personal Fund Value at Time of Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as investment growth.")
+
+if personal_balance > 0:
+    st.markdown(f"**Personal Fund Balance at Death:** ${personal_balance:,.0f} — *personal fund is viable* ✓", help="The personal fund still has money left after paying out the same income as the pension for every year of retirement. This leftover balance is money you'd still own at death — the pension option leaves nothing equivalent.")
+else:
+    st.markdown(f"**Personal Fund Balance at Death:** ${personal_balance:,.0f} — *personal fund ran out* ✗", help="The personal fund was depleted before the end of your retirement years. The pension would have continued paying regardless — this is where the pension's lifetime guarantee has real value.")
 
 # Display the table
 st.divider()
