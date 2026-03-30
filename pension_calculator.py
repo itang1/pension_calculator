@@ -1,3 +1,4 @@
+import math
 import streamlit as st
 import pandas as pd
 from plotly import graph_objects as go
@@ -6,7 +7,7 @@ from plotly import graph_objects as go
 st.title("Is Your Pension Worth It?")
 
 st.markdown("""
-Many public employees — teachers, law enforcement officers, civil servants — are required to contribute a portion of every paycheck into a pension plan, with no say in the matter. But is the pension actually worth it? **What if you had instead kept that money and invested it yourself?**
+Many public employees (such as teachers, law enforcement officers, civil servants) are required to contribute a portion of every paycheck into a pension plan, with no say in the matter. But is the pension actually worth it? **What if you had instead kept that money and invested it yourself?**
 """)
 
 st.markdown("This calculator compares two options side by side:")
@@ -26,7 +27,7 @@ What if, instead of contributing to the pension, you deposited that same amount 
 """)
 
 st.markdown("""
-By running both scenarios with the same inputs — your salary, contribution rate, investment return, and retirement timeline — you can see which option comes out ahead, and by how much.
+By running both scenarios with the same inputs (such as salary, contribution rate, investment return, and retirement timeline), you can see which option comes out ahead, and by how much.
 """)
 
 st.markdown("""
@@ -35,9 +36,9 @@ st.markdown("""
 
 1. **Background:** The pension debate, and what this calculator does and doesn't model**
 2. **Input assumptions:** Enter your salary, career details, and retirement estimates
-3. **Simulation results:** — A side-by-side chart and numeric summary comparing both options
-4. **Year over year breakdown:** — Detailed tables showing how every number was calculated, year by year
-5. **Case studies:** — Three worked examples illustrating when each option wins
+3. **Simulation results:** A side-by-side chart and numeric summary comparing both options
+4. **Year over year breakdown:** Detailed tables showing how every number was calculated, year by year
+5. **Case studies:** Three worked examples illustrating when each option wins
 """)
 
 
@@ -74,7 +75,7 @@ with st.expander("Limitations & Assumptions"):
     st.markdown("""
 This calculator is an educational tool, not a comprehensive financial model. Several important factors are simplified or omitted:
 
-**Tax treatment.** This calculator assumes the personal savings option has the same pre-tax advantages as the pension--i.e. contributions reduce your taxable income now, and you pay taxes later. In practice, this assumption holds best for someone who has available space in a 457(b) plan (which accepts pre-tax contributions with its own contribution limit separate from your pension). If you aren't yet maxing out your 457(b), redirecting pension-equivalent contributions there would give you the same pre-tax treatment modeled here with this calculator. If you have no tax-advantaged space available, the personal savings option would be at a disadvantage not captured by this calculator.
+**Tax treatment.** This calculator assumes the personal savings option has the same pre-tax advantages as the pension (i.e. contributions reduce your taxable income now, and you pay taxes later). In practice, this assumption holds best for someone who has available space in a 457(b) plan (which accepts pre-tax contributions with its own contribution limit separate from your pension). If you aren't yet maxing out your 457(b), redirecting pension-equivalent contributions there would give you the same pre-tax treatment modeled here with this calculator. If you have no tax-advantaged space available, the personal savings option would be at a disadvantage not captured by this calculator.
 
 **No market volatility.** The calculator uses a fixed annual return every year. Real markets fluctuate, and a string of bad years early in retirement can be far more damaging than the average return would suggest, which is a phenomenon called "sequence of returns risk."
 
@@ -314,6 +315,17 @@ fig.add_trace(go.Scatter(
     )
 ))
 
+# Adaptive x-axis: target ~10 labels regardless of total years, snapped to multiples of 5
+total_years = len(years)
+x_tick_step = max(5, int(math.ceil(total_years / 10 / 5) * 5))
+
+# Nice y-axis interval: target ~8 gridlines, rounded to a clean magnitude
+max_y = max((v for v in pension_fund_values + personal_fund_values if v is not None), default=1)
+max_y = max(max_y, 1)
+raw_interval = max_y / 8
+magnitude = 10 ** math.floor(math.log10(raw_interval))
+y_tick_interval = round(raw_interval / magnitude) * magnitude or magnitude
+
 fig.update_layout(
     title='Pension vs. Personal Retirement Fund Over Time',
     xaxis_title='Year (W = Working, R = Retirement)',
@@ -321,13 +333,17 @@ fig.update_layout(
     xaxis=dict(
         tickangle=45,
         tickmode='array',
-        tickvals=[years[i] for i in range(0, len(years), 5)],
-        tickfont=dict(size=10)
+        tickvals=[years[i] for i in range(0, len(years), x_tick_step)],
+        tickfont=dict(size=10),
+        showgrid=True,
+        gridcolor='lightgray',
     ),
     yaxis=dict(
+        showgrid=True,
         gridcolor='lightgray',
+        dtick=y_tick_interval,
         tickformat=',',
-        separatethousands=True
+        separatethousands=True,
     ),
     plot_bgcolor='white',
     legend=dict(x=0.01, y=0.99),
@@ -336,9 +352,6 @@ fig.update_layout(
 
 fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Retirement begins here",
           annotation_position="top right")
-tick_interval = max(pension_contribution_total, pension_redeemed_total, personal_balance)//10
-fig.update_yaxes(showgrid=True, dtick=tick_interval)
-fig.update_xaxes(showgrid=True)
 
 st.plotly_chart(fig, use_container_width=True)
 
