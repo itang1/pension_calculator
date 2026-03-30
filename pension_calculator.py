@@ -49,34 +49,34 @@ with st.expander("The Pension Debate"):
     st.markdown("""
 ### The Case Against Pensions
 
-Pension systems were designed for a different era — one where people worked a single job for 30 years, life expectancy was shorter, and personal investing was difficult and expensive. Today, those conditions largely no longer hold.
+Pension systems were designed for a different era, one where people worked a single job for 30 years, life expectancy was shorter, and personal investing was difficult and expensive. Today, those conditions largely no longer hold.
 
-Critics argue that pensions are financially unsustainable. Many public pension funds are underfunded, meaning they owe more in future benefits than they currently hold in assets. When that gap widens, taxpayers bear the cost. Critics also point to structural flaws: pensions disproportionately reward employees who stay for decades, while those who leave before vesting — sometimes after 5 or 10 years — walk away with nothing or very little. In a workforce where job-hopping is common, that's a serious penalty for mobility.
+Critics argue that pensions are financially unsustainable. Many public pension funds are underfunded, such that they owe more in future benefits than they currently hold in assets. When that gap widens, taxpayers bear the cost. Critics also point to structural flaws: pensions disproportionately reward employees who stay for decades, while those who leave before vesting (which sometimes is set to 5 or 10 years) walk away with nothing or very little. In today's climate, where job-hopping every few years is common practice, that's a serious penalty for mobility.
 
-There's also the matter of control. Pension contributions are gone the moment they leave your paycheck. You can't invest them, access them early in an emergency, or pass them to your family if you die before retirement. A personal investment account, by contrast, is your money — it grows on your terms, you can leave it to heirs, and you're not dependent on a government agency to remain solvent for the next 30 years.
+There's also the matter of control. Pension contributions are gone the moment they leave your paycheck. You can't invest them, access them early in an emergency, or pass them to your family if you die before retirement. A personal investment account, by contrast, is your money: it grows on your terms, you can leave it to heirs, and you're not dependent on a government agency to remain solvent for the next 30 years.
 
 ### The Case For Pensions
 
-On the other side, defenders of pensions make a compelling argument: guaranteed income for life is genuinely hard to replicate on your own. A pension pays no matter how long you live, regardless of whether the market crashes the year you retire. A personal investment account has no such guarantee. If your investments perform poorly — or if you simply live longer than expected — you can run out of money.
+On the other side, defenders of pensions make a compelling argument: guaranteed income for life is genuinely hard to replicate on your own. A pension pays no matter how long you live, regardless of whether the market crashes the year you retire. A personal investment account has no such guarantee. If your investments perform poorly or if you live longer than expected, you can run out of money.
 
 Pensions also provide a kind of collective insurance. When a large pool of workers all contribute together, those who live longest are effectively subsidized by those who don't. An individual investor can't access this "mortality pooling" in a personal account.
 
-Defenders also note that many public sector jobs pay less than their private sector equivalents. The pension is often part of the total compensation package that makes those jobs attractive — remove it, and you'd need to raise salaries to compensate.
+Defenders also note that many public sector jobs pay less than their private sector equivalents. The pension is often part of the total compensation package that makes those jobs attractive.
 
-### The Honest Answer
+### Is it Worth It?
 
 Both sides have a point, and the research reflects that. Whether a pension is "worth it" for a given individual depends on a web of factors: how long you work and whether you vest fully, how the market performs over your career, how long you live in retirement, whether you have heirs you want to provide for, and how much you value certainty versus upside potential.
 
-This calculator doesn't resolve that debate — it just makes the comparison concrete and transparent. Plug in your own numbers and see for yourself.
+This calculator doesn't resolve that debate, but it is a tool to aid in making the comparison transparent. Plug in your own numbers to see for for yourself.
 """)
 
 with st.expander("Limitations & Assumptions"):
     st.markdown("""
 This calculator is an educational tool, not a comprehensive financial model. Several important factors are simplified or omitted:
 
-**Tax treatment.** This calculator assumes the personal savings option has the same pre-tax advantages as the pension — meaning contributions reduce your taxable income now, and you pay taxes later. In practice, this assumption holds best for someone who has available space in a 457(b) plan: a 457(b) accepts pre-tax contributions with its own contribution limit separate from your pension. If you aren't yet maxing out your 457(b), redirecting pension-equivalent contributions there would give you the same pre-tax treatment modeled here. If you have no tax-advantaged space available, the personal savings option would be at a disadvantage not captured by this calculator.
+**Tax treatment.** This calculator assumes the personal savings option has the same pre-tax advantages as the pension--i.e. contributions reduce your taxable income now, and you pay taxes later. In practice, this assumption holds best for someone who has available space in a 457(b) plan (which accepts pre-tax contributions with its own contribution limit separate from your pension). If you aren't yet maxing out your 457(b), redirecting pension-equivalent contributions there would give you the same pre-tax treatment modeled here with this calculator. If you have no tax-advantaged space available, the personal savings option would be at a disadvantage not captured by this calculator.
 
-**No market volatility.** The calculator uses a fixed annual return every year. Real markets fluctuate, and a string of bad years early in retirement can be far more damaging than the average return would suggest — a phenomenon called "sequence of returns risk."
+**No market volatility.** The calculator uses a fixed annual return every year. Real markets fluctuate, and a string of bad years early in retirement can be far more damaging than the average return would suggest, which is a phenomenon called "sequence of returns risk."
 
 **No mortality risk pooling.** Because everyone in a pension pool contributes together, those who live longer are subsidized by those who don't. An individual account can't replicate this, which means the pension becomes especially valuable for people who live well past average life expectancy.
 
@@ -86,7 +86,7 @@ This calculator is an educational tool, not a comprehensive financial model. Sev
 
 **Fixed contribution and withdrawal patterns.** Contributions are assumed to be steady throughout your career, and withdrawals are assumed to start at a fixed amount (growing with COLA). Real behavior varies.
 
-*Real-world retirement decisions should involve a licensed financial planner who can account for your full situation.*
+*Real-world retirement decisions should involve a licensed financial planner who can account for your full situation. Please consult a tax professional for personalized advice.*
 """)
 
 
@@ -198,6 +198,8 @@ pension_redeemed = starting_allowance
 years = ["W0"]
 pension_fund_values = [0]
 personal_fund_values = [0]
+# Per-year hover data: [contribution, disbursement, deposit, withdrawal, market_returns]
+hover_data = [[0, 0, 0, 0, 0]]
 yearly_data = pd.DataFrame({'Year': [],
                             'Salary': [],
                             'Pension Contribution': [],
@@ -226,6 +228,7 @@ for work_year in range(1, int(work_years) + 1):
     years.append(f"W{work_year}")
     pension_fund_values.append(0)
     personal_fund_values.append(personal_balance)
+    hover_data.append([pension_contribution_this_year, 0, pension_contribution_this_year, 0, market_returns])
 
     # Store data for the table
     new_row = {
@@ -259,6 +262,7 @@ for ret_year in range(1, retirement_years + 1):
     years.append(f"R{ret_year}")
     pension_fund_values.append(pension_redeemed_total)
     personal_fund_values.append(personal_balance)
+    hover_data.append([0, pension_redeemed, 0, pension_redeemed, market_returns])
 
     # Store data for the table
     new_row = {"Year": f"R{ret_year}",
@@ -283,7 +287,14 @@ fig.add_trace(go.Scatter(
     mode='lines+markers',
     name='Total Pension Received (cumulative)',
     line=dict(color='blue'),
-    hovertemplate='Year: %{x}<br>Total pension received: $%{y:,.0f}<extra></extra>'
+    customdata=hover_data,
+    hovertemplate=(
+        '<b>Year %{x}</b><br>'
+        'Contribution this year: $%{customdata[0]:,.0f}<br>'
+        'Pension payment this year: $%{customdata[1]:,.0f}<br>'
+        'Cumulative total received: $%{y:,.0f}'
+        '<extra></extra>'
+    )
 ))
 
 fig.add_trace(go.Scatter(
@@ -292,7 +303,15 @@ fig.add_trace(go.Scatter(
     mode='lines+markers',
     name='Personal Retirement Fund Balance',
     line=dict(color='green'),
-    hovertemplate='Year: %{x}<br>Personal fund balance: $%{y:,.0f}<extra></extra>'
+    customdata=hover_data,
+    hovertemplate=(
+        '<b>Year %{x}</b><br>'
+        'Deposit this year: $%{customdata[2]:,.0f}<br>'
+        'Withdrawal this year: $%{customdata[3]:,.0f}<br>'
+        'Market returns this year: $%{customdata[4]:,.0f}<br>'
+        'Fund balance: $%{y:,.0f}'
+        '<extra></extra>'
+    )
 ))
 
 fig.update_layout(
@@ -337,14 +356,42 @@ else:
 Your personal fund would have run dry before your {int(retirement_years)}-year retirement was over, while the pension would have kept paying regardless. The lifetime guarantee is the decisive advantage here — the personal fund simply can't sustain the withdrawal rate with these investment returns over this retirement length.
 """)
 
-st.markdown(f"**Total Pension Contributed at Time of Retirement:** ${pension_contribution_total:,.0f}", help="The total amount automatically deducted from your paychecks and contributed to the pension system over the course of your working years.")
-st.markdown(f"**Total Pension Received At Death:** ${pension_redeemed_total:,.0f}", help="The total amount you would have received from the pension over all retirement years, accounting for annual COLA increases.")
-st.markdown(f"**Personal Fund Value at Time of Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as investment growth.")
-
-if personal_balance > 0:
-    st.markdown(f"**Personal Fund Balance at Death:** ${personal_balance:,.0f} — *personal fund is viable* ✓", help="The personal fund still has money left after paying out the same income as the pension for every year of retirement. This leftover balance is money you'd still own at death — the pension option leaves nothing equivalent.")
-else:
-    st.markdown(f"**Personal Fund Balance at Death:** ${personal_balance:,.0f} — *personal fund ran out* ✗", help="The personal fund was depleted before the end of your retirement years. The pension would have continued paying regardless — this is where the pension's lifetime guarantee has real value.")
+mcol1, mcol2 = st.columns(2)
+with mcol1:
+    st.markdown("**Pension**")
+    st.metric(
+        label="Total Contributed",
+        value=f"${pension_contribution_total:,.0f}",
+        help="The total amount automatically deducted from your paychecks and contributed to the pension system over your working years."
+    )
+    st.metric(
+        label="Total Received at Death",
+        value=f"${pension_redeemed_total:,.0f}",
+        delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net over contributions",
+        help="The total pension income paid out over all retirement years, including annual COLA increases. The delta shows how much more you received than you put in."
+    )
+with mcol2:
+    st.markdown("**Personal Fund**")
+    st.metric(
+        label="Value at Retirement",
+        value=f"${personal_fund_values[work_years]:,.0f}",
+        help="The balance of your hypothetical personal investment account on the day you retire, after years of contributions and market growth."
+    )
+    if personal_balance > 0:
+        st.metric(
+            label="Balance at Death",
+            value=f"${personal_balance:,.0f}",
+            delta="Viable — fund did not run out ✓",
+            help="The personal fund still has money left after paying out the same income as the pension for every retirement year. This is money you'd still own at death."
+        )
+    else:
+        st.metric(
+            label="Balance at Death",
+            value=f"${personal_balance:,.0f}",
+            delta="Ran out before retirement ended ✗",
+            delta_color="inverse",
+            help="The personal fund was depleted before your retirement years were up. The pension would have continued paying regardless — this is where the pension's lifetime guarantee has real value."
+        )
 
 st.markdown("""
 The chart above tracks both options across your full career and retirement, using your current input variables.
@@ -361,21 +408,21 @@ The chart above tracks both options across your full career and retirement, usin
 The only question that matters is: **does the personal fund run out of money before your retirement years are up?**
 
 - **Personal fund wins** if the green line stays above zero through all your retirement years. This means you received the same income as the pension *and* still have money left over when you die. The higher the green line at the end, the larger that leftover.
-- **Pension wins** if the green line drops to zero before retirement ends. This means the personal fund ran dry, and the pension's guarantee — that it pays no matter how long you live — is what would have kept you afloat.
+- **Pension wins** if the green line drops to zero before retirement ends. This means the personal fund ran dry, and the pension's guarantee to pay no matter how long you live is what would have kept you afloat.
 
-The blue line (cumulative pension income) is useful context for scale, but **don't compare the green and blue lines directly** to judge a winner — they measure different things. Green is a remaining account balance; blue is a running total of income received.
+The blue line (cumulative pension income) is useful context for scale, but **don't compare the green and blue lines directly** to judge a winner. They measure different things. Green is a remaining account balance; blue is a running total of income received.
 
 **What you leave behind:**
-- With the **personal fund**, whatever the green line shows at the end of your retirement is money you still own — you could leave it to heirs, donate it, or spend it.
+- With the **personal fund**, whatever the green line shows at the end of your retirement is money you still own. You could leave it to heirs, donate it, or spend it.
 - With the **pension**, payments stop when you die. That being said, your pension may include a *survivor benefit* (a reduced annual payment to a spouse or dependent after your death) if you choose to select that option at the time of your retirement. This calculator does not model survivor benefits.
 """)
 
 # Display the table
 st.divider()
-st.subheader("Year Over Year Breakdown")
+st.subheader("Year-Over-Year Breakdown")
 
 st.markdown("""
-The tables below walk through every year of your career and retirement, showing exactly where the numbers come from. Each row is one year. The left table tracks the **pension side**, and the right table tracks the **personal retirement fund side** — using the same dollar amounts contributed each year so the comparison is apples-to-apples.
+The tables below walk through every year of your career and retirement, showing exactly where the numbers come from. Each row is one year. The left table tracks the **pension side**, and the right table tracks the **personal retirement fund side** using the same dollar amounts contributed each year.
 """)
 
 st.markdown("#### Working Years")
@@ -441,7 +488,7 @@ The pension pays a set annual amount, growing by {(cola_increase-1)*100:.1f}% ea
 with col2:
     st.markdown("**Personal Fund Side**")
     st.markdown(f"""
-Each year, you withdraw the same dollar amount as the pension would have paid — so the comparison stays fair. The column headers show the formula: the previous balance earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
+Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the previous balance earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
 """)
 
 # Tables
