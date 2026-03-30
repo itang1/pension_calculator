@@ -29,7 +29,7 @@ with st.expander("The Public Pension Debate"):
     st.markdown("""
     Many public sector employees (such as teachers, law enforcement officers, and civil servants) mandatorily participate in defined-benefit pension plans. Under a pension plan, workers are required to contribute a fixed percentage of their salary throughout their working years in exchange for a guaranteed, fixed income during their retirement years. The employer bears the responsibility of paying out the pension and assumes the investment risk. By contrast, the private sector has largely shifted to defined-contribution plans such as 401(k)s and 403(b)s. In these plans, employees can voluntarily invest contributions into a range of market assets, often with some employer matching as well. Since market performance is not guaranteed, employees assume the full responsibility for managing the risks associated with their retirement investments.
 
-    This structural difference between the two retirement systems has sparked debate and, at times, resentment and jealousy. Critics argue that pensions are financially unsustainable in the long run, especially as populations age and life expectancy increases. They contend that pensions impose an unfair burden on taxpayers, particularly in states or cities where the government pension plan is underfunded yet still obligated to conjure up funds to pay out the promised benefits. Some detractors even feel that pension benefits are overly generous compared to what private sector employees receive. On the other hand, proponents maintain that pensions encourage individuals to accept public sector jobs, which can sometimes pay less than their equivalent private sector counterparts. They also highlight that pensions help reduce elderly poverty through predictable monthly or annual payments—especially benefiting those who might not otherwise save enough or those who lack the financial literacy to manage retirement funds effectively. Ultimately, this debate involves issues of fairness, fiscal responsibility, and the government’s role in securing citizens’ retirement income.
+    This structural difference between the two retirement systems has sparked debate and, at times, resentment and jealousy. Critics argue that pensions are financially unsustainable in the long run, especially as populations age and life expectancy increases. They contend that pensions impose an unfair burden on taxpayers, particularly in states or cities where the government pension plan is underfunded yet still obligated to conjure up funds to pay out the promised benefits. Some detractors even feel that pension benefits are overly generous compared to what private sector employees receive. On the other hand, proponents maintain that pensions encourage individuals to accept public sector jobs, which can sometimes pay less than their equivalent private sector counterparts. They also highlight that pensions help reduce elderly poverty through predictable monthly or annual payments—especially benefiting those who might not otherwise save enough or those who lack the financial literacy to manage retirement funds effectively. Ultimately, this debate involves issues of fairness, fiscal responsibility, and the government's role in securing citizens' retirement income.
 
     While pensions indeed offer stability and predictability, they might not be the optimal choice for everyone—particularly for those who are disciplined, financially literate, and value the flexibility, control, and potential upside of tax-deferred personal accounts. This calculator is designed to explore the question that follows: **If the same annual contribution were made, would a traditional pension or a personal investment account yield a better outcome?**
 
@@ -104,11 +104,11 @@ with col3:
         step=1.,
         help="Salary bump when you receive a promotion."
     ) / 100 + 1
-    pension_tax_rate = st.number_input(
-        "Pension Tax Rate (%)",
+    pension_contribution_rate = st.number_input(
+        "Pension Contribution Rate (%)",
         value=10.0,
         step=1.,
-        help="Percentage of your salary contributed to the pension system each year."
+        help="Percentage of your salary automatically deducted and contributed to the pension system each year."
     ) / 100
     starting_allowance = st.number_input(
         "Starting Annual Pension Allowance ($)",
@@ -146,7 +146,7 @@ except:
     promotion_years = []
 
 # Initialize variables
-pension_taxed_total = 0
+pension_contribution_total = 0
 pension_redeemed_total = 0
 personal_balance = 0
 salary = starting_wage
@@ -158,8 +158,8 @@ pension_fund_values = [0]
 personal_fund_values = [0]
 yearly_data = pd.DataFrame({'Year': [],
                             'Salary': [],
-                            'Pension Taxed': [],
-                            'Pension Taxed Total': [],
+                            'Pension Contribution': [],
+                            'Pension Contribution Total': [],
                             'Pension Redeemed': [],
                             'Pension Redeemed Total': [],
                             'Market Returns': [],
@@ -173,13 +173,13 @@ for work_year in range(1, int(work_years) + 1):
     else:
         effective_salary = salary
 
-    # Compute pension tax
-    pension_tax_this_year = effective_salary * pension_tax_rate
-    pension_taxed_total += pension_tax_this_year
+    # Compute pension contribution
+    pension_contribution_this_year = effective_salary * pension_contribution_rate
+    pension_contribution_total += pension_contribution_this_year
 
     # Compute personal balance
     market_returns = personal_balance * (index_returns_rate-1)
-    personal_balance = personal_balance + market_returns + pension_tax_this_year
+    personal_balance = personal_balance + market_returns + pension_contribution_this_year
 
     years.append(f"W{work_year}")
     pension_fund_values.append(0)
@@ -189,8 +189,8 @@ for work_year in range(1, int(work_years) + 1):
     new_row = {
         "Year": f"W{work_year}",
         "Salary": f"${effective_salary:,.0f}",
-        "Pension Taxed": f"${pension_tax_this_year:,.0f}",
-        "Pension Taxed Total": f"${pension_taxed_total:,.0f}",
+        "Pension Contribution": f"${pension_contribution_this_year:,.0f}",
+        "Pension Contribution Total": f"${pension_contribution_total:,.0f}",
         "Pension Redeemed": "$0",  # No pension redeemed during work years
         "Pension Redeemed Total": "$0",  # No pension redeemed during work years
         "Market Returns": f"${market_returns:,.0f}",
@@ -220,8 +220,8 @@ for ret_year in range(1, retirement_years + 1):
 
     # Store data for the table
     new_row = {"Year": f"R{ret_year}",
-        "Pension Taxed": "$0",  # No pension tax paid during retirement years
-        "Pension Taxed Total": "$0",  # No pension tax paid during retirement years
+        "Pension Contribution": "$0",  # No pension contribution paid during retirement years
+        "Pension Contribution Total": "$0",  # No pension contribution paid during retirement years
         "Pension Redeemed": f"${pension_redeemed:,.0f}",
         "Pension Redeemed Total": f"${pension_redeemed_total:,.0f}",
         "Market Returns": f"${market_returns:,.0f}",
@@ -232,6 +232,17 @@ for ret_year in range(1, retirement_years + 1):
     # Update allowance for next year
     pension_redeemed *= cola_increase
 
+# Chart explanation
+st.markdown("""
+The chart below shows how both options — the **pension** and the **personal retirement fund** — compare over your entire career and retirement.
+
+- The **green line** shows the value of your hypothetical personal retirement fund. During your working years, it grows as you make annual contributions and earn investment returns. During retirement, you withdraw from it each year to cover living expenses. The line will rise or fall depending on whether your investment returns outpace your withdrawals.
+- The **blue line** shows the total amount of money you've received from your pension. It's zero during your working years (the pension hasn't paid out yet), then rises steadily once you retire as you collect your annual allowance.
+- The **red dashed line** marks the year you retire — where your working years end and your retirement years begin.
+
+**How to read this chart:** Before the red line, watch the green line climb — that's your personal fund growing. After the red line, the blue line starts rising (your pension paying out), and the green line either keeps growing or starts declining depending on how well your investments do. The higher the green line is at the end, the more money is left over in your personal fund.
+""")
+
 # Plot
 fig = go.Figure()
 
@@ -239,22 +250,24 @@ fig.add_trace(go.Scatter(
     x=years,
     y=pension_fund_values,
     mode='lines+markers',
-    name='Cumulative Pension Received',
-    line=dict(color='blue')
+    name='Total Pension Received (cumulative)',
+    line=dict(color='blue'),
+    hovertemplate='Year: %{x}<br>Total pension received: $%{y:,.0f}<extra></extra>'
 ))
 
 fig.add_trace(go.Scatter(
     x=years,
     y=personal_fund_values,
     mode='lines+markers',
-    name='Hypothetical Personal Retirement Fund',
-    line=dict(color='green')
+    name='Personal Retirement Fund Balance',
+    line=dict(color='green'),
+    hovertemplate='Year: %{x}<br>Personal fund balance: $%{y:,.0f}<extra></extra>'
 ))
 
 fig.update_layout(
-    title='Retirement Fund Comparison',
-    xaxis_title='Year',
-    yaxis_title='Amount ($)',
+    title='Pension vs. Personal Retirement Fund Over Time',
+    xaxis_title='Year (W = Working, R = Retirement)',
+    yaxis_title='Dollar Amount ($)',
     xaxis=dict(
         tickangle=45,
         tickmode='array',
@@ -271,9 +284,9 @@ fig.update_layout(
     margin=dict(l=40, r=20, t=60, b=100)
 )
 
-fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Year of Retirement",
+fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Retirement begins here",
           annotation_position="top right")
-tick_interval = max(pension_taxed_total, pension_redeemed_total, personal_balance)//10
+tick_interval = max(pension_contribution_total, pension_redeemed_total, personal_balance)//10
 fig.update_yaxes(showgrid=True, dtick=tick_interval)
 fig.update_xaxes(showgrid=True)
 
@@ -283,72 +296,87 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 st.subheader("Summary")
 
-st.markdown(f"**Total Pension Contributions:** ${pension_taxed_total:,.0f}", help="The total amount you paid into the pension system through automatic deductions over the course of your working years.")
+st.markdown(f"**Total Pension Contributions:** ${pension_contribution_total:,.0f}", help="The total amount automatically deducted from your paychecks and contributed to the pension system over the course of your working years.")
 st.markdown(f"**Total Pension Received:** ${pension_redeemed_total:,.0f}", help="The total amount you received from the pension disbursements based on your retirement allowance throughout your retirement years, accounting for Cost of Living Adjustments.")
 st.markdown(f"**Personal Fund Value at Retirement:** ${personal_fund_values[work_years]:,.0f}", help="The total value accumulated in your hypothetical personal retirement fund by the time you retire. It includes your annual contributions as well as the growth of those contributions through market returns.")
-st.markdown(f"**Personal Fund Value at End of Retirement:** ${personal_balance:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you’ve withdrawn your annual allowance for each year of retirement.")
+st.markdown(f"**Personal Fund Value at End of Retirement:** ${personal_balance:,.0f}", help="The remaining balance in your hypothetical personal retirement fund after you've withdrawn your annual allowance for each year of retirement.")
 
 # Display the table
 st.divider()
 st.subheader("Year Over Year Breakdown")
 
+st.markdown("""
+The tables below walk through every year of your career and retirement, showing exactly where the numbers come from. Each row is one year. The left table tracks the **pension side**, and the right table tracks the **personal retirement fund side** — using the same contribution amounts so the comparison is apples-to-apples.
+""")
+
 st.markdown("#### Working Years")
+
+st.markdown("""
+During your working years, a fixed percentage of your salary is contributed each year — either into the pension system, or (hypothetically) into your own personal investment account. Your salary grows each year from Cost of Living Adjustments (COLA), step increases, and any promotions you receive.
+""")
 
 # Explanations
 col1, col2 = st.columns(2)
 with col1:
     st.markdown("**Pension Contributions**")
-
     st.markdown(f"""
-        - `Salary = Previous year's salary × {cola_increase:,.2f} COLA`
-            - Years 2–5: Additional `Salary *= {(step_increase):.3f} Step Increase`
-            - Years {str(promotion_years).strip("[]")}: Additional `Salary *= {(promotion_increase):.2f} Promotion Increase`
-        - **Year 1 only**: `Salary = (Step 1 salary + Step 2 salary) / 2` — Step 1→2 occurs at 6 months, so Year 1 averages both halves
-        - `Pension Contribution = Salary × {pension_tax_rate}`
-        - `Pension Contribution Total = Previous total + Pension Contribution this year`
-        """)
+Each year, {pension_contribution_rate*100:.0f}% of your salary is automatically contributed to the pension system. You don't get to keep or invest this money — it goes into the pension pool.
+
+- **Salary** grows each year by your COLA ({(cola_increase-1)*100:.1f}%). In your first 4 years, it also grows by your step increase ({(step_increase-1)*100:.1f}%). In promotion years ({str(promotion_years).strip("[]") if promotion_years else "none entered"}), it gets an additional {(promotion_increase-1)*100:.0f}% bump. *(Special case: Year 1 averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months into the job.)*
+- **Pension Contribution** is {pension_contribution_rate*100:.0f}% of that year's salary — the amount deducted from your paycheck.
+- **Pension Contribution Total** is a running tally of everything you've contributed so far across all working years.
+    """)
 
 with col2:
     st.markdown("**Hypothetical Personal Fund**")
     st.markdown(f"""
-        - `Deposit = same amount as Pension Contribution`
-        - `Market Returns = Previous year's Balance × {(index_returns_rate - 1):,.2f}`
-        - `Balance = Previous year's Balance + Deposit + Market Returns`
-        """)
-    
+Instead of paying into the pension, imagine you deposited that same amount into your own investment account (like a 403b or 401k) each year. Your money would grow through investment returns.
+
+- **Deposit** is the same dollar amount as your pension contribution that year — the comparison is kept equal so it's fair.
+- **Market Returns** is the growth your existing balance earned that year, based on a {(index_returns_rate-1)*100:.1f}% annual return. *(Returns are calculated on the balance at the start of the year, before that year's deposit is added.)*
+- **Balance** is what your account is worth at the end of the year: last year's balance, plus market returns, plus this year's deposit.
+    """)
 
 
 # Tables
 col1, col2 = st.columns(2)
 with col1:
-    working_pension_df = yearly_data[["Year", "Salary", "Pension Taxed", "Pension Taxed Total"]]
+    working_pension_df = yearly_data[["Year", "Salary", "Pension Contribution", "Pension Contribution Total"]]
     working_pension_df = working_pension_df[working_pension_df['Year'].str.startswith('W')]
     st.dataframe(working_pension_df, hide_index=True)
 
 with col2:
-    working_personal_df = yearly_data[["Year", "Pension Taxed", "Market Returns", "Balance"]]
-    working_personal_df = working_personal_df.rename(columns={"Pension Taxed": "Deposit"})
+    working_personal_df = yearly_data[["Year", "Pension Contribution", "Market Returns", "Balance"]]
+    working_personal_df = working_personal_df.rename(columns={"Pension Contribution": "Deposit"})
     working_personal_df = working_personal_df[working_personal_df['Year'].str.startswith('W')]
     st.dataframe(working_personal_df, hide_index=True)
-    
+
 
 st.markdown("#### Retirement Years")
+
+st.markdown("""
+Once you retire, you stop contributing to either account. The pension begins paying you a fixed annual allowance (which increases each year with COLA). The personal fund is drawn down by that same amount each year — but it continues to earn investment returns on whatever is left.
+""")
 
 # Explanations
 col1, col2 = st.columns(2)
 with col1:
     st.markdown("**Pension Disbursements**")
     st.markdown(f"""
-    - `Pension Redeemed = Previous year's redemption allowance × {(cola_increase):.2f} COLA`
-    - `Pension Redeemed Total = Previous year's total + Pension Redeemed`
+The pension pays you a set amount every year for the rest of your life. That amount increases slightly each year to keep up with inflation (COLA).
+
+- **Pension Received** is the amount paid to you that year. It increases each year by {(cola_increase-1)*100:.1f}% (COLA).
+- **Pension Received Total** is a running tally of all pension payments you've received so far across retirement.
     """)
 
 with col2:
     st.markdown("**Hypothetical Personal Fund**")
     st.markdown(f"""
-    - `Withdrawn = same as Pension Redeemed`
-    - `Market Returns = Previous year's Balance × {(index_returns_rate - 1):,.2f}`
-    - `Balance = Previous year's Balance - Withdrawn + Market Returns`
+Your personal fund keeps earning returns even in retirement. Each year, you withdraw the same amount as the pension would have paid — then your remaining balance earns market returns.
+
+- **Withdrawn** is the same dollar amount as the pension payout that year — keeping the comparison fair.
+- **Market Returns** is the growth earned on your remaining balance before the withdrawal, at a {(index_returns_rate-1)*100:.1f}% annual return.
+- **Balance** is what's left at the end of the year: last year's balance, plus market returns, minus the withdrawal. If your returns exceed your withdrawal, the balance grows. If not, it shrinks.
     """)
 
 
@@ -357,6 +385,7 @@ with col2:
 col1, col2 = st.columns(2)
 with col1:
     retirement_pension_df = yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]]
+    retirement_pension_df = retirement_pension_df.rename(columns={"Pension Redeemed": "Pension Received", "Pension Redeemed Total": "Pension Received Total"})
     retirement_pension_df = retirement_pension_df[retirement_pension_df['Year'].str.startswith('R')]
     st.dataframe(retirement_pension_df, hide_index=True)
 
