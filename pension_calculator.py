@@ -370,7 +370,7 @@ with mc2:
     st.metric(
         label="Pension Received",
         value=f"${pension_redeemed_total:,.0f}",
-        delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net over contributions",
+        delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
         help="The total pension income paid out over all retirement years, including annual COLA increases. The delta shows how much more you received than you put in."
     )
 with mc3:
@@ -436,95 +436,80 @@ st.divider()
 st.subheader("Year-Over-Year Breakdown")
 
 st.markdown("""
-The tables below walk through every year of your career and retirement, showing exactly where the numbers come from. Each row is one year. The left table tracks the **pension side**, and the right table tracks the **personal retirement fund side** using the same dollar amounts contributed each year.
+Each row is one year. The left table tracks the **pension side**, the right tracks the **personal fund side** — using the same dollar amounts each year so the comparison is apples-to-apples.
 """)
 
-st.markdown("#### Working Years")
-
-st.markdown("""
+with st.expander("Working Years"):
+    st.markdown("""
 During your working years, a fixed percentage of your salary is contributed annually. Your salary grows each year from Cost of Living Adjustments (COLA), step increases, and any promotions.
 """)
-
-# Explanations
-col1, col2 = st.columns(2)
-with col1:
-    st.markdown("**Pension Side**")
-    st.markdown(f"""
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Pension Side**")
+        st.markdown(f"""
 Each year, {pension_contribution_rate*100:.0f}% of your salary is deducted and paid into the pension. The **Contribution** column shows that deduction. The **Total Contributed** column is a running sum of all contributions to date.
 
 Salary grows each year by your COLA ({(cola_increase-1)*100:.1f}%), plus a step increase ({(step_increase-1)*100:.1f}%) in your first 4 years, plus a {(promotion_increase-1)*100:.0f}% bump in any promotion years ({str(promotion_years).strip("[]") if promotion_years else "none entered"}). Year 1 is a special case: it averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months in.
 """)
-
-with col2:
-    st.markdown("**Personal Fund Side**")
-    st.markdown(f"""
+    with col2:
+        st.markdown("**Personal Fund Side**")
+        st.markdown(f"""
 Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: **+ Deposit** (same as the pension contribution) and **+ Returns** (investment growth on your existing balance at {(index_returns_rate-1)*100:.1f}%/year) add together to produce **= Balance** at year-end.
 
 Returns are calculated on the balance at the *start* of the year, before that year's deposit is added.
 """)
+    col1, col2 = st.columns(2)
+    with col1:
+        working_pension_df = yearly_data[["Year", "Salary", "Pension Contribution", "Pension Contribution Total"]]
+        working_pension_df = working_pension_df[working_pension_df['Year'].str.startswith('W')]
+        working_pension_df = working_pension_df.rename(columns={
+            "Pension Contribution": "Contribution",
+            "Pension Contribution Total": "Total Contributed"
+        })
+        st.dataframe(working_pension_df, hide_index=True)
+    with col2:
+        working_personal_df = yearly_data[["Year", "Pension Contribution", "Market Returns", "Balance"]]
+        working_personal_df = working_personal_df.rename(columns={
+            "Pension Contribution": "+ Deposit",
+            "Market Returns": "+ Returns",
+            "Balance": "= Balance"
+        })
+        working_personal_df = working_personal_df[working_personal_df['Year'].str.startswith('W')]
+        st.dataframe(working_personal_df, hide_index=True)
 
-# Tables
-col1, col2 = st.columns(2)
-with col1:
-    working_pension_df = yearly_data[["Year", "Salary", "Pension Contribution", "Pension Contribution Total"]]
-    working_pension_df = working_pension_df[working_pension_df['Year'].str.startswith('W')]
-    working_pension_df = working_pension_df.rename(columns={
-        "Pension Contribution": "Contribution",
-        "Pension Contribution Total": "Total Contributed"
-    })
-    st.dataframe(working_pension_df, hide_index=True)
-
-with col2:
-    working_personal_df = yearly_data[["Year", "Pension Contribution", "Market Returns", "Balance"]]
-    working_personal_df = working_personal_df.rename(columns={
-        "Pension Contribution": "+ Deposit",
-        "Market Returns": "+ Returns",
-        "Balance": "= Balance"
-    })
-    working_personal_df = working_personal_df[working_personal_df['Year'].str.startswith('W')]
-    st.dataframe(working_personal_df, hide_index=True)
-
-
-st.markdown("#### Retirement Years")
-
-st.markdown("""
-Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but it continues earning investment returns on whatever balance remains.
+with st.expander("Retirement Years"):
+    st.markdown("""
+Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains.
 """)
-
-# Explanations
-col1, col2 = st.columns(2)
-with col1:
-    st.markdown("**Pension Side**")
-    st.markdown(f"""
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Pension Side**")
+        st.markdown(f"""
 The pension pays a set annual amount, growing by {(cola_increase-1)*100:.1f}% each year (COLA). **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
 """)
-
-with col2:
-    st.markdown("**Personal Fund Side**")
-    st.markdown(f"""
+    with col2:
+        st.markdown("**Personal Fund Side**")
+        st.markdown(f"""
 Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the previous balance earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
 """)
-
-# Tables
-col1, col2 = st.columns(2)
-with col1:
-    retirement_pension_df = yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]]
-    retirement_pension_df = retirement_pension_df.rename(columns={
-        "Pension Redeemed": "Pension Received",
-        "Pension Redeemed Total": "Total Received"
-    })
-    retirement_pension_df = retirement_pension_df[retirement_pension_df['Year'].str.startswith('R')]
-    st.dataframe(retirement_pension_df, hide_index=True)
-
-with col2:
-    retirement_personal_df = yearly_data[["Year", "Pension Redeemed", "Market Returns", "Balance"]]
-    retirement_personal_df = retirement_personal_df.rename(columns={
-        "Pension Redeemed": "− Withdrawal",
-        "Market Returns": "+ Returns",
-        "Balance": "= Balance"
-    })
-    retirement_personal_df = retirement_personal_df[retirement_personal_df['Year'].str.startswith('R')]
-    st.dataframe(retirement_personal_df, hide_index=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        retirement_pension_df = yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]]
+        retirement_pension_df = retirement_pension_df.rename(columns={
+            "Pension Redeemed": "Pension Received",
+            "Pension Redeemed Total": "Total Received"
+        })
+        retirement_pension_df = retirement_pension_df[retirement_pension_df['Year'].str.startswith('R')]
+        st.dataframe(retirement_pension_df, hide_index=True)
+    with col2:
+        retirement_personal_df = yearly_data[["Year", "Pension Redeemed", "Market Returns", "Balance"]]
+        retirement_personal_df = retirement_personal_df.rename(columns={
+            "Pension Redeemed": "− Withdrawal",
+            "Market Returns": "+ Returns",
+            "Balance": "= Balance"
+        })
+        retirement_personal_df = retirement_personal_df[retirement_personal_df['Year'].str.startswith('R')]
+        st.dataframe(retirement_personal_df, hide_index=True)
 
 
 # Case Studies
