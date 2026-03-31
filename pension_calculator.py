@@ -355,43 +355,43 @@ fig.update_layout(
 fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Retirement begins here",
           annotation_position="top right")
 
-st.caption("Watch the **green line** during retirement. If it stays above zero, the personal fund wins — you got the same income as the pension and still have money left over. If it hits zero, the pension wins.")
+st.caption("Watch the **green line** during retirement. If it stays above zero, the personal fund wins: it means that you got the same income as the pension AND still have money left over at your death. If it hits zero, the pension wins.")
 
 st.plotly_chart(fig, use_container_width=True)
 
 mc1, mc2, mc3, mc4 = st.columns(4)
 with mc1:
     st.metric(
-        label="Pension: Total Contributed",
+        label="Pension Contributed",
         value=f"${pension_contribution_total:,.0f}",
         help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years."
     )
 with mc2:
     st.metric(
-        label="Pension: Total Received",
+        label="Pension Received",
         value=f"${pension_redeemed_total:,.0f}",
         delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net over contributions",
         help="The total pension income paid out over all retirement years, including annual COLA increases. The delta shows how much more you received than you put in."
     )
 with mc3:
     st.metric(
-        label="Personal Fund: Value at Retirement",
+        label="Fund at Retirement",
         value=f"${personal_fund_values[work_years]:,.0f}",
         help="The balance of your hypothetical personal investment account on the day you retire, after years of contributions and market growth."
     )
 with mc4:
     if personal_balance > 0:
         st.metric(
-            label="Personal Fund: Balance at Death",
+            label="Fund at Death",
             value=f"${personal_balance:,.0f}",
-            delta="Fund did not run out ✓",
+            delta="Did not run out ✓",
             help="The personal fund still has money left after paying out the same income as the pension for every retirement year. This is money you'd still own at death."
         )
     else:
         st.metric(
-            label="Personal Fund: Balance at Death",
+            label="Fund at Death",
             value=f"${personal_balance:,.0f}",
-            delta="Fund ran out before retirement ended ✗",
+            delta="Ran out before retirement ended ✗",
             delta_color="inverse",
             help="The personal fund was depleted before your retirement years were up. The pension would have continued paying regardless."
         )
