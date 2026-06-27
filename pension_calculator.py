@@ -1,7 +1,104 @@
+import json
 import math
+import urllib.request
+from datetime import datetime
 import streamlit as st
 import pandas as pd
 from plotly import graph_objects as go
+import gspread
+from user_agents import parse as _parse_ua
+
+_SPREADSHEET_ID = "1-H0MxbLs4QhES0tbXT4EztNm-5y-GY_jOzwJnwprP1M"
+
+_FEEDBACK_HEADERS = [
+    "Timestamp", "Feedback",
+    "Starting Wage", "Work Years", "Retirement Years",
+    "COLA %", "Index Returns %", "Pension Contribution %", "First-Year Allowance",
+    "Pension Contributed", "Pension Received", "Fund at Retirement",
+    "Final Fund Balance", "Break-even Rate %", "Years Fund Covers", "Winner",
+    "IP", "Country", "Region", "City", "Zip", "Lat", "Lon",
+    "Timezone", "ISP", "VPN/Proxy", "Mobile Network",
+    "Accept-Language", "Referrer", "Platform", "Mobile Browser",
+    "Browser", "Browser Version", "OS", "OS Version", "Device",
+]
+
+
+@st.cache_resource
+def _get_feedback_sheet():
+    return gspread.service_account_from_dict(
+        dict(st.secrets["gcp_service_account"]),
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    ).open_by_key(_SPREADSHEET_ID).sheet1
+
+
+def _client_metadata():
+    ip = ua_str = lang = referrer = platform_hdr = mobile_hdr = "unknown"
+    country = region = city = zip_code = timezone = isp = "unknown"
+    lat = lon = is_vpn = is_mobile_net = "unknown"
+    browser = browser_ver = os_name = os_ver = device = "unknown"
+
+    try:
+        hdrs = st.context.headers
+        ip = hdrs.get("X-Forwarded-For") or hdrs.get("X-Real-Ip") or "unknown"
+        ip = ip.split(",")[0].strip() or "unknown"
+        ua_str = hdrs.get("User-Agent", "unknown")
+        lang = hdrs.get("Accept-Language", "unknown")
+        referrer = hdrs.get("Referer", "unknown")
+        platform_hdr = hdrs.get("Sec-Ch-Ua-Platform", "unknown").strip('"')
+        mobile_hdr = hdrs.get("Sec-Ch-Ua-Mobile", "unknown")
+    except Exception:
+        pass
+
+    if ip not in ("unknown", "127.0.0.1", "::1"):
+        try:
+            fields = "status,country,regionName,city,zip,lat,lon,timezone,isp,proxy,mobile"
+            with urllib.request.urlopen(
+                f"http://ip-api.com/json/{ip}?fields={fields}", timeout=3
+            ) as r:
+                geo = json.loads(r.read())
+            if geo.get("status") == "success":
+                country = geo.get("country", "unknown")
+                region = geo.get("regionName", "unknown")
+                city = geo.get("city", "unknown")
+                zip_code = str(geo.get("zip", "unknown"))
+                lat = geo.get("lat", "unknown")
+                lon = geo.get("lon", "unknown")
+                timezone = geo.get("timezone", "unknown")
+                isp = geo.get("isp", "unknown")
+                is_vpn = geo.get("proxy", "unknown")
+                is_mobile_net = geo.get("mobile", "unknown")
+        except Exception:
+            pass
+
+    if ua_str != "unknown":
+        try:
+            ua = _parse_ua(ua_str)
+            browser = ua.browser.family
+            browser_ver = ua.browser.version_string
+            os_name = ua.os.family
+            os_ver = ua.os.version_string
+            device = "mobile" if ua.is_mobile else "tablet" if ua.is_tablet else "desktop" if ua.is_pc else "other"
+        except Exception:
+            pass
+
+    return (
+        ip, country, region, city, zip_code, lat, lon,
+        timezone, isp, is_vpn, is_mobile_net,
+        lang, referrer, platform_hdr, mobile_hdr,
+        browser, browser_ver, os_name, os_ver, device,
+    )
+
+
+def _append_feedback(row: list):
+    try:
+        ws = _get_feedback_sheet()
+        if ws.acell("A1").value != "Timestamp":
+            ws.insert_row(_FEEDBACK_HEADERS, 1)
+        ws.append_row(row)
+        return None
+    except Exception as e:
+        return str(e)
+
 
 st.set_page_config(layout="wide")
 
@@ -764,6 +861,35 @@ with st.form("feedback_form"):
     )
     if st.form_submit_button("Submit"):
         if feedback_text.strip():
-            st.success("Thank you. Your feedback is noted.")
+            (
+                ip, country, region, city, zip_code, lat, lon,
+                timezone, isp, is_vpn, is_mobile_net,
+                lang, referrer, platform_hdr, mobile_hdr,
+                browser, browser_ver, os_name, os_ver, device,
+            ) = _client_metadata()
+            err = _append_feedback([
+                datetime.now().isoformat(timespec="seconds"),
+                feedback_text.strip(),
+                starting_wage, int(work_years), int(retirement_years),
+                round((cola_increase - 1) * 100, 2),
+                round((index_returns_rate - 1) * 100, 2),
+                round(pension_contribution_rate * 100, 2),
+                round(starting_allowance, 2),
+                round(pension_contribution_total, 2),
+                round(pension_redeemed_total, 2),
+                round(personal_fund_values[int(work_years)], 2),
+                round(personal_balance, 2),
+                round(_breakeven_rate, 2),
+                _years_covered,
+                "Option A" if personal_balance <= 0 else "Option B",
+                ip, country, region, city, zip_code, lat, lon,
+                timezone, isp, is_vpn, is_mobile_net,
+                lang, referrer, platform_hdr, mobile_hdr,
+                browser, browser_ver, os_name, os_ver, device,
+            ])
+            if err:
+                st.warning(f"Could not save feedback: {err}")
+            else:
+                st.success("Thank you. Your feedback is noted.")
         else:
             st.warning("Please enter some feedback before submitting.")

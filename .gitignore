@@ -1,6 +1,9 @@
 # Streamlit
 .streamlit/secrets.toml
 
+# Google service account credentials
+*.json
+
 # Python
 __pycache__/
 *.py[cod]
