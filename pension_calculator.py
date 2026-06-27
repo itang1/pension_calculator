@@ -4,6 +4,7 @@ import time
 import urllib.request
 from datetime import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from plotly import graph_objects as go
 import gspread
@@ -99,6 +100,37 @@ def _append_feedback(row: list):
         return None
     except Exception as e:
         return str(e)
+
+
+_VISIT_HEADERS = [
+    "Timestamp",
+    "IP", "Country", "Region", "City", "Zip", "Lat", "Lon",
+    "Timezone", "ISP", "VPN/Proxy", "Mobile Network",
+    "Accept-Language", "Referrer", "Platform", "Mobile Browser",
+    "Browser", "Browser Version", "OS", "OS Version", "Device",
+]
+
+
+@st.cache_resource
+def _get_visit_sheet():
+    ss = gspread.service_account_from_dict(
+        dict(st.secrets["gcp_service_account"]),
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    ).open_by_key(_SPREADSHEET_ID)
+    try:
+        return ss.worksheet("Visits")
+    except gspread.exceptions.WorksheetNotFound:
+        return ss.add_worksheet(title="Visits", rows=5000, cols=len(_VISIT_HEADERS))
+
+
+def _log_visit():
+    try:
+        ws = _get_visit_sheet()
+        if ws.acell("A1").value != "Timestamp":
+            ws.insert_row(_VISIT_HEADERS, 1)
+        ws.append_row([datetime.now().isoformat(timespec="seconds"), *_client_metadata()])
+    except Exception:
+        pass
 
 
 st.set_page_config(layout="wide")
@@ -290,6 +322,19 @@ Before your {int(retirement_years)}-year retirement was over, Option B would hav
 </div>
 """, unsafe_allow_html=True)
 
+
+if "session_tracked" not in st.session_state:
+    st.session_state.session_tracked = True
+    components.html("""
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7SKCXXZV9W"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-7SKCXXZV9W');
+        </script>
+    """, height=0)
+    _log_visit()
 
 st.title("Is Your Pension Worth It?")
 
