@@ -7,93 +7,45 @@ from plotly import graph_objects as go
 st.title("Is Your Pension Worth It?")
 
 st.markdown("""
-Many public employees (such as teachers, law enforcement officers, and civil servants) are required to contribute part of each paycheck to a pension plan.
+Many public employees (such as teachers, law enforcement officers, and civil servants) are mandatorily required to contribute part of each paycheck to a pension plan (e.g. a flat 10%). In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
 
-In this website, I ask the question: **if that same money were instead invested in a personal retirement account, which path would likely produce better outcomes under the same assumptions?**
-
-This calculator compares the two side-by-side scenarios:
+In this website, I ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which of the two options would produce better outcomes for them?**
 """)
 
-col_a, col_b = st.columns(2)
-with col_a:
-    st.info("""
+st.info("*On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.*")
+
+with st.expander("Explanation of the Two Options"):
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.info("""
 **Option A: Traditional Pension**
 
-Each year, a fixed percentage of your paycheck is contributed automatically to the pension system. You do not choose how those funds are invested. In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
+Each year, a fixed percentage of your paycheck (e.g. 10%) is automatically deducted and funneled directly into your organization's pension system. The funds are then managed by professional fund managers who ensure its long-term stability and growth. In return, once you retire, the pension program will pay you a guaranteed annual payment for the rest of your life, regardless of broad market performance. (The specific amount will depend on your salary, years of service, and the pension formula used by your organization.)
 """)
-with col_b:
-    st.info("""
+    with col_b:
+        st.success("""
 **Option B: Personal Retirement Account**
 
-Instead of contributing to the pension, imagine depositing that same amount each year into your own investment account. The balance grows with market returns and remains entirely under your control. In retirement, you withdraw the same annual amount the pension would have paid. Additionally, any remaining balance is yours to keep.
+Instead of contributing to the pension, imagine that you deposit that same amount (e.g. 10%) each year into your own personal investment account. You have total control over how to invest the funds, and the balance will grow with market returns depending on your investment choices. Imagine that in retirement, you choose to withdraw the same annual amount that the pension would have paid. Additionally, any remaining balance in your account at the end of your life is yours to keep or donate as well.
 """)
 
-st.markdown("""
-By running both scenarios with the same inputs (salary, contribution rate, investment return, and retirement timeline), you can see which option is stronger under your assumptions and by how much.
-""")
-
-st.markdown("""
----
-**What's on this page:**
-
-1. **Background:** The pension tradeoffs and what this calculator does and does not model
-2. **Input assumptions:** Enter your salary, career details, and retirement estimates
-3. **Simulation results:** A side-by-side chart and numeric summary comparing both options
-4. **Year over year breakdown:** Detailed tables showing how each value is calculated
-5. **Case studies:** Two worked examples illustrating when each option wins
-""")
-
-
-st.divider()
-st.header("Background")
-
-
-with st.expander("The Pension Debate"):
+with st.expander("Limitations & Assumptions of the Tool"):
     st.markdown("""
-Public pension discussions often focus on two competing goals: guaranteed lifetime income and long-term personal control of assets.
+This calculator is an educational tool, not a comprehensive financial model. Several factors are simplified or left out:
 
-This calculator does not predict the future, but rather stress-tests your assumptions so that you can compare to see which option appears better for your particular life circumstances.
+**Tax treatment.** The calculator assumes the personal account gets the same pre-tax advantages as the pension. This holds if you have room in a 457(b) plan (which has its own contribution limit, separate from your pension). But if you have no tax-advantaged space available, the personal account is at a disadvantage not captured here.
 
-### Critics of Pensions
+**No market volatility.** Returns are a fixed rate every year. Real markets swing, and a few bad years early in retirement hurt far more than the average suggests (known as "sequence of returns risk").
 
-Some critics argue pension systems fit an older employment model where workers stayed in one role for decades. In that view, modern workers who change jobs more frequently may receive less value, especially if they leave before full vesting.
+**No mortality pooling.** In a pension, those who live longer are effectively subsidized by those who don't. An individual account can't do this, so the pension is especially valuable if you live well past average life expectancy.
 
-Another concern is funding risk. Some plans are underfunded, meaning projected obligations can exceed current assets. Critics argue that persistent funding gaps can eventually shift costs to future taxpayers or public budgets.
+**No survivor or disability benefits.** Pensions often offer survivor payments to a spouse or disability benefits. These are real insurance value not modeled here.
 
-There is also the matter of control: pension contributions are pooled and governed by plan rules. A personal account offers direct ownership, investment choice, and potential transfer of remaining assets to heirs.
+**No employer contributions.** Some personal accounts include employer matching. Only the employee side is modeled.
 
-### Supporters of Pensions
+**Fixed contribution and withdrawal patterns.** Contributions and withdrawals are assumed steady. Real behavior varies.
 
-Supporters argue that pensions provide a key benefit that is difficult to replicate alone: guaranteed income for life. A pension continues paying even through poor market periods and even if retirement lasts longer than expected.
-
-Pensions also provide mortality pooling. In simple terms, participants who live longer are supported by the pooled structure in ways an individual account cannot fully mirror.
-
-Supporters further note that many public-sector compensation packages are designed with retirement benefits included, so pension value is part of total compensation, not a standalone perk.
-
-### Is it Worth It?
-
-For most people, the answer is case-specific. Outcomes depend on factors like career length, vesting status, investment returns, retirement duration, and preference for certainty versus flexibility.
-
-This calculator does not settle the debate, but it makes the tradeoffs transparent. Enter your own assumptions to see how each option behaves.
-""")
-
-with st.expander("Limitations & Assumptions"):
-    st.markdown("""
-This calculator is an educational tool, not a comprehensive financial model. Several important factors are simplified or omitted:
-
-**Tax treatment.** This calculator assumes the personal savings option has the same pre-tax advantages as the pension (i.e. contributions reduce your taxable income now, and you pay taxes later). In practice, this assumption holds best for someone who has available space in a 457(b) plan (which accepts pre-tax contributions with its own contribution limit separate from your pension). If you aren't yet maxing out your 457(b), redirecting pension-equivalent contributions there would give you the same pre-tax treatment modeled here with this calculator. If you have no tax-advantaged space available, the personal savings option would be at a disadvantage not captured by this calculator.
-
-**No market volatility.** The calculator uses a fixed annual return every year. Real markets fluctuate, and a string of bad years early in retirement can be far more damaging than the average return would suggest, which is a phenomenon called "sequence of returns risk."
-
-**No mortality risk pooling.** Because everyone in a pension pool contributes together, those who live longer are subsidized by those who don't. An individual account can't replicate this, which means the pension becomes especially valuable for people who live well past average life expectancy.
-
-**No spousal, survivor, or disability benefits.** Pensions often include options for survivor payments to a spouse, or benefits in the event of disability. These are real forms of insurance value not modeled here.
-
-**No employer contributions.** Some personal retirement accounts include employer matching. This calculator only models the employee contribution side.
-
-**Fixed contribution and withdrawal patterns.** Contributions are assumed to be steady throughout your career, and withdrawals are assumed to start at a fixed amount (growing with COLA). Real behavior varies.
-
-*Real-world retirement decisions should involve a licensed financial planner who can account for your full situation. Please consult a tax professional for personalized advice.*
+*Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
 """)
 
 
@@ -170,7 +122,7 @@ This calculator operates in annual periods. Within each year:
 
     st.subheader("Retirement")
     retirement_years = st.number_input(
-        "Years After Retirement",
+        "Years Alive After Retirement",
         value=30,
         min_value=1,
         max_value=60,
@@ -186,7 +138,7 @@ This calculator operates in annual periods. Within each year:
 
 # Results
 st.divider()
-st.header("Simulation Results")
+st.header("Simulation Results: Pension vs. Personal Fund")
 
 # Parse promotion years
 try:
