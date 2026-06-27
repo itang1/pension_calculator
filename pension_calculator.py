@@ -4,30 +4,83 @@ import pandas as pd
 from plotly import graph_objects as go
 
 
+def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
+    """Render one side of the year-over-year breakdown.
+
+    Filters ``df`` to the rows for the given phase (``"W"`` or ``"R"``),
+    renames columns, appends a summary ("Total") row, formats every dollar
+    column, and—if ``balance_col`` is given—colors negative balances red so a
+    depleted personal fund is easy to spot.
+    """
+    table = df[df["Year"].str.startswith(phase_prefix)].copy()
+    table = table.rename(columns=rename_map)
+
+    money_cols = [c for c in table.columns if c != "Year"]
+
+    # Build a summary row. Running-total and balance columns take their final
+    # value; flow columns (contributions, deposits, withdrawals, returns) are
+    # summed. Per-year salary is a snapshot, so it is left blank in the total.
+    total_row = {"Year": "Total"}
+    for col in money_cols:
+        renamed_running = {rename_map.get(k, k) for k in (
+            "Pension Contribution Total", "Pension Redeemed Total")}
+        renamed_balance = {rename_map.get(k, k) for k in ("Balance",)}
+        if col in renamed_running or col in renamed_balance:
+            total_row[col] = table[col].iloc[-1] if len(table) else 0.0
+        elif col == rename_map.get("Salary", "Salary") or col == rename_map.get("Start Balance", "Start Balance"):
+            total_row[col] = float("nan")
+        else:
+            total_row[col] = table[col].sum()
+    table = pd.concat([table, pd.DataFrame([total_row])], ignore_index=True)
+
+    def _highlight_negative(val):
+        if isinstance(val, (int, float)) and pd.notna(val) and val < 0:
+            return "color: #d62728; font-weight: 600;"
+        return ""
+
+    def _bold_total(row):
+        return ["font-weight: 700;" if row["Year"] == "Total" else "" for _ in row]
+
+    styler = table.style.format("${:,.0f}", subset=money_cols, na_rep="—")
+    styler = styler.apply(_bold_total, axis=1)
+    if balance_col is not None:
+        styler = styler.map(_highlight_negative, subset=[balance_col])
+    return styler
+
+
 st.title("Is Your Pension Worth It?")
 
 st.markdown("""
 Many public employees (such as teachers, law enforcement officers, and civil servants) are mandatorily required to contribute part of each paycheck to a pension plan (e.g. a flat 10%). In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
 
-In this website, I ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which of the two options would produce better outcomes for them?**
+In this website, we ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which of the two options would produce better outcomes for them?**
 """)
 
-st.info("*On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.*")
+st.markdown("""
+<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<em>&larr; On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.</em>
+</div>
+
+""", unsafe_allow_html=True)
+
+st.space()
 
 with st.expander("Explanation of the Two Options"):
     col_a, col_b = st.columns(2)
     with col_a:
-        st.info("""
-**Option A: Traditional Pension**
-
+        st.markdown("""
+<div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>Option A: Traditional Pension</strong><br><br>
 Each year, a fixed percentage of your paycheck (e.g. 10%) is automatically deducted and funneled directly into your organization's pension system. The funds are then managed by professional fund managers who ensure its long-term stability and growth. In return, once you retire, the pension program will pay you a guaranteed annual payment for the rest of your life, regardless of broad market performance. (The specific amount will depend on your salary, years of service, and the pension formula used by your organization.)
-""")
+</div>
+""", unsafe_allow_html=True)
     with col_b:
-        st.success("""
-**Option B: Personal Retirement Account**
-
+        st.markdown("""
+<div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>Option B: Personal Retirement Account</strong><br><br>
 Instead of contributing to the pension, imagine that you deposit that same amount (e.g. 10%) each year into your own personal investment account. You have total control over how to invest the funds, and the balance will grow with market returns depending on your investment choices. Imagine that in retirement, you choose to withdraw the same annual amount that the pension would have paid. Additionally, any remaining balance in your account at the end of your life is yours to keep or donate as well.
-""")
+</div>
+""", unsafe_allow_html=True)
 
 with st.expander("Limitations & Assumptions of the Tool"):
     st.markdown("""
@@ -45,7 +98,7 @@ This calculator is an educational tool, not a comprehensive financial model. The
 """)
 
 
-# Input form — sidebar
+# Input form sidebar
 with st.sidebar:
     st.header("Input Assumptions")
 
@@ -63,9 +116,9 @@ This calculator operates in annual periods. Within each year:
     st.subheader("Career")
     starting_wage = st.number_input(
         "Starting Annual Wage ($)",
-        value=120000,
+        value=50000,
         min_value=0,
-        step=500,
+        step=2500,
         help="Your initial salary for the first year you were hired."
     )
     work_years = st.number_input(
@@ -97,7 +150,7 @@ This calculator operates in annual periods. Within each year:
     )
     promotion_increase = st.number_input(
         "Promotion Increase (%)",
-        value=10.0,
+        value=8.0,
         step=1.,
         help="Expected salary bump when you receive a promotion."
     ) / 100 + 1
@@ -112,8 +165,8 @@ This calculator operates in annual periods. Within each year:
     starting_allowance = st.number_input(
         "Starting Annual Pension Allowance ($)",
         value=12 * 5871.52,
-        step=500.,
-        help="Estimate your annual pension payout in your first year of retirement, before COLA adjustments. You can calculate yours using the RIS website pension calculator."
+        step=2500.,
+        help="Estimate your annual pension payout in your first year of retirement, before COLA adjustments. You can calculate yours using the designated pension calculator website."
     )
 
     st.subheader("Retirement")
@@ -155,14 +208,15 @@ pension_fund_values = [0]
 personal_fund_values = [0]
 # Per-year hover data: [contribution, disbursement, deposit, withdrawal, market_returns]
 hover_data = [[0, 0, 0, 0, 0]]
-yearly_data = pd.DataFrame({'Year': [],
-                            'Salary': [],
-                            'Pension Contribution': [],
-                            'Pension Contribution Total': [],
-                            'Pension Redeemed': [],
-                            'Pension Redeemed Total': [],
-                            'Market Returns': [],
-                            'Balance': []})
+yearly_data = pd.DataFrame({'Year': pd.Series(dtype='str'),
+                            'Salary': pd.Series(dtype='float'),
+                            'Start Balance': pd.Series(dtype='float'),
+                            'Pension Contribution': pd.Series(dtype='float'),
+                            'Pension Contribution Total': pd.Series(dtype='float'),
+                            'Pension Redeemed': pd.Series(dtype='float'),
+                            'Pension Redeemed Total': pd.Series(dtype='float'),
+                            'Market Returns': pd.Series(dtype='float'),
+                            'Balance': pd.Series(dtype='float')})
 
 # Work phase - Loop through the work years
 for work_year in range(1, int(work_years) + 1):
@@ -177,6 +231,7 @@ for work_year in range(1, int(work_years) + 1):
     pension_contribution_total += pension_contribution_this_year
 
     # Compute personal balance
+    start_balance = personal_balance
     market_returns = personal_balance * (index_returns_rate-1)
     personal_balance = personal_balance + market_returns + pension_contribution_this_year
 
@@ -185,16 +240,17 @@ for work_year in range(1, int(work_years) + 1):
     personal_fund_values.append(personal_balance)
     hover_data.append([pension_contribution_this_year, 0, pension_contribution_this_year, 0, market_returns])
 
-    # Store data for the table
+    # Store data for the table (numeric; formatted at display time)
     new_row = {
         "Year": f"W{work_year}",
-        "Salary": f"${effective_salary:,.0f}",
-        "Pension Contribution": f"${pension_contribution_this_year:,.0f}",
-        "Pension Contribution Total": f"${pension_contribution_total:,.0f}",
-        "Pension Redeemed": "$0",
-        "Pension Redeemed Total": "$0",
-        "Market Returns": f"${market_returns:,.0f}",
-        "Balance": f"${personal_balance:,.0f}"
+        "Salary": effective_salary,
+        "Start Balance": start_balance,
+        "Pension Contribution": pension_contribution_this_year,
+        "Pension Contribution Total": pension_contribution_total,
+        "Pension Redeemed": 0.0,
+        "Pension Redeemed Total": 0.0,
+        "Market Returns": market_returns,
+        "Balance": personal_balance
     }
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
@@ -211,6 +267,7 @@ for ret_year in range(1, retirement_years + 1):
     pension_redeemed_total += pension_redeemed
 
     # Personal fund
+    start_balance = personal_balance
     market_returns = personal_balance * (index_returns_rate-1)
     personal_balance = personal_balance - pension_redeemed + market_returns
 
@@ -219,14 +276,16 @@ for ret_year in range(1, retirement_years + 1):
     personal_fund_values.append(personal_balance)
     hover_data.append([0, pension_redeemed, 0, pension_redeemed, market_returns])
 
-    # Store data for the table
+    # Store data for the table (numeric; formatted at display time)
     new_row = {"Year": f"R{ret_year}",
-        "Pension Contribution": "$0",
-        "Pension Contribution Total": "$0",
-        "Pension Redeemed": f"${pension_redeemed:,.0f}",
-        "Pension Redeemed Total": f"${pension_redeemed_total:,.0f}",
-        "Market Returns": f"${market_returns:,.0f}",
-        "Balance": f"${personal_balance:,.0f}"
+        "Salary": float('nan'),
+        "Start Balance": start_balance,
+        "Pension Contribution": 0.0,
+        "Pension Contribution Total": 0.0,
+        "Pension Redeemed": pension_redeemed,
+        "Pension Redeemed Total": pension_redeemed_total,
+        "Market Returns": market_returns,
+        "Balance": personal_balance
     }
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
@@ -240,8 +299,8 @@ fig.add_trace(go.Scatter(
     x=years,
     y=pension_fund_values,
     mode='lines+markers',
-    name='Total Pension Received (cumulative)',
-    line=dict(color='blue'),
+    name='Pension: total income received so far',
+    line=dict(color='#D97706'),
     customdata=hover_data,
     hovertemplate=(
         '<b>Year %{x}</b><br>'
@@ -256,8 +315,8 @@ fig.add_trace(go.Scatter(
     x=years,
     y=personal_fund_values,
     mode='lines+markers',
-    name='Personal Retirement Fund Balance',
-    line=dict(color='green'),
+    name='Personal fund: money left in the account',
+    line=dict(color='#0D9488'),
     customdata=hover_data,
     hovertemplate=(
         '<b>Year %{x}</b><br>'
@@ -269,16 +328,29 @@ fig.add_trace(go.Scatter(
     )
 ))
 
-# Adaptive x-axis: target ~10 labels regardless of total years, snapped to multiples of 5
+# Adaptive x-axis
 total_years = len(years)
 x_tick_step = max(5, int(math.ceil(total_years / 10 / 5) * 5))
 
-# Nice y-axis interval: target ~8 gridlines, rounded to a clean magnitude
-max_y = max((v for v in pension_fund_values + personal_fund_values if v is not None), default=1)
-max_y = max(max_y, 1)
-raw_interval = max_y / 8
+# Adaptive y-axis
+all_values = [v for v in pension_fund_values + personal_fund_values if v is not None]
+data_min = min(all_values, default=0)
+data_max = max(all_values, default=1)
+data_range = max(data_max - data_min, 1)
+raw_interval = data_range / 8
 magnitude = 10 ** math.floor(math.log10(raw_interval))
-y_tick_interval = round(raw_interval / magnitude) * magnitude or magnitude
+normalized = raw_interval / magnitude
+if normalized <= 1:
+    nice = 1
+elif normalized <= 2:
+    nice = 2
+elif normalized <= 2.5:
+    nice = 2.5
+elif normalized <= 5:
+    nice = 5
+else:
+    nice = 10
+y_tick_interval = nice * magnitude
 
 fig.update_layout(
     title='Pension vs. Personal Retirement Fund Over Time',
@@ -307,11 +379,38 @@ fig.update_layout(
 fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Retirement begins here",
           annotation_position="top right")
 
-st.caption("Watch the **green line** during retirement. If it stays above zero, the personal fund wins: it means that you got the same income as the pension AND still have money left over at your death. If it hits zero, the pension wins.")
+# Emphasize the zero baseline
+fig.add_hline(y=0, line_width=2, line_color="#666666",
+          annotation_text="$0 — personal fund depleted",
+          annotation_position="bottom right")
+
+st.markdown("""
+**How to read this chart**
+
+Here, we imagine that both options pay you the **same income every year in retirement**. This brings the whole comparison down to the question: **does your personal fund run out before you die?**
+
+- **Teal line = how much remains in your personal fund after withdrawing your annual allotment.** If it stays above zero, the personal fund wins. If it reaches zero, the pension wins.
+- **Amber line = running tally of how much pension income received so far.** Shown only for scale. A high amber line does **not** mean that the pension is winning. Both options pay this exact income, so don't compare the two lines against each other.
+- **Red dashed line = the year retirement begins.**
+- **Light gray line = the $0 mark.** If the teal line touches this, the personal fund has run out of money.
+""")
 
 st.plotly_chart(fig, use_container_width=True)
 
-mc1, mc2, mc3, mc4 = st.columns(4)
+if personal_balance > 0:
+    st.success(f"""
+**Based on your inputs, the personal fund is viable.**
+
+After {int(retirement_years)} years of retirement, your personal fund would still have **\\${personal_balance:,.0f}** remaining for you to keep (donate, pass on, etc.), on top of having already paid out the same income as the pension every single year. The pension would leave nothing (besides potential survivor benefits, if applicable).
+""")
+else:
+    st.info(f"""
+**Based on your inputs, the pension is the better option.**
+
+Before your {int(retirement_years)}-year retirement was over, your personal fund would have fully depleted, while the pension would have kept paying. Your investment returns can't sustain that many years of withdrawals, so you should choose the pension for its lifetime guarantee.
+""")
+
+mc1, mc2 = st.columns(2)
 with mc1:
     st.metric(
         label="Pension Contributed",
@@ -325,6 +424,8 @@ with mc2:
         delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
         help="The total pension income paid out over all retirement years, including annual COLA increases. The delta shows how much more you received than you put in."
     )
+
+mc3, mc4 = st.columns(2)
 with mc3:
     st.metric(
         label="Fund at Retirement",
@@ -343,44 +444,15 @@ with mc4:
         st.metric(
             label="Fund at Death",
             value=f"${personal_balance:,.0f}",
-            delta="Ran out before retirement ended ✗",
+            delta="Ran out before death ✗",
             delta_color="inverse",
             help="The personal fund was depleted before your retirement years were up. The pension would have continued paying regardless."
         )
 
-if personal_balance > 0:
-    st.success(f"""
-**Based on your inputs, the personal fund is viable.**
-
-After {int(retirement_years)} years of retirement, your personal fund would still have **\\${personal_balance:,.0f}** remaining, on top of having already paid out the same income as the pension every single year. That leftover balance is money you'd still own at death. The pension would leave nothing equivalent.
-""")
-else:
-    st.warning(f"""
-**Based on your inputs, the pension wins.**
-
-Your personal fund would have run dry before your {int(retirement_years)}-year retirement was over, while the pension would have kept paying regardless. The lifetime guarantee is the decisive advantage here; the personal fund simply can't sustain the withdrawal rate with these investment returns over this retirement length.
-""")
-
 st.markdown("""
-**What each line represents:**
-- The **green line** is the balance of your hypothetical personal retirement fund. Before retirement, it grows as you make contributions and earn investment returns. After retirement, you withdraw from it each year (the same amount as your pension would have paid out) and the balance either keeps growing or shrinks depending on your returns vs. withdrawal rate.
-- The **blue line** is the cumulative total you've received from the pension so far. It's zero during working years, then rises steadily once retirement begins.
-- The **red dashed line** marks the moment retirement begins.
-
-**An important note on how this comparison works:** Both options pay you the *same annual income* in retirement. The personal fund withdraws the exact same amount each year as the pension would have paid. So the green line balance is what's left *on top of* having already received that income. It's the leftover, not the total.
-
-**How to tell which option is better:**
-
-The only question that matters is: **does the personal fund run out of money before your retirement years are up?**
-
-- **Personal fund wins** if the green line stays above zero through all your retirement years. This means you received the same income as the pension *and* still have money left over when you die. The higher the green line at the end, the larger that leftover.
-- **Pension wins** if the green line drops to zero before retirement ends. This means the personal fund ran dry, and the pension's guarantee to pay no matter how long you live is what would have kept you afloat.
-
-The blue line (cumulative pension income) is useful context for scale, but **don't compare the green and blue lines directly** to judge a winner. They measure different things. Green is a remaining account balance; blue is a running total of income received.
-
-**What you leave behind:**
-- With the **personal fund**, whatever the green line shows at the end of your retirement is money you still own. You could leave it to heirs, donate it, or spend it.
-- With the **pension**, payments stop when you die. That being said, your pension may include a *survivor benefit* (a reduced annual payment to a spouse or dependent after your death) if you choose to select that option at the time of your retirement. This calculator does not model survivor benefits.
+**What you leave behind at your death:**
+- With the **personal fund**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
+- With the **pension**, payments stop when you die (unless you elected an option that includes a *survivor benefit*, which is a reduced annual payment to a spouse or dependent after your death). This calculator does not model survivor benefits.
 """)
 
 # Display the table
@@ -388,7 +460,7 @@ st.divider()
 st.subheader("Year-Over-Year Breakdown")
 
 st.markdown("""
-Each row is one year. The left table tracks the **pension side**, the right tracks the **personal fund side** — using the same dollar amounts each year so the comparison is apples-to-apples.
+Each row is one year. The left table tracks the **pension side**, while the right tracks the **personal fund side**. They use the same dollar amounts each year so the comparison is apples-to-apples. The bold **Total** row at the bottom of each table ties back to the summary metrics above.
 """)
 
 with st.expander("Working Years"):
@@ -406,32 +478,37 @@ Salary grows each year by your COLA ({(cola_increase-1)*100:.1f}%), plus a step 
     with col2:
         st.markdown("**Personal Fund Side**")
         st.markdown(f"""
-Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: **+ Deposit** (same as the pension contribution) and **+ Returns** (investment growth on your existing balance at {(index_returns_rate-1)*100:.1f}%/year) add together to produce **= Balance** at year-end.
+Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: the **Start Balance** earns **+ Returns** (investment growth at {(index_returns_rate-1)*100:.1f}%/year), then the **+ Deposit** (same as the pension contribution) is added, producing the **= Balance** at year-end.
 
 Returns are calculated on the balance at the *start* of the year, before that year's deposit is added.
 """)
     col1, col2 = st.columns(2)
     with col1:
-        working_pension_df = yearly_data[["Year", "Salary", "Pension Contribution", "Pension Contribution Total"]]
-        working_pension_df = working_pension_df[working_pension_df['Year'].str.startswith('W')]
-        working_pension_df = working_pension_df.rename(columns={
-            "Pension Contribution": "Contribution",
-            "Pension Contribution Total": "Total Contributed"
-        })
-        st.dataframe(working_pension_df, hide_index=True)
+        st.dataframe(
+            render_breakdown_table(
+                yearly_data[["Year", "Salary", "Pension Contribution", "Pension Contribution Total"]],
+                "W",
+                {"Pension Contribution": "Contribution",
+                 "Pension Contribution Total": "Total Contributed"},
+            ),
+            hide_index=True,
+        )
     with col2:
-        working_personal_df = yearly_data[["Year", "Pension Contribution", "Market Returns", "Balance"]]
-        working_personal_df = working_personal_df.rename(columns={
-            "Pension Contribution": "+ Deposit",
-            "Market Returns": "+ Returns",
-            "Balance": "= Balance"
-        })
-        working_personal_df = working_personal_df[working_personal_df['Year'].str.startswith('W')]
-        st.dataframe(working_personal_df, hide_index=True)
+        st.dataframe(
+            render_breakdown_table(
+                yearly_data[["Year", "Start Balance", "Market Returns", "Pension Contribution", "Balance"]],
+                "W",
+                {"Market Returns": "+ Returns",
+                 "Pension Contribution": "+ Deposit",
+                 "Balance": "= Balance"},
+                balance_col="= Balance",
+            ),
+            hide_index=True,
+        )
 
 with st.expander("Retirement Years"):
     st.markdown("""
-Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains.
+Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), the personal fund has run out — the year it first goes red is the year the pension's lifetime guarantee starts to matter.
 """)
     col1, col2 = st.columns(2)
     with col1:
@@ -442,26 +519,32 @@ The pension pays a set annual amount, growing by {(cola_increase-1)*100:.1f}% ea
     with col2:
         st.markdown("**Personal Fund Side**")
         st.markdown(f"""
-Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the previous balance earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
+Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the **Start Balance** earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
 """)
     col1, col2 = st.columns(2)
     with col1:
-        retirement_pension_df = yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]]
-        retirement_pension_df = retirement_pension_df.rename(columns={
-            "Pension Redeemed": "Pension Received",
-            "Pension Redeemed Total": "Total Received"
-        })
-        retirement_pension_df = retirement_pension_df[retirement_pension_df['Year'].str.startswith('R')]
-        st.dataframe(retirement_pension_df, hide_index=True)
+        st.dataframe(
+            render_breakdown_table(
+                yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]],
+                "R",
+                {"Pension Redeemed": "Pension Received",
+                 "Pension Redeemed Total": "Total Received"},
+            ),
+            hide_index=True,
+        )
     with col2:
-        retirement_personal_df = yearly_data[["Year", "Pension Redeemed", "Market Returns", "Balance"]]
-        retirement_personal_df = retirement_personal_df.rename(columns={
-            "Pension Redeemed": "− Withdrawal",
-            "Market Returns": "+ Returns",
-            "Balance": "= Balance"
-        })
-        retirement_personal_df = retirement_personal_df[retirement_personal_df['Year'].str.startswith('R')]
-        st.dataframe(retirement_personal_df, hide_index=True)
+        st.dataframe(
+            render_breakdown_table(
+                yearly_data[["Year", "Start Balance", "Market Returns", "Pension Redeemed", "Balance"]],
+                "R",
+                {"Start Balance": "Start Balance",
+                 "Market Returns": "+ Returns",
+                 "Pension Redeemed": "− Withdrawal",
+                 "Balance": "= Balance"},
+                balance_col="= Balance",
+            ),
+            hide_index=True,
+        )
 
 
 # Case Studies
@@ -472,36 +555,36 @@ st.markdown("""
 The two examples below show one scenario where each option wins. To see the full charts and tables for either, enter the listed settings into the calculator above.
 """)
 
-with st.expander("Case Study A — Personal Fund Wins"):
+with st.expander("Case Study A: Personal Fund Wins"):
     st.markdown("""
 **Settings:** Starting wage \\$120,000 · Step increase 5.5% · COLA 3% · Promotions at years 10 and 20 (10% each) · Pension contribution rate 10% · Index returns 7% · Work years 30 · Retirement years 30 · First-year pension allowance \\$70,458
 
 ---
 
-Alice is a public school administrator who earns \\$120,000 to start. Over her 30-year career, her salary grows steadily through step increases, COLA adjustments, and two promotions. Each year, 10% of her salary goes into the pension.
+Alice is a public school administrator who starts at \\$120,000. Across a 30-year career, her salary climbs through step increases, COLA adjustments, and two promotions. Every year, 10% of it goes into the pension.
 
-**The pension:** By retirement, Alice has paid roughly **\\$785,000** into the pension over 30 years. In exchange, she receives an allowance starting at about \\$70,458 per year, growing 3% annually. Over 30 years of retirement, her total pension payments add up to roughly **\\$3.35 million**.
+**The pension:** By the time Alice retires, she has paid about **\\$785,000** into the pension. In return, she gets an allowance that starts around \\$70,458 a year and rises 3% annually. Add up 30 years of those payments and she collects roughly **\\$3.35 million**.
 
-**The personal fund:** If Alice had deposited those same contributions into an account earning 7% per year, she would have built up roughly **\\$2.02 million by retirement**. She withdraws the same amount as her pension would have paid each year. Because her 7% returns exceed her withdrawal rate, her account keeps growing even in retirement, ending at over **\\$6.28 million**.
+**The personal fund:** Now suppose she had put those same contributions into an account earning 7% a year instead. By retirement it would hold about **\\$2.02 million**. She then withdraws the same amount the pension would have paid each year. Since 7% growth outpaces what she takes out, the balance keeps climbing through retirement and finishes above **\\$6.28 million**.
 
-**Verdict:** The personal fund wins. Here's why: both options paid Alice the exact same annual income throughout retirement. The pension didn't give her more — they were identical year by year. But the personal fund ended with \\$6.28 million still in the account, money she owns outright and can leave to her family. The pension leaves nothing at death.
+**Verdict:** The personal fund wins, and it is worth being clear about why. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. The personal fund still holds \\$6.28 million that she owns and can pass to her family, while the pension leaves nothing once she dies.
 
-This is also the case that most commonly causes confusion. People look at "\\$3.35 million in pension income" and think the pension came out ahead — but that figure is the cumulative total of Alice's annual payments, and the personal fund paid out the exact same cumulative amount. The \\$6.28 million is the bonus on top of that.
+This is also the scenario people misread most often. They see "\\$3.35 million in pension income" and assume the pension came out ahead, but that number is just the running total of Alice's annual payments; keep in mind that the personal fund paid out that same amount! The \\$6.28 million is *extra* that she gets to keep (donate, pass on, etc.), on top of the \\$3.35 million that she already withdrew and spent during her life.
 """)
 
-with st.expander("Case Study B — Pension Wins"):
+with st.expander("Case Study B: Pension Wins"):
     st.markdown("""
 **Settings:** Starting wage \\$65,000 · Step increase 5.5% · COLA 3% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retirement years 40 · First-year pension allowance \\$27,000
 
 ---
 
-Bob is a civil servant who starts at \\$65,000 and works a steady 20-year career without promotions. He retires relatively early and lives a long life of 40 years in retirement. The stock market delivers modest returns of about 5% per year over his lifetime.
+Bob is a civil servant who starts at \\$65,000 and works a steady 20 years with no promotions. He retires fairly early and then spends 40 years in retirement. Over that lifetime the market returns a modest 5% a year.
 
-**The pension:** Over 20 years of work, Bob contributes roughly **\\$175,000** to the pension. In retirement, he receives about \\$27,000 in year one, growing 3% annually. Over 40 years, that adds up to approximately **\\$2 million** in total pension income — more than 11 times what he put in.
+**The pension:** During his 20 working years, Bob pays about **\\$175,000** into the pension. In retirement he collects around \\$27,000 the first year, rising 3% annually. Stretched over 40 years, that comes to roughly **\\$2 million**, more than 11 times what he put in.
 
-**The personal fund:** Bob's 20 years of contributions at 5% annual returns would have grown to roughly **\\$265,000 by retirement**. Once he begins withdrawing \\$27,000 per year (growing 3% annually), his investment growth cannot keep pace with the withdrawals. His personal fund is **depleted within about 13 years**, leaving him with nothing for the remaining 27 years of retirement.
+**The personal fund:** Those same contributions, growing at 5% a year, would leave Bob with about **\\$265,000** at retirement. Once he starts pulling out \\$27,000 a year (rising 3% annually), the growth cannot keep up with the withdrawals. The account runs dry in **about 13 years**, leaving nothing for his final 27 years.
 
-**Verdict:** The pension wins. Bob's personal fund runs out before his retirement does. At 5% returns, the growth simply isn't enough to sustain 40 years of withdrawals from a \\$265,000 starting balance. The pension's guarantee — that it pays no matter how long he lives — is exactly what he needs here. Without it, he runs out of money in his early 70s.
+**Verdict:** The pension wins because Bob outlives his savings. At 5% returns, a \\$265,000 balance just cannot fund 40 years of withdrawals. What carries him through is the pension's promise to keep paying for as long as he lives. Without it, he runs out of money in his early 70s.
 
-The pension tends to win when returns are modest, the retirement is long, or the fund doesn't have enough time to grow during working years. The lifetime guarantee is the thing a personal account cannot replicate.
+The pension option tends to come out ahead when returns are low, retirement is long, or the personal fund didn't have enough working years to grow.
 """)
