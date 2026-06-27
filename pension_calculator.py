@@ -7,21 +7,12 @@ st.set_page_config(layout="wide")
 
 
 def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
-    """Render one side of the year-over-year breakdown.
-
-    Filters ``df`` to the rows for the given phase (``"W"`` or ``"R"``),
-    renames columns, appends a summary ("Total") row, formats every dollar
-    column, and—if ``balance_col`` is given—colors negative balances red so a
-    depleted personal fund is easy to spot.
-    """
+    """Render one side of the year-over-year breakdown."""
     table = df[df["Year"].str.startswith(phase_prefix)].copy()
     table = table.rename(columns=rename_map)
 
     money_cols = [c for c in table.columns if c != "Year"]
 
-    # Build a summary row. Running-total and balance columns take their final
-    # value; flow columns (contributions, deposits, withdrawals, returns) are
-    # summed. Per-year salary is a snapshot, so it is left blank in the total.
     total_row = {"Year": "Total"}
     for col in money_cols:
         renamed_running = {rename_map.get(k, k) for k in (
@@ -53,9 +44,9 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
 st.title("Is Your Pension Worth It?")
 
 st.markdown("""
-Many public employees (such as teachers, law enforcement officers, and civil servants) are mandatorily required to contribute part of each paycheck to a pension plan (e.g. a flat 10%). In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
+Many public employees (such as teachers, law enforcement officers, and civil servants) are required to contribute part of each paycheck to a pension plan (e.g. a flat 10%). In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
 
-In this website, we ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which of the two options would produce better outcomes for them?**
+In this calculator, we ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which option would produce better outcomes for them?**
 """)
 
 st.markdown("""
@@ -65,7 +56,6 @@ st.markdown("""
 
 """, unsafe_allow_html=True)
 
-st.space()
 
 with st.expander("Explanation of the Two Options"):
     col_a, col_b = st.columns(2)
@@ -90,9 +80,9 @@ This calculator is an educational tool, not a comprehensive financial model. The
 
 **Constant input rates.** The investment return, COLA, and step increase you enter are treated as fixed values applied every year. Real markets and salary schedules fluctuate, and a few bad return years early in retirement hurt far more than a steady average suggests.
 
-**Equal tax treatment for both options.** The contribution rate is applied to the personal account on the same pre-tax basis as the pension. This is fine if you have room in a 457(b) plan, which has its own contribution limit, separate from your pension). But if you have no tax-advantaged space available, the personal account is actually disadvantaged in a way that is not factored in here.
+**Equal tax treatment for both options.** The contribution rate is applied to the personal account on the same pre-tax basis as the pension. This is fine if you have room in a 457(b) plan (a tax-advantaged account available to government employees, similar to a 401k), which has its own contribution limit separate from your pension. But if you have no tax-advantaged space available, the personal account is actually disadvantaged in a way that is not factored in here.
 
-**Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods, which is a simplification. See the "Timing Assumptions" note for the exact ordering used.
+**Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods, which is a simplification. See the *Timing Assumptions* note on the sidebar for the exact ordering used.
 
 **Steady contribution and withdrawal amounts.** Contributions follow your salary inputs, and withdrawals match the pension allowance exactly. The tool does not model any deviations such as irregular saving, retiring in the middle of the year, or altering your withdrawal rate from year to year.
 
@@ -100,7 +90,6 @@ This calculator is an educational tool, not a comprehensive financial model. The
 """)
 
 
-# Input form sidebar
 with st.sidebar:
     st.header("Input Assumptions")
 
@@ -118,31 +107,27 @@ This calculator operates in annual periods. Within each year:
     st.subheader("Career")
     starting_wage = st.number_input(
         "Starting Annual Wage ($)",
-        value=50000,
-        min_value=0,
-        step=2500,
+        value=50000, min_value=0, step=2500,
         help="Your initial salary for the first year you were hired."
     )
     work_years = st.number_input(
         "Years to Work",
-        value=30,
-        min_value=1,
-        step=1,
+        value=30, min_value=1, step=1,
         help="How many years you plan to work before retirement."
+    )
+    retirement_age = st.number_input(
+        "Age at Retirement",
+        value=55, min_value=40, max_value=75, step=1,
+        help="Your age on the day you retire. Used to determine your pension factor."
     )
     cola_increase = st.number_input(
         "Cost of Living Adjustment (%)",
-        value=3.0,
-        min_value=2.5,
-        max_value=5.5,
-        step=0.1,
-        help="Annual salary adjustment announced each October, typically between 2–3.5%."
+        value=3.0, min_value=2.5, max_value=5.5, step=0.1,
+        help="Annual salary adjustment announced each October, typically between 2\u20133.5%."
     ) / 100 + 1
     step_increase = st.number_input(
         "Step Increase (%)",
-        value=5.5,
-        min_value=0.,
-        step=0.1,
+        value=5.5, min_value=0., step=0.1,
         help="Annual raise from step progression (e.g., moving up a salary scale)."
     ) / 100 + 1
     promotion_years_input = st.text_input(
@@ -152,52 +137,121 @@ This calculator operates in annual periods. Within each year:
     )
     promotion_increase = st.number_input(
         "Promotion Increase (%)",
-        value=8.0,
-        step=1.,
+        value=8.0, step=1.,
         help="Expected salary bump when you receive a promotion."
     ) / 100 + 1
 
     st.subheader("Pension")
     pension_contribution_rate = st.number_input(
         "Pension Contribution Rate (%)",
-        value=10.0,
-        step=1.,
+        value=10.0, step=1.,
         help="Percentage of your salary automatically deducted and contributed to the pension system each year."
     ) / 100
-    starting_allowance = st.number_input(
-        "Starting Annual Pension Allowance ($)",
-        value=12 * 5871.52,
-        step=2500.,
-        help="Estimate your annual pension payout in your first year of retirement, before COLA adjustments. You can calculate yours using the designated pension calculator website."
+
+    st.markdown("**Starting Pension Allowance**")
+
+    _allowance_mode = st.radio(
+        "How to set allowance",
+        ["Estimate for me", "Enter manually"],
+        horizontal=True,
+        label_visibility="collapsed",
     )
+    manual_override = (_allowance_mode == "Enter manually")
+
+    if not manual_override:
+        # Auto-determine Tier 2 factor from age and years of service
+        _t2_age = int(retirement_age)
+        _t2_yrs = int(work_years)
+        if _t2_age >= 63 and _t2_yrs >= 30:
+            _t2_factor = 0.021
+            _is_reduced = False
+        elif _t2_age >= 60 and _t2_yrs >= 30:
+            _t2_factor = 0.020
+            _is_reduced = False
+        elif _t2_age >= 55 and _t2_yrs >= 30:
+            _t2_factor = 0.020
+            _is_reduced = False
+        elif _t2_yrs >= 30:
+            _t2_factor = 0.020
+            _is_reduced = True
+        elif _t2_age >= 63 and _t2_yrs >= 5:
+            _t2_factor = 0.020
+            _is_reduced = False
+        else:
+            _t2_factor = 0.015
+            _is_reduced = False
+
+        if _is_reduced:
+            _early_red = st.number_input(
+                "Early Retirement Reduction (%)",
+                value=0.0, min_value=0.0, max_value=50.0, step=0.5,
+                help="Your age and years of service qualify for retirement with an early reduction. Enter the exact percentage from your plan's retirement estimator.",
+            )
+        else:
+            _early_red = 0.0
+
+        # Compute Final Average Salary (highest 36 consecutive months) and allowance
+        try:
+            _promo_yrs = [int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit()]
+        except Exception:
+            _promo_yrs = []
+        _sim_sal = starting_wage
+        _sal_hist = []
+        for _yr in range(1, int(work_years) + 1):
+            _eff = _sim_sal * (1 + step_increase) / 2 if _yr == 1 else _sim_sal
+            _sal_hist.append(_eff)
+            _sim_sal *= cola_increase
+            if 1 <= _yr < 5:
+                _sim_sal *= step_increase
+            if _yr in set(_promo_yrs):
+                _sim_sal *= promotion_increase
+        if len(_sal_hist) >= 3:
+            _fas = max(sum(_sal_hist[i:i + 3]) / 3 for i in range(len(_sal_hist) - 2))
+        else:
+            _fas = sum(_sal_hist) / len(_sal_hist) if _sal_hist else starting_wage
+        _reduction = 1.0 - _early_red / 100.0
+        _computed_allowance = work_years * _fas * _t2_factor * _reduction
+
+        st.markdown(f"**${_computed_allowance / 12:,.0f}/mo** &nbsp; (${_computed_allowance:,.0f}/yr)")
+        st.markdown(
+            '<small><abbr title="Years of Service × Final Average Salary (highest 36 consecutive months) '
+            '× Retirement Factor × Early Retirement Reduction Factor" '
+            'style="cursor:help; color:#64748b; text-decoration:underline dotted;">'
+            'ⓘ how is this calculated?</abbr></small>',
+            unsafe_allow_html=True,
+        )
+        starting_allowance = _computed_allowance
+    else:
+        manual_allowance = st.number_input(
+            "First-year annual pension allowance ($)",
+            value=70000, min_value=0, step=500,
+            help="Your first-year annual pension payment, before any COLA increases.",
+        )
+        starting_allowance = manual_allowance
 
     st.subheader("Retirement")
     retirement_years = st.number_input(
-        "Years Alive After Retirement",
-        value=30,
-        min_value=1,
-        max_value=60,
-        step=1,
-        help="How many years you expect to live after retiring."
+        "Years in Retirement",
+        value=30, min_value=1, max_value=60, step=1,
+        help="How many years you expect to spend in retirement."
     )
     index_returns_rate = st.number_input(
         "Index Returns Rate (%)",
-        value=7.0,
-        step=0.1,
+        value=7.0, min_value=0.0, max_value=25.0, step=0.1,
         help="Expected annual return rate of your hypothetical personal retirement investments."
     ) / 100 + 1
 
-# Results
+
 st.divider()
 st.header("Simulation Results: Pension vs. Personal Fund")
 
 # Parse promotion years
 try:
     promotion_years = [int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit()]
-except:
+except Exception:
     promotion_years = []
 
-# Initialize variables
+# Initialize simulation variables
 pension_contribution_total = 0
 pension_redeemed_total = 0
 personal_balance = 0
@@ -210,31 +264,30 @@ pension_fund_values = [0]
 personal_fund_values = [0]
 # Per-year hover data: [contribution, disbursement, deposit, withdrawal, market_returns]
 hover_data = [[0, 0, 0, 0, 0]]
-yearly_data = pd.DataFrame({'Year': pd.Series(dtype='str'),
-                            'Salary': pd.Series(dtype='float'),
-                            'Start Balance': pd.Series(dtype='float'),
-                            'Pension Contribution': pd.Series(dtype='float'),
-                            'Pension Contribution Total': pd.Series(dtype='float'),
-                            'Pension Redeemed': pd.Series(dtype='float'),
-                            'Pension Redeemed Total': pd.Series(dtype='float'),
-                            'Market Returns': pd.Series(dtype='float'),
-                            'Balance': pd.Series(dtype='float')})
+yearly_data = pd.DataFrame({
+    "Year": pd.Series(dtype="str"),
+    "Salary": pd.Series(dtype="float"),
+    "Start Balance": pd.Series(dtype="float"),
+    "Pension Contribution": pd.Series(dtype="float"),
+    "Pension Contribution Total": pd.Series(dtype="float"),
+    "Pension Redeemed": pd.Series(dtype="float"),
+    "Pension Redeemed Total": pd.Series(dtype="float"),
+    "Market Returns": pd.Series(dtype="float"),
+    "Balance": pd.Series(dtype="float"),
+})
 
-# Work phase - Loop through the work years
+# Work phase
 for work_year in range(1, int(work_years) + 1):
-    # Year 1: Step 1→2 occurs at 6 months, so average Step 1 and Step 2 salaries
     if work_year == 1:
         effective_salary = salary * (1 + step_increase) / 2
     else:
         effective_salary = salary
 
-    # Compute pension contribution
     pension_contribution_this_year = effective_salary * pension_contribution_rate
     pension_contribution_total += pension_contribution_this_year
 
-    # Compute personal balance
     start_balance = personal_balance
-    market_returns = personal_balance * (index_returns_rate-1)
+    market_returns = personal_balance * (index_returns_rate - 1)
     personal_balance = personal_balance + market_returns + pension_contribution_this_year
 
     years.append(f"W{work_year}")
@@ -242,7 +295,6 @@ for work_year in range(1, int(work_years) + 1):
     personal_fund_values.append(personal_balance)
     hover_data.append([pension_contribution_this_year, 0, pension_contribution_this_year, 0, market_returns])
 
-    # Store data for the table (numeric; formatted at display time)
     new_row = {
         "Year": f"W{work_year}",
         "Salary": effective_salary,
@@ -252,25 +304,22 @@ for work_year in range(1, int(work_years) + 1):
         "Pension Redeemed": 0.0,
         "Pension Redeemed Total": 0.0,
         "Market Returns": market_returns,
-        "Balance": personal_balance
+        "Balance": personal_balance,
     }
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
-    # Update salary for next year
     salary *= cola_increase
     if 1 <= work_year < 5:
         salary *= step_increase
     if work_year in promotion_years:
         salary *= promotion_increase
 
-# Retirement phase - Loop through the retirement years
+# Retirement phase
 for ret_year in range(1, retirement_years + 1):
-    # Pension redemptions
     pension_redeemed_total += pension_redeemed
 
-    # Personal fund
     start_balance = personal_balance
-    market_returns = personal_balance * (index_returns_rate-1)
+    market_returns = personal_balance * (index_returns_rate - 1)
     personal_balance = personal_balance - pension_redeemed + market_returns
 
     years.append(f"R{ret_year}")
@@ -278,56 +327,54 @@ for ret_year in range(1, retirement_years + 1):
     personal_fund_values.append(personal_balance)
     hover_data.append([0, pension_redeemed, 0, pension_redeemed, market_returns])
 
-    # Store data for the table (numeric; formatted at display time)
-    new_row = {"Year": f"R{ret_year}",
-        "Salary": float('nan'),
+    new_row = {
+        "Year": f"R{ret_year}",
+        "Salary": float("nan"),
         "Start Balance": start_balance,
         "Pension Contribution": 0.0,
         "Pension Contribution Total": 0.0,
         "Pension Redeemed": pension_redeemed,
         "Pension Redeemed Total": pension_redeemed_total,
         "Market Returns": market_returns,
-        "Balance": personal_balance
+        "Balance": personal_balance,
     }
     yearly_data = pd.concat([yearly_data, pd.DataFrame([new_row])], ignore_index=True)
 
-    # Update allowance for next year
     pension_redeemed *= cola_increase
 
-# Plot
 fig = go.Figure()
 
 fig.add_trace(go.Scatter(
     x=years,
     y=pension_fund_values,
-    mode='lines+markers',
-    name='Pension: total income received so far',
-    line=dict(color='#D97706'),
+    mode="lines+markers",
+    name="Pension: total income received so far",
+    line=dict(color="#D97706"),
     customdata=hover_data,
     hovertemplate=(
-        '<b>Year %{x}</b><br>'
-        'Contribution this year: $%{customdata[0]:,.0f}<br>'
-        'Pension payment this year: $%{customdata[1]:,.0f}<br>'
-        'Cumulative total received: $%{y:,.0f}'
-        '<extra></extra>'
-    )
+        "<b>Year %{x}</b><br>"
+        "Contribution this year: $%{customdata[0]:,.0f}<br>"
+        "Pension payment this year: $%{customdata[1]:,.0f}<br>"
+        "Cumulative total received: $%{y:,.0f}"
+        "<extra></extra>"
+    ),
 ))
 
 fig.add_trace(go.Scatter(
     x=years,
     y=personal_fund_values,
-    mode='lines+markers',
-    name='Personal fund: money left in the account',
-    line=dict(color='#0D9488'),
+    mode="lines+markers",
+    name="Personal fund: money left in the account",
+    line=dict(color="#0D9488"),
     customdata=hover_data,
     hovertemplate=(
-        '<b>Year %{x}</b><br>'
-        'Deposit this year: $%{customdata[2]:,.0f}<br>'
-        'Withdrawal this year: $%{customdata[3]:,.0f}<br>'
-        'Market returns this year: $%{customdata[4]:,.0f}<br>'
-        'Fund balance: $%{y:,.0f}'
-        '<extra></extra>'
-    )
+        "<b>Year %{x}</b><br>"
+        "Deposit this year: $%{customdata[2]:,.0f}<br>"
+        "Withdrawal this year: $%{customdata[3]:,.0f}<br>"
+        "Market returns this year: $%{customdata[4]:,.0f}<br>"
+        "Fund balance: $%{y:,.0f}"
+        "<extra></extra>"
+    ),
 ))
 
 # Adaptive x-axis
@@ -355,35 +402,34 @@ else:
 y_tick_interval = nice * magnitude
 
 fig.update_layout(
-    title='Pension vs. Personal Retirement Fund Over Time',
-    xaxis_title='Year (W = Working, R = Retirement)',
-    yaxis_title='Dollar Amount ($)',
+    title="Pension vs. Personal Retirement Fund Over Time",
+    xaxis_title="Year (W = Working, R = Retirement)",
+    yaxis_title="Dollar Amount ($)",
     xaxis=dict(
         tickangle=45,
-        tickmode='array',
+        tickmode="array",
         tickvals=[years[i] for i in range(0, len(years), x_tick_step)],
         tickfont=dict(size=10),
         showgrid=True,
-        gridcolor='lightgray',
+        gridcolor="lightgray",
     ),
     yaxis=dict(
         showgrid=True,
-        gridcolor='lightgray',
+        gridcolor="lightgray",
         dtick=y_tick_interval,
-        tickformat=',',
+        tickformat=",",
         separatethousands=True,
     ),
-    plot_bgcolor='white',
+    plot_bgcolor="white",
     legend=dict(x=0.01, y=0.99),
-    margin=dict(l=40, r=20, t=60, b=100)
+    margin=dict(l=40, r=20, t=60, b=100),
 )
 
-fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red", annotation_text="Retirement begins here",
-          annotation_position="top right")
-
-# Emphasize the zero baseline
+fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red",
+              annotation_text="Retirement begins here", annotation_position="top right")
+_fund_depletes = min(personal_fund_values) < 0
 fig.add_hline(y=0, line_width=2, line_color="#666666",
-          annotation_text="$0 — personal fund depleted",
+          annotation_text="$0 — personal fund depleted" if _fund_depletes else "$0",
           annotation_position="bottom right")
 
 st.markdown("""
@@ -400,17 +446,19 @@ Here, we imagine that both options pay you the **same income every year in retir
 st.plotly_chart(fig, use_container_width=True)
 
 if personal_balance > 0:
-    st.success(f"""
-**Based on your inputs, the personal fund is viable.**
-
-After {int(retirement_years)} years of retirement, your personal fund would still have **\\${personal_balance:,.0f}** remaining for you to keep (donate, pass on, etc.), on top of having already paid out the same income as the pension every single year. The pension would leave nothing (besides potential survivor benefits, if applicable).
-""")
+    st.markdown(f"""
+<div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>Based on your inputs, the personal fund is viable.</strong><br><br>
+After {int(retirement_years)} years of retirement, your personal fund would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having already paid out the same income as the pension every single year. The pension would leave nothing (besides potential survivor benefits, if applicable).
+</div>
+""", unsafe_allow_html=True)
 else:
-    st.info(f"""
-**Based on your inputs, the pension is the better option.**
-
+    st.markdown(f"""
+<div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>Based on your inputs, the pension is the better option.</strong><br><br>
 Before your {int(retirement_years)}-year retirement was over, your personal fund would have fully depleted, while the pension would have kept paying. Your investment returns can't sustain that many years of withdrawals, so you should choose the pension for its lifetime guarantee.
-""")
+</div>
+""", unsafe_allow_html=True)
 
 mc1, mc2 = st.columns(2)
 with mc1:
@@ -431,20 +479,20 @@ mc3, mc4 = st.columns(2)
 with mc3:
     st.metric(
         label="Fund at Retirement",
-        value=f"${personal_fund_values[work_years]:,.0f}",
+        value=f"${personal_fund_values[int(work_years)]:,.0f}",
         help="The balance of your hypothetical personal investment account on the day you retire, after years of contributions and market growth."
     )
 with mc4:
     if personal_balance > 0:
         st.metric(
-            label="Fund at Death",
+            label="Final Fund Balance at Death",
             value=f"${personal_balance:,.0f}",
             delta="Did not run out ✓",
-            help="The personal fund still has money left after paying out the same income as the pension for every retirement year. This is money you'd still own at death."
+            help="The personal fund still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
         )
     else:
         st.metric(
-            label="Fund at Death",
+            label="Final Fund Balance at Death",
             value=f"${personal_balance:,.0f}",
             delta="Ran out before death ✗",
             delta_color="inverse",
@@ -457,7 +505,6 @@ st.markdown("""
 - With the **pension**, payments stop when you die (unless you elected an option that includes a *survivor benefit*, which is a reduced annual payment to a spouse or dependent after your death). This calculator does not model survivor benefits.
 """)
 
-# Display the table
 st.divider()
 st.subheader("Year-Over-Year Breakdown")
 
@@ -490,8 +537,7 @@ Returns are calculated on the balance at the *start* of the year, before that ye
             render_breakdown_table(
                 yearly_data[["Year", "Salary", "Pension Contribution", "Pension Contribution Total"]],
                 "W",
-                {"Pension Contribution": "Contribution",
-                 "Pension Contribution Total": "Total Contributed"},
+                {"Pension Contribution": "Contribution", "Pension Contribution Total": "Total Contributed"},
             ),
             hide_index=True,
         )
@@ -500,9 +546,7 @@ Returns are calculated on the balance at the *start* of the year, before that ye
             render_breakdown_table(
                 yearly_data[["Year", "Start Balance", "Market Returns", "Pension Contribution", "Balance"]],
                 "W",
-                {"Market Returns": "+ Returns",
-                 "Pension Contribution": "+ Deposit",
-                 "Balance": "= Balance"},
+                {"Market Returns": "+ Returns", "Pension Contribution": "+ Deposit", "Balance": "= Balance"},
                 balance_col="= Balance",
             ),
             hide_index=True,
@@ -510,7 +554,7 @@ Returns are calculated on the balance at the *start* of the year, before that ye
 
 with st.expander("Retirement Years"):
     st.markdown("""
-Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), the personal fund has run out — the year it first goes red is the year the pension's lifetime guarantee starts to matter.
+Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), the personal fund has run out. The year it first goes red is the year that the pension's lifetime guarantee starts to matter.
 """)
     col1, col2 = st.columns(2)
     with col1:
@@ -529,8 +573,7 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
             render_breakdown_table(
                 yearly_data[["Year", "Pension Redeemed", "Pension Redeemed Total"]],
                 "R",
-                {"Pension Redeemed": "Pension Received",
-                 "Pension Redeemed Total": "Total Received"},
+                {"Pension Redeemed": "Pension Received", "Pension Redeemed Total": "Total Received"},
             ),
             hide_index=True,
         )
@@ -549,7 +592,6 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
         )
 
 
-# Case Studies
 st.divider()
 st.header("Case Studies")
 
@@ -559,7 +601,7 @@ The two examples below show one scenario where each option wins. To see the full
 
 with st.expander("Case Study A: Personal Fund Wins"):
     st.markdown("""
-**Settings:** Starting wage \\$120,000 · Step increase 5.5% · COLA 3% · Promotions at years 10 and 20 (10% each) · Pension contribution rate 10% · Index returns 7% · Work years 30 · Retirement years 30 · First-year pension allowance \\$70,458
+**Settings:** Starting wage \\$120,000 · Step increase 5.5% · COLA 3% · Promotions at years 10 and 20 (8% each) · Pension contribution rate 10% · Index returns 7% · Work years 30 · Retirement years 30 · First-year pension allowance \\$70,458
 
 ---
 
