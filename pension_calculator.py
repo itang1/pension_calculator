@@ -31,19 +31,15 @@ Instead of contributing to the pension, imagine that you deposit that same amoun
 
 with st.expander("Limitations & Assumptions of the Tool"):
     st.markdown("""
-This calculator is an educational tool, not a comprehensive financial model. Several factors are simplified or left out:
+This calculator is an educational tool, not a comprehensive financial model. The inputs you provide are applied with several simplifying assumptions:
 
-**Tax treatment.** The calculator assumes the personal account gets the same pre-tax advantages as the pension. This holds if you have room in a 457(b) plan (which has its own contribution limit, separate from your pension). But if you have no tax-advantaged space available, the personal account is at a disadvantage not captured here.
+**Constant input rates.** The investment return, COLA, and step increase you enter are treated as fixed values applied every year. Real markets and salary schedules fluctuate, and a few bad return years early in retirement hurt far more than a steady average suggests.
 
-**No market volatility.** Returns are a fixed rate every year. Real markets swing, and a few bad years early in retirement hurt far more than the average suggests (known as "sequence of returns risk").
+**Equal tax treatment for both options.** The contribution rate is applied to the personal account on the same pre-tax basis as the pension. This is fine if you have room in a 457(b) plan, which has its own contribution limit, separate from your pension). But if you have no tax-advantaged space available, the personal account is actually disadvantaged in a way that is not factored in here.
 
-**No mortality pooling.** In a pension, those who live longer are effectively subsidized by those who don't. An individual account can't do this, so the pension is especially valuable if you live well past average life expectancy.
+**Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods, which is a simplification. See the "Timing Assumptions" note for the exact ordering used.
 
-**No survivor or disability benefits.** Pensions often offer survivor payments to a spouse or disability benefits. These are real insurance value not modeled here.
-
-**No employer contributions.** Some personal accounts include employer matching. Only the employee side is modeled.
-
-**Fixed contribution and withdrawal patterns.** Contributions and withdrawals are assumed steady. Real behavior varies.
+**Steady contribution and withdrawal amounts.** Contributions follow your salary inputs, and withdrawals match the pension allowance exactly. The tool does not model any deviations such as irregular saving, retiring in the middle of the year, or altering your withdrawal rate from year to year.
 
 *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
 """)
@@ -70,7 +66,7 @@ This calculator operates in annual periods. Within each year:
         value=120000,
         min_value=0,
         step=500,
-        help="Your initial salary the first year you were hired."
+        help="Your initial salary for the first year you were hired."
     )
     work_years = st.number_input(
         "Years to Work",
@@ -103,7 +99,7 @@ This calculator operates in annual periods. Within each year:
         "Promotion Increase (%)",
         value=10.0,
         step=1.,
-        help="Salary bump when you receive a promotion."
+        help="Expected salary bump when you receive a promotion."
     ) / 100 + 1
 
     st.subheader("Pension")
