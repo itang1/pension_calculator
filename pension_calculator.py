@@ -1,5 +1,6 @@
 import json
 import math
+import time
 import urllib.request
 from datetime import datetime
 import streamlit as st
@@ -852,12 +853,19 @@ The pension option tends to come out ahead when returns are low, retirement is l
 st.divider()
 st.header("Share Your Feedback")
 st.caption("What would make this calculator more useful? What's missing, confusing, or surprising?")
+
+if "feedback_key" not in st.session_state:
+    st.session_state.feedback_key = 0
+if "feedback_success" not in st.session_state:
+    st.session_state.feedback_success = False
+
 with st.form("feedback_form"):
     feedback_text = st.text_area(
         "Your feedback",
         height=120,
         placeholder="e.g. I wish it showed the impact of leaving before vesting, or the chart was hard to read...",
         label_visibility="collapsed",
+        key=f"feedback_text_{st.session_state.feedback_key}",
     )
     if st.form_submit_button("Submit"):
         if feedback_text.strip():
@@ -890,6 +898,25 @@ with st.form("feedback_form"):
             if err:
                 st.warning(f"Could not save feedback: {err}")
             else:
-                st.success("Thank you. Your feedback is noted.")
+                st.session_state.feedback_key += 1
+                st.session_state.feedback_success = True
+                st.rerun()
         else:
             st.warning("Please enter some feedback before submitting.")
+
+if st.session_state.feedback_success:
+    _msg = st.empty()
+    _msg.markdown(
+        """
+        <div style="background:#d4edda;border:1px solid #c3e6cb;color:#155724;
+                    padding:.75rem 1.25rem;border-radius:.375rem;margin:.25rem 0;
+                    animation:fb_fade .8s ease-in 2.2s forwards">
+            ✓ &nbsp;Thank you. Your feedback is noted.
+        </div>
+        <style>@keyframes fb_fade{from{opacity:1}to{opacity:0}}</style>
+        """,
+        unsafe_allow_html=True,
+    )
+    time.sleep(3)
+    _msg.empty()
+    st.session_state.feedback_success = False
