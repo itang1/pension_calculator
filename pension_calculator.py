@@ -142,6 +142,17 @@ Many public employees (such as teachers, law enforcement officers, and civil ser
 In this calculator, we ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which option would produce better outcomes for them?**
 """)
 
+st.markdown(
+    """
+<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<em>&larr; On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.</em>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+st.space("small")
+
 with st.expander("Explanation of the Two Options"):
     col_a, col_b = st.columns(2)
     with col_a:
@@ -174,14 +185,14 @@ This calculator is an educational tool, not a comprehensive financial model. The
 *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
 """)
 
-st.markdown(
-    """
-<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<em>&larr; On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.</em>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+with st.expander("Limitations on the Results"):
+    st.markdown("""
+- **The return rate is the biggest factor.** A 1% difference in long-term returns shifts the outcome dramatically between Option A and Option B. Check the break-even rate in the results to see the minimum market return Option B needs to survive retirement.
+- **Return sequence is not modeled.** Retiring into a market downturn draws down Option B's fund much faster than a stable average return suggests. This calculator applies the same return rate every year, which is a simplification.
+- **Vesting matters for Option A.** If you leave before your pension vests, you may receive little or nothing. This calculator assumes you work your full stated career and collect the full benefit.
+- **Both options pay the same annual income.** This is not a comparison about how much you receive each year. Both options pay the same amount. The question is whether Option B has money left over after covering all those payments through retirement.
+- **COLA may differ between options.** This model applies the same COLA rate to both the Option A pension payment and the Option B withdrawal amount. In practice they can differ.
+""")
 
 with st.sidebar:
     st.header("Input Assumptions")
@@ -346,8 +357,8 @@ This calculator operates in annual periods. Within each year:
     )
     index_returns_rate = st.number_input(
         "Index Returns Rate (%)",
-        value=7.0, min_value=0.0, max_value=25.0, step=0.1,
-        help="Expected annual return rate of your hypothetical personal retirement investments."
+        value=10.0, min_value=0.0, max_value=25.0, step=0.1,
+        help="Expected annual return on Option B's investment account, in nominal terms (before subtracting inflation). Use a nominal figure here because salaries and pension payments in this calculator are also nominal, growing with your COLA rate. The S&P 500 has averaged about 10% nominally over the long run; a diversified balanced portfolio might return 6 to 8%."
     ) / 100 + 1
 
 
@@ -408,13 +419,15 @@ fig = go.Figure()
 _annual_payments = [h[1] for h in hover_data]
 fig.add_trace(go.Scatter(
     x=years,
-    y=_annual_payments,
+    y=pension_fund_values,
     mode="lines",
-    name="Annual withdrawal (= pension payment)",
+    name="Total paid out to date (same for both options)",
     line=dict(color="#78716C", dash="dot", width=1.5),
+    customdata=_annual_payments,
     hovertemplate=(
         "<b>Year %{x}</b><br>"
-        "Annual payment / withdrawal: $%{y:,.0f}"
+        "This year: $%{customdata:,.0f}<br>"
+        "Total: $%{y:,.0f}"
         "<extra></extra>"
     ),
 ))
@@ -438,14 +451,14 @@ fig.add_trace(go.Scatter(
 
 # Adaptive x-axis
 total_years = len(years)
-x_tick_step = max(5, int(math.ceil(total_years / 10 / 5) * 5))
+x_tick_step = max(5, int(math.ceil(total_years / 12 / 5) * 5))
 
 # Adaptive y-axis
-all_values = [v for v in pension_fund_values + personal_fund_values if v is not None]
+all_values = [v for v in personal_fund_values if v is not None]
 data_min = min(all_values, default=0)
 data_max = max(all_values, default=1)
 data_range = max(data_max - data_min, 1)
-raw_interval = data_range / 8
+raw_interval = data_range / 10
 magnitude = 10 ** math.floor(math.log10(raw_interval))
 normalized = raw_interval / magnitude
 if normalized <= 1:
@@ -479,8 +492,8 @@ fig.update_layout(
         separatethousands=True,
     ),
     plot_bgcolor="white",
-    legend=dict(x=0.01, y=0.99),
-    margin=dict(l=40, r=20, t=60, b=100),
+    legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+    margin=dict(l=40, r=20, t=20, b=120),
 )
 
 fig.add_vrect(
@@ -495,25 +508,23 @@ fig.add_vrect(
     annotation_text="Retirement Years", annotation_position="top left",
     annotation=dict(font_size=11, font_color="#D97706"),
 )
-fig.add_vline(x=int(work_years), line_width=2, line_dash="dash", line_color="#DC2626",
-              annotation_text="Retirement begins", annotation_position="top right",
-              annotation=dict(font_size=11))
+fig.add_vline(x=int(work_years), line_width=2, line_dash="dash", line_color="#DC2626")
 _fund_depletes = min(personal_fund_values) < 0
 fig.add_hline(y=0, line_width=2, line_color="#666666",
-          annotation_text="$0 — personal fund depleted" if _fund_depletes else "$0",
+          annotation_text="$0 = personal fund depleted" if _fund_depletes else "$0",
           annotation_position="bottom right")
 
-st.subheader("Pension vs. Personal Retirement Fund Over Time")
+st.header("Pension vs. Personal Retirement Fund Over Time")
 
 with st.expander("How to read this chart"):
     st.markdown("""
-Here, we imagine that both options pay you the **same income every year in retirement**. This brings the whole comparison down to the question: **does your personal fund run out before you die?**
+Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does the Personal Fund (Option B) run out of money before you die?**
 
-- **Teal line** = how much remains in your personal fund after each annual withdrawal. If it stays above zero through all retirement years, the personal fund wins. If it hits zero, the pension wins.
-- **Dotted gray line** = the annual payment amount: what the pension pays you each year, and identically what you withdraw from the personal fund each year. Toggle it on with the checkbox below.
+- **Teal line (Option B)** = how much remains in the personal fund after each annual withdrawal. If it stays above zero through all retirement years, Option B wins. If it hits zero, Option A wins.
+- **Dotted gray line** = the annual payment amount: what Option A pays each year, which is also exactly what you withdraw from Option B each year. Toggle it on/off with the checkbox below.
 - **Background shading** = the blue-gray region is your working years; the warm region is retirement.
-- **Red dashed line** = the exact year retirement begins.
-- **Horizontal gray line** = the $0 mark. If the teal line crosses this, the personal fund has run out.
+- **Red dashed line** = the year retirement begins.
+- **Horizontal gray line** = the $0 mark. If the teal line crosses this, Option B has run out of money.
 """)
 
 _show_ref_line = st.checkbox("Show annual withdrawal reference line", value=False)
@@ -524,19 +535,21 @@ st.plotly_chart(fig, use_container_width=True)
 if personal_balance > 0:
     st.markdown(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>Based on your inputs, the personal fund is viable.</strong><br><br>
-After {int(retirement_years)} years of retirement, your personal fund would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having already paid out the same income as the pension every single year. The pension would leave nothing (besides potential survivor benefits, if applicable).
+<strong>Based on your inputs, Option B (personal fund) comes out ahead.</strong><br><br>
+After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
 <br><br><em>At your {(index_returns_rate-1)*100:.1f}% return assumption, you are {(index_returns_rate-1)*100 - _breakeven_rate:.1f} percentage points above the {_breakeven_rate:.1f}% break-even return rate.</em>
 </div>
 """, unsafe_allow_html=True)
 else:
     st.markdown(f"""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>Based on your inputs, the pension is the better option.</strong><br><br>
-Before your {int(retirement_years)}-year retirement was over, your personal fund would have fully depleted in retirement year {_depletion_year}, leaving {int(retirement_years) - _depletion_year} years without coverage. Your investment returns can't sustain that many years of withdrawals, so you should choose the pension for its lifetime guarantee.
+<strong>Based on your inputs, Option A (pension) comes out ahead.</strong><br><br>
+Before your {int(retirement_years)}-year retirement was over, Option B would have fully depleted in retirement year {_depletion_year}, leaving {int(retirement_years) - _depletion_year} years without coverage. The investment returns on Option B cannot sustain that many years of withdrawals, so Option A's lifetime guarantee is the more reliable choice.
 <br><br><em>Your fund would need at least a {_breakeven_rate:.1f}% annual return (you entered {(index_returns_rate-1)*100:.1f}%) to last the full retirement period.</em>
 </div>
 """, unsafe_allow_html=True)
+
+st.space("small")
 
 mc1, mc2 = st.columns(2)
 with mc1:
@@ -591,15 +604,15 @@ with mc5:
 
 st.markdown("""
 **What you leave behind at your death:**
-- With the **personal fund**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
-- With the **pension**, payments stop when you die (unless you elected an option that includes a *survivor benefit*, which is a reduced annual payment to a spouse or dependent after your death). This calculator does not model survivor benefits.
+- With **Option B (personal fund)**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
+- With **Option A (pension)**, payments stop when you die (unless you elected a survivor benefit, which is a reduced annual payment to a spouse or dependent after your death). This calculator does not model survivor benefits.
 """)
 
 st.divider()
-st.subheader("Year-Over-Year Breakdown")
+st.header("Year-Over-Year Breakdown")
 
 st.markdown("""
-Each row is one year. The left table tracks the **pension side**, while the right tracks the **personal fund side**. They use the same dollar amounts each year so the comparison is apples-to-apples. The bold **Total** row at the bottom of each table ties back to the summary metrics above.
+Each row is one year. The left table tracks **Option A (pension)**, while the right tracks **Option B (personal fund)**. They use the same dollar amounts each year so the comparison is apples-to-apples. The bold **Total** row at the bottom of each table ties back to the summary metrics above.
 """)
 
 with st.expander("Working Years"):
@@ -608,14 +621,14 @@ During your working years, a fixed percentage of your salary is contributed annu
 """)
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**Pension Side**")
+        st.markdown("**Option A: Pension**")
         st.markdown(f"""
 Each year, {pension_contribution_rate*100:.0f}% of your salary is deducted and paid into the pension. The **Contribution** column shows that deduction. The **Total Contributed** column is a running sum of all contributions to date.
 
 Salary grows each year by your COLA ({(cola_increase-1)*100:.1f}%), plus a step increase ({(step_increase-1)*100:.1f}%) in your first 4 years, plus a {(promotion_increase-1)*100:.0f}% bump in any promotion years ({str(promotion_years).strip("[]") if promotion_years else "none entered"}). Year 1 is a special case: it averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months in.
 """)
     with col2:
-        st.markdown("**Personal Fund Side**")
+        st.markdown("**Option B: Personal Fund**")
         st.markdown(f"""
 Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: the **Start Balance** earns **+ Returns** (investment growth at {(index_returns_rate-1)*100:.1f}%/year), then the **+ Deposit** (same as the pension contribution) is added, producing the **= Balance** at year-end.
 
@@ -648,12 +661,12 @@ Once you retire, contributions stop. The pension begins paying you a fixed annua
 """)
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**Pension Side**")
+        st.markdown("**Option A: Pension**")
         st.markdown(f"""
 The pension pays a set annual amount, growing by {(cola_increase-1)*100:.1f}% each year (COLA). **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
 """)
     with col2:
-        st.markdown("**Personal Fund Side**")
+        st.markdown("**Option B: Personal Fund**")
         st.markdown(f"""
 Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the **Start Balance** earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
 """)
@@ -724,19 +737,7 @@ The pension option tends to come out ahead when returns are low, retirement is l
 """)
 
 st.divider()
-st.header("Before You Decide")
-
-st.markdown("""
-A few things to keep in mind when interpreting your results:
-
-- **The return rate is the biggest lever.** A 1% change in long-term returns produces dramatically different outcomes. Use the break-even rate above to understand exactly what market performance you'd need.
-- **Sequence of returns is not modeled.** Retiring into a bear market depletes a personal fund far faster than a steady average suggests. The real world is not a straight line.
-- **Vesting matters.** If you leave before your pension vests, you may receive little or nothing. This calculator assumes you work your full stated years and collect.
-- **Both options pay the same income.** The comparison is not about how much income you get — both pay the same amount each year. The question is what you own beyond that income.
-- **COLA assumptions.** This model applies the same COLA rate to both your pension payment and your withdrawal amount. In practice these can differ.
-""")
-
-st.subheader("Share Your Feedback")
+st.header("Share Your Feedback")
 st.caption("What would make this calculator more useful? What's missing, confusing, or surprising?")
 with st.form("feedback_form"):
     feedback_text = st.text_area(
