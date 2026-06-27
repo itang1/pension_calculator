@@ -41,6 +41,7 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     return styler
 
 
+@st.cache_data
 def run_simulation(starting_wage, work_years, cola_increase, step_increase,
                    promotion_years, promotion_increase, pension_contribution_rate,
                    starting_allowance, retirement_years, index_returns_rate):
@@ -132,6 +133,64 @@ def run_simulation(starting_wage, work_years, cola_increase, step_increase,
         "pension_redeemed_total": pension_redeemed_total,
         "personal_balance": personal_balance,
     }
+
+
+def compute_fas(starting_wage, work_years, cola_increase, step_increase,
+                promotion_years, promotion_increase):
+    sim_sal = starting_wage
+    sal_hist = []
+    for yr in range(1, work_years + 1):
+        eff = sim_sal * (1 + step_increase) / 2 if yr == 1 else sim_sal
+        sal_hist.append(eff)
+        sim_sal *= cola_increase
+        if 1 <= yr < 5:
+            sim_sal *= step_increase
+        if yr in promotion_years:
+            sim_sal *= promotion_increase
+    if len(sal_hist) >= 3:
+        return max(sum(sal_hist[i:i + 3]) / 3 for i in range(len(sal_hist) - 2))
+    return sum(sal_hist) / len(sal_hist) if sal_hist else starting_wage
+
+
+def compute_breakeven_rate(starting_wage, work_years, cola_increase, step_increase,
+                            promotion_years, promotion_increase, pension_contribution_rate,
+                            starting_allowance, retirement_years):
+    sim_args = (starting_wage, work_years, cola_increase, step_increase,
+                promotion_years, promotion_increase, pension_contribution_rate,
+                starting_allowance, retirement_years)
+    if run_simulation(*sim_args, 1.0)["personal_balance"] > 0:
+        return 0.0
+    if run_simulation(*sim_args, 1.25)["personal_balance"] <= 0:
+        return 25.0
+    lo, hi = 0.0, 0.25
+    for _ in range(30):
+        mid = (lo + hi) / 2
+        if run_simulation(*sim_args, 1.0 + mid)["personal_balance"] > 0:
+            hi = mid
+        else:
+            lo = mid
+    return hi * 100
+
+
+def render_result_banner(personal_balance, retirement_years, depletion_year,
+                          breakeven_rate, current_rate_pct):
+    rate_buffer = current_rate_pct - breakeven_rate
+    if personal_balance > 0:
+        st.markdown(f"""
+<div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>Based on your inputs, Option B (personal fund) comes out ahead.</strong><br><br>
+After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
+<br><br><em>At your {current_rate_pct:.1f}% return assumption, you are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate.</em>
+</div>
+""", unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+<div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>Based on your inputs, Option A (pension) comes out ahead.</strong><br><br>
+Before your {int(retirement_years)}-year retirement was over, Option B would have fully depleted in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years without coverage. The investment returns on Option B cannot sustain that many years of withdrawals, so Option A's lifetime guarantee is the more reliable choice.
+<br><br><em>Your fund would need at least a {breakeven_rate:.1f}% annual return (you entered {current_rate_pct:.1f}%) to last the full retirement period.</em>
+</div>
+""", unsafe_allow_html=True)
 
 
 st.title("Is Your Pension Worth It?")
@@ -302,25 +361,9 @@ This calculator operates in annual periods. Within each year:
         else:
             _early_red = 0.0
 
-        # Compute Final Average Salary (highest 36 consecutive months) and allowance
-        try:
-            _promo_yrs = [int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit()]
-        except ValueError:
-            _promo_yrs = []
-        _sim_sal = starting_wage
-        _sal_hist = []
-        for _yr in range(1, int(work_years) + 1):
-            _eff = _sim_sal * (1 + step_increase) / 2 if _yr == 1 else _sim_sal
-            _sal_hist.append(_eff)
-            _sim_sal *= cola_increase
-            if 1 <= _yr < 5:
-                _sim_sal *= step_increase
-            if _yr in set(_promo_yrs):
-                _sim_sal *= promotion_increase
-        if len(_sal_hist) >= 3:
-            _fas = max(sum(_sal_hist[i:i + 3]) / 3 for i in range(len(_sal_hist) - 2))
-        else:
-            _fas = sum(_sal_hist) / len(_sal_hist) if _sal_hist else starting_wage
+        _promo_yrs = tuple(int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit())
+        _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
+                           _promo_yrs, promotion_increase)
         _reduction = 1.0 - _early_red / 100.0
         _computed_allowance = work_years * _fas * _t2_factor * _reduction
 
@@ -362,11 +405,7 @@ This calculator operates in annual periods. Within each year:
     ) / 100 + 1
 
 
-# Parse promotion years
-try:
-    promotion_years = [int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit()]
-except ValueError:
-    promotion_years = []
+promotion_years = tuple(int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit())
 
 result = run_simulation(
     starting_wage, int(work_years), cola_increase, step_increase,
@@ -389,30 +428,11 @@ _depletion_year = next(
     None,
 )
 
-# Break-even: minimum return rate at which fund survives full retirement (binary search)
-_be_lo, _be_hi = 0.0, 0.25
-_be_at_zero = run_simulation(starting_wage, int(work_years), cola_increase, step_increase,
-                              promotion_years, promotion_increase, pension_contribution_rate,
-                              starting_allowance, int(retirement_years), 1.0)
-if _be_at_zero["personal_balance"] > 0:
-    _breakeven_rate = 0.0
-else:
-    _be_at_max = run_simulation(starting_wage, int(work_years), cola_increase, step_increase,
-                                promotion_years, promotion_increase, pension_contribution_rate,
-                                starting_allowance, int(retirement_years), 1.25)
-    if _be_at_max["personal_balance"] <= 0:
-        _breakeven_rate = 25.0
-    else:
-        for _ in range(30):
-            _be_mid = (_be_lo + _be_hi) / 2
-            _be_check = run_simulation(starting_wage, int(work_years), cola_increase, step_increase,
-                                       promotion_years, promotion_increase, pension_contribution_rate,
-                                       starting_allowance, int(retirement_years), 1.0 + _be_mid)
-            if _be_check["personal_balance"] > 0:
-                _be_hi = _be_mid
-            else:
-                _be_lo = _be_mid
-        _breakeven_rate = _be_hi * 100
+_breakeven_rate = compute_breakeven_rate(
+    starting_wage, int(work_years), cola_increase, step_increase,
+    promotion_years, promotion_increase, pension_contribution_rate,
+    starting_allowance, int(retirement_years),
+)
 
 fig = go.Figure()
 
@@ -532,22 +552,10 @@ fig.data[0].visible = _show_ref_line
 
 st.plotly_chart(fig, use_container_width=True)
 
-if personal_balance > 0:
-    st.markdown(f"""
-<div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>Based on your inputs, Option B (personal fund) comes out ahead.</strong><br><br>
-After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
-<br><br><em>At your {(index_returns_rate-1)*100:.1f}% return assumption, you are {(index_returns_rate-1)*100 - _breakeven_rate:.1f} percentage points above the {_breakeven_rate:.1f}% break-even return rate.</em>
-</div>
-""", unsafe_allow_html=True)
-else:
-    st.markdown(f"""
-<div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>Based on your inputs, Option A (pension) comes out ahead.</strong><br><br>
-Before your {int(retirement_years)}-year retirement was over, Option B would have fully depleted in retirement year {_depletion_year}, leaving {int(retirement_years) - _depletion_year} years without coverage. The investment returns on Option B cannot sustain that many years of withdrawals, so Option A's lifetime guarantee is the more reliable choice.
-<br><br><em>Your fund would need at least a {_breakeven_rate:.1f}% annual return (you entered {(index_returns_rate-1)*100:.1f}%) to last the full retirement period.</em>
-</div>
-""", unsafe_allow_html=True)
+render_result_banner(
+    personal_balance, retirement_years, _depletion_year,
+    _breakeven_rate, (index_returns_rate - 1) * 100,
+)
 
 st.space("small")
 
