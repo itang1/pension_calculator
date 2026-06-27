@@ -7,37 +7,39 @@ from plotly import graph_objects as go
 st.title("Is Your Pension Worth It?")
 
 st.markdown("""
-Many public employees (such as teachers, law enforcement officers, civil servants) are required to contribute a portion of every paycheck into a pension plan, with no say in the matter. But is the pension actually worth it? **What if you had instead kept that money and invested it yourself?**
-""")
+Many public employees (such as teachers, law enforcement officers, and civil servants) are required to contribute part of each paycheck to a pension plan.
 
-st.markdown("This calculator compares two options side by side:")
+In this website, I ask the question: **if that same money were instead invested in a personal retirement account, which path would likely produce better outcomes under the same assumptions?**
+
+This calculator compares the two side-by-side scenarios:
+""")
 
 col_a, col_b = st.columns(2)
 with col_a:
     st.info("""
 **Option A: Traditional Pension**
 
-Each year, a fixed percentage of your paycheck is automatically deducted and paid into the pension system. You don't control this money or decide how it's invested. In exchange, when you retire, the pension pays you a guaranteed fixed amount every year for the rest of your life, no matter how long you live or how the stock market performs.
+Each year, a fixed percentage of your paycheck is contributed automatically to the pension system. You do not choose how those funds are invested. In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
 """)
 with col_b:
     st.info("""
 **Option B: Personal Retirement Account**
 
-What if, instead of contributing to the pension, you deposited that same amount each year into your own investment account? Your money would grow over time through market returns, and you'd own it outright. After retiring, you withdraw the same annual amount as your pension would have paid, and whatever is left over stays in your account and keeps growing.
+Instead of contributing to the pension, imagine depositing that same amount each year into your own investment account. The balance grows with market returns and remains entirely under your control. In retirement, you withdraw the same annual amount the pension would have paid. Additionally, any remaining balance is yours to keep.
 """)
 
 st.markdown("""
-By running both scenarios with the same inputs (such as salary, contribution rate, investment return, and retirement timeline), you can see which option comes out ahead, and by how much.
+By running both scenarios with the same inputs (salary, contribution rate, investment return, and retirement timeline), you can see which option is stronger under your assumptions and by how much.
 """)
 
 st.markdown("""
 ---
 **What's on this page:**
 
-1. **Background:** The pension debate, and what this calculator does and doesn't model**
+1. **Background:** The pension tradeoffs and what this calculator does and does not model
 2. **Input assumptions:** Enter your salary, career details, and retirement estimates
 3. **Simulation results:** A side-by-side chart and numeric summary comparing both options
-4. **Year over year breakdown:** Detailed tables showing how every number was calculated, year by year
+4. **Year over year breakdown:** Detailed tables showing how each value is calculated
 5. **Case studies:** Two worked examples illustrating when each option wins
 """)
 
@@ -48,29 +50,31 @@ st.header("Background")
 
 with st.expander("The Pension Debate"):
     st.markdown("""
-In order to answer whether the pension is actually worth it, it helps to understand the broader discourse around public pensions.
+Public pension discussions often focus on two competing goals: guaranteed lifetime income and long-term personal control of assets.
 
-### The Case Against Pensions
+This calculator does not predict the future, but rather stress-tests your assumptions so that you can compare to see which option appears better for your particular life circumstances.
 
-Pension systems were designed for a different era, one where people worked a single job for 30 years, life expectancy was shorter, and personal investing was difficult and expensive. Today, those conditions largely no longer hold.
+### Critics of Pensions
 
-Critics argue that pensions are financially unsustainable. Many public pension funds are underfunded, such that they owe more in future benefits than they currently hold in assets. When that gap widens, taxpayers bear the cost. Critics also point to structural flaws: pensions disproportionately reward employees who stay for decades, while those who leave before vesting (which sometimes is set to 5 or 10 years) walk away with nothing or very little. In today's climate, where job-hopping every few years is common practice, that's a serious penalty for mobility.
+Some critics argue pension systems fit an older employment model where workers stayed in one role for decades. In that view, modern workers who change jobs more frequently may receive less value, especially if they leave before full vesting.
 
-There's also the matter of control. Pension contributions are gone the moment they leave your paycheck. You can't invest them, access them early in an emergency, or pass them to your family if you die before retirement. A personal investment account, by contrast, is your money: it grows on your terms, you can leave it to heirs, and you're not dependent on a government agency to remain solvent for the next 30 years.
+Another concern is funding risk. Some plans are underfunded, meaning projected obligations can exceed current assets. Critics argue that persistent funding gaps can eventually shift costs to future taxpayers or public budgets.
 
-### The Case For Pensions
+There is also the matter of control: pension contributions are pooled and governed by plan rules. A personal account offers direct ownership, investment choice, and potential transfer of remaining assets to heirs.
 
-On the other side, defenders of pensions make a compelling argument: guaranteed income for life is genuinely hard to replicate on your own. A pension pays no matter how long you live, regardless of whether the market crashes the year you retire. A personal investment account has no such guarantee. If your investments perform poorly or if you live longer than expected, you can run out of money.
+### Supporters of Pensions
 
-Pensions also provide a kind of collective insurance. When a large pool of workers all contribute together, those who live longest are effectively subsidized by those who don't. An individual investor can't access this "mortality pooling" in a personal account.
+Supporters argue that pensions provide a key benefit that is difficult to replicate alone: guaranteed income for life. A pension continues paying even through poor market periods and even if retirement lasts longer than expected.
 
-Defenders also note that many public sector jobs pay less than their private sector equivalents. The pension is often part of the total compensation package that makes those jobs attractive.
+Pensions also provide mortality pooling. In simple terms, participants who live longer are supported by the pooled structure in ways an individual account cannot fully mirror.
+
+Supporters further note that many public-sector compensation packages are designed with retirement benefits included, so pension value is part of total compensation, not a standalone perk.
 
 ### Is it Worth It?
 
-Both sides have a point, and the research reflects that. Whether a pension is "worth it" for a given individual depends on a web of factors: how long you work and whether you vest fully, how the market performs over your career, how long you live in retirement, whether you have heirs you want to provide for, and how much you value certainty versus upside potential.
+For most people, the answer is case-specific. Outcomes depend on factors like career length, vesting status, investment returns, retirement duration, and preference for certainty versus flexibility.
 
-This calculator doesn't resolve that debate, but it is a tool to aid in making the comparison transparent. Plug in your own numbers to see for for yourself.
+This calculator does not settle the debate, but it makes the tradeoffs transparent. Enter your own assumptions to see how each option behaves.
 """)
 
 with st.expander("Limitations & Assumptions"):
@@ -93,13 +97,12 @@ This calculator is an educational tool, not a comprehensive financial model. Sev
 """)
 
 
-# Input form
-st.divider()
-st.header("Input Assumptions")
+# Input form — sidebar
+with st.sidebar:
+    st.header("Input Assumptions")
 
-st.info("""
-**Timing Assumptions**
-
+    with st.expander("Timing Assumptions"):
+        st.markdown("""
 This calculator operates in annual periods. Within each year:
 - **Contributions & deposits**: Made at the end of the year.
 - **Withdrawals**: Made at the end of the year.
@@ -109,15 +112,7 @@ This calculator operates in annual periods. Within each year:
 - **Promotions**: Applied at the end of the year you specify, taking effect the following year.
 """)
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    step_increase = st.number_input(
-        "Step Increase (%)",
-        value=5.5,
-        min_value=0.,
-        step=0.1,
-        help="Annual raise from step progression (e.g., moving up a salary scale)."
-    ) / 100 + 1
+    st.subheader("Career")
     starting_wage = st.number_input(
         "Starting Annual Wage ($)",
         value=120000,
@@ -132,7 +127,6 @@ with col1:
         step=1,
         help="How many years you plan to work before retirement."
     )
-with col2:
     cola_increase = st.number_input(
         "Cost of Living Adjustment (%)",
         value=3.0,
@@ -141,26 +135,26 @@ with col2:
         step=0.1,
         help="Annual salary adjustment announced each October, typically between 2–3.5%."
     ) / 100 + 1
+    step_increase = st.number_input(
+        "Step Increase (%)",
+        value=5.5,
+        min_value=0.,
+        step=0.1,
+        help="Annual raise from step progression (e.g., moving up a salary scale)."
+    ) / 100 + 1
     promotion_years_input = st.text_input(
         "Promotion Years",
         value="10, 20",
         help="Year numbers in which you expect to be promoted (e.g., 10, 20). Should fall within your working years."
     )
-    retirement_years = st.number_input(
-        "Years After Retirement",
-        value=30,
-        min_value=1,
-        max_value=60,
-        step=1,
-        help="How many years you expect to live after retiring."
-    )
-with col3:
     promotion_increase = st.number_input(
         "Promotion Increase (%)",
         value=10.0,
         step=1.,
         help="Salary bump when you receive a promotion."
     ) / 100 + 1
+
+    st.subheader("Pension")
     pension_contribution_rate = st.number_input(
         "Pension Contribution Rate (%)",
         value=10.0,
@@ -172,6 +166,16 @@ with col3:
         value=12 * 5871.52,
         step=500.,
         help="Estimate your annual pension payout in your first year of retirement, before COLA adjustments. You can calculate yours using the RIS website pension calculator."
+    )
+
+    st.subheader("Retirement")
+    retirement_years = st.number_input(
+        "Years After Retirement",
+        value=30,
+        min_value=1,
+        max_value=60,
+        step=1,
+        help="How many years you expect to live after retiring."
     )
     index_returns_rate = st.number_input(
         "Index Returns Rate (%)",
