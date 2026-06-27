@@ -53,9 +53,9 @@ st.markdown("""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <em>&larr; On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.</em>
 </div>
-
 """, unsafe_allow_html=True)
 
+st.space("small")
 
 with st.expander("Explanation of the Two Options"):
     col_a, col_b = st.columns(2)
@@ -118,7 +118,7 @@ This calculator operates in annual periods. Within each year:
     retirement_age = st.number_input(
         "Age at Retirement",
         value=55, min_value=40, max_value=75, step=1,
-        help="Your age on the day you retire. Used to determine your pension factor."
+        help="Your age on the day you expect to retire."
     )
     cola_increase = st.number_input(
         "Cost of Living Adjustment (%)",
@@ -128,17 +128,25 @@ This calculator operates in annual periods. Within each year:
     step_increase = st.number_input(
         "Step Increase (%)",
         value=5.5, min_value=0., step=0.1,
-        help="Annual raise from step progression (e.g., moving up a salary scale)."
+        help="Annual raise from step progression. Applies in each of your first 4 years."
     ) / 100 + 1
     promotion_years_input = st.text_input(
         "Promotion Years",
         value="10, 20",
-        help="Year numbers in which you expect to be promoted (e.g., 10, 20). Should fall within your working years."
+        help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
     )
+    _promo_tokens = [t.strip() for t in promotion_years_input.split(",") if t.strip()]
+    _promo_bad = [t for t in _promo_tokens if not t.isdigit()]
+    _promo_valid_raw = [int(t) for t in _promo_tokens if t.isdigit()]
+    _promo_oob = [y for y in _promo_valid_raw if y < 1 or y > int(work_years)]
+    if _promo_bad:
+        st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only.")
+    elif _promo_oob:
+        st.error(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career.")
     promotion_increase = st.number_input(
         "Promotion Increase (%)",
         value=8.0, step=1.,
-        help="Expected salary bump when you receive a promotion."
+        help="Expected salary bump each time you are promoted."
     ) / 100 + 1
 
     st.subheader("Pension")
@@ -212,20 +220,28 @@ This calculator operates in annual periods. Within each year:
         _reduction = 1.0 - _early_red / 100.0
         _computed_allowance = work_years * _fas * _t2_factor * _reduction
 
-        st.markdown(f"**${_computed_allowance / 12:,.0f}/mo** &nbsp; (${_computed_allowance:,.0f}/yr)")
-        st.markdown(
-            '<small><abbr title="Years of Service × Final Average Salary (highest 36 consecutive months) '
-            '× Retirement Factor × Early Retirement Reduction Factor" '
-            'style="cursor:help; color:#64748b; text-decoration:underline dotted;">'
-            'ⓘ how is this calculated?</abbr></small>',
-            unsafe_allow_html=True,
+        st.number_input(
+            "First-year annual pension allowance ($)",
+            value=round(_computed_allowance),
+            min_value=0,
+            step=500,
+            disabled=True,
+            key="allowance_formula",
+            help=(
+                "Years of Service × Final Average Salary (highest 36 consecutive months) "
+                "× Retirement Factor × Early Retirement Reduction Factor. "
+                "Derived from your career inputs above. Switch to 'Enter manually' to override."
+            ),
         )
         starting_allowance = _computed_allowance
     else:
         manual_allowance = st.number_input(
             "First-year annual pension allowance ($)",
-            value=70000, min_value=0, step=500,
-            help="Your first-year annual pension payment, before any COLA increases.",
+            value=70000,
+            min_value=0,
+            step=2500,
+            key="allowance_manual",
+            help="Your annual pension payment in the first year of retirement. Find this from your plan's retirement estimator. COLA will compound on top of this each subsequent year.",
         )
         starting_allowance = manual_allowance
 
