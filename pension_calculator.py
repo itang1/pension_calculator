@@ -174,17 +174,6 @@ This calculator is an educational tool, not a comprehensive financial model. The
 *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
 """)
 
-with st.expander("How to read this chart"):
-    st.markdown("""
-Here, we imagine that both options pay you the **same income every year in retirement**. This brings the whole comparison down to the question: **does your personal fund run out before you die?**
-
-- **Teal line = how much remains in your personal fund after withdrawing your annual allotment.** If it stays above zero, the personal fund wins. If it reaches zero, the pension wins.
-- **Amber line = running tally of how much pension income received so far.** Shown only for scale. A high amber line does **not** mean that the pension is winning. Both options pay this exact income, so don't compare the two lines against each other.
-- **Red dashed line = the year retirement begins.**
-- **Light gray line = the $0 mark.** If the teal line touches this, the personal fund has run out of money.
-""")
-
-
 st.markdown(
     """
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
@@ -416,18 +405,16 @@ else:
 
 fig = go.Figure()
 
+_annual_payments = [h[1] for h in hover_data]
 fig.add_trace(go.Scatter(
     x=years,
-    y=pension_fund_values,
-    mode="lines+markers",
-    name="Pension: total income received so far",
-    line=dict(color="#D97706"),
-    customdata=hover_data,
+    y=_annual_payments,
+    mode="lines",
+    name="Annual withdrawal (= pension payment)",
+    line=dict(color="#78716C", dash="dot", width=1.5),
     hovertemplate=(
         "<b>Year %{x}</b><br>"
-        "Contribution this year: $%{customdata[0]:,.0f}<br>"
-        "Pension payment this year: $%{customdata[1]:,.0f}<br>"
-        "Cumulative total received: $%{y:,.0f}"
+        "Annual payment / withdrawal: $%{y:,.0f}"
         "<extra></extra>"
     ),
 ))
@@ -474,7 +461,6 @@ else:
 y_tick_interval = nice * magnitude
 
 fig.update_layout(
-    title="Pension vs. Personal Retirement Fund Over Time",
     xaxis_title="Year (W = Working, R = Retirement)",
     yaxis_title="Dollar Amount ($)",
     xaxis=dict(
@@ -497,12 +483,41 @@ fig.update_layout(
     margin=dict(l=40, r=20, t=60, b=100),
 )
 
-fig.add_vline(x=work_years, line_width=3, line_dash="dash", line_color="red",
-              annotation_text="Retirement begins here", annotation_position="top right")
+fig.add_vrect(
+    x0=-0.5, x1=int(work_years) + 0.5,
+    fillcolor="rgba(148,163,184,0.08)", layer="below", line_width=0,
+    annotation_text="Working Years", annotation_position="top left",
+    annotation=dict(font_size=11, font_color="#64748B"),
+)
+fig.add_vrect(
+    x0=int(work_years) + 0.5, x1=len(years) - 0.5,
+    fillcolor="rgba(217,119,6,0.06)", layer="below", line_width=0,
+    annotation_text="Retirement Years", annotation_position="top left",
+    annotation=dict(font_size=11, font_color="#D97706"),
+)
+fig.add_vline(x=int(work_years), line_width=2, line_dash="dash", line_color="#DC2626",
+              annotation_text="Retirement begins", annotation_position="top right",
+              annotation=dict(font_size=11))
 _fund_depletes = min(personal_fund_values) < 0
 fig.add_hline(y=0, line_width=2, line_color="#666666",
           annotation_text="$0 — personal fund depleted" if _fund_depletes else "$0",
           annotation_position="bottom right")
+
+st.subheader("Pension vs. Personal Retirement Fund Over Time")
+
+with st.expander("How to read this chart"):
+    st.markdown("""
+Here, we imagine that both options pay you the **same income every year in retirement**. This brings the whole comparison down to the question: **does your personal fund run out before you die?**
+
+- **Teal line** = how much remains in your personal fund after each annual withdrawal. If it stays above zero through all retirement years, the personal fund wins. If it hits zero, the pension wins.
+- **Dotted gray line** = the annual payment amount: what the pension pays you each year, and identically what you withdraw from the personal fund each year. Toggle it on with the checkbox below.
+- **Background shading** = the blue-gray region is your working years; the warm region is retirement.
+- **Red dashed line** = the exact year retirement begins.
+- **Horizontal gray line** = the $0 mark. If the teal line crosses this, the personal fund has run out.
+""")
+
+_show_ref_line = st.checkbox("Show annual withdrawal reference line", value=False)
+fig.data[0].visible = _show_ref_line
 
 st.plotly_chart(fig, use_container_width=True)
 
