@@ -6,7 +6,6 @@ Improvement ideas for the pension calculator, roughly ordered by effort.
 
 ## UX / Design Decisions
 
-- [ ] **Metrics: 3 × 2 layout + "Years Fund Covers" stat** — Currently a partial third row with an empty column. Reorganize as 2 rows of 3. Add "Years Fund Covers" (e.g. "18 / 30 years") as a sixth stat to give an at-a-glance answer on how long the personal fund lasts.
 - [ ] **Feedback form backend** — Submissions are currently discarded (form shows success but saves nothing). Wire up to a real backend: write to a local `.jsonl` file for local use, or Google Sheets / Formspree for a deployed app.
 
 ---

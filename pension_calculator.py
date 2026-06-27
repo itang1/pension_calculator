@@ -559,7 +559,11 @@ render_result_banner(
 
 st.space("small")
 
-mc1, mc2 = st.columns(2)
+_current_rate_pct = (index_returns_rate - 1) * 100
+_rate_buffer = _current_rate_pct - _breakeven_rate
+_years_covered = int(retirement_years) if _depletion_year is None else _depletion_year - 1
+
+mc1, mc2, mc3 = st.columns(3)
 with mc1:
     st.metric(
         label="Pension Contributed",
@@ -573,14 +577,14 @@ with mc2:
         delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
         help="The total pension income paid out over all retirement years, including annual COLA increases. The delta shows how much more you received than you put in."
     )
-
-mc3, mc4 = st.columns(2)
 with mc3:
     st.metric(
         label="Fund at Retirement",
         value=f"${personal_fund_values[int(work_years)]:,.0f}",
         help="The balance of your hypothetical personal investment account on the day you retire, after years of contributions and market growth."
     )
+
+mc4, mc5, mc6 = st.columns(3)
 with mc4:
     if personal_balance > 0:
         st.metric(
@@ -597,10 +601,6 @@ with mc4:
             delta_color="inverse",
             help="The personal fund was depleted before your retirement years were up. The pension would have continued paying regardless."
         )
-
-_current_rate_pct = (index_returns_rate - 1) * 100
-_rate_buffer = _current_rate_pct - _breakeven_rate
-mc5, mc6 = st.columns(2)
 with mc5:
     st.metric(
         label="Break-even Return Rate",
@@ -608,6 +608,14 @@ with mc5:
         delta=f"{_rate_buffer:+.1f}pp vs. your {_current_rate_pct:.1f}% assumption",
         delta_color="normal" if _rate_buffer >= 0 else "inverse",
         help="The minimum annual investment return at which the personal fund survives your full retirement period. Compare this to your Index Returns Rate input.",
+    )
+with mc6:
+    st.metric(
+        label="Years Fund Covers",
+        value=f"{_years_covered} / {int(retirement_years)} yrs",
+        delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {int(retirement_years) - _years_covered} yrs early ✗",
+        delta_color="normal" if _depletion_year is None else "inverse",
+        help="How many retirement years Option B (personal fund) can sustain the same annual withdrawal as the pension, out of your total retirement period.",
     )
 
 st.markdown("""
