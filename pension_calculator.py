@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 from plotly import graph_objects as go
 
+st.set_page_config(layout="wide")
+
 
 def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     """Render one side of the year-over-year breakdown.
