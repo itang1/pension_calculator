@@ -28,18 +28,9 @@ pip install -r requirements.txt
 streamlit run pension_calculator.py
 ```
 
-## Assumptions and Limitations
-
-- Salary grows annually by COLA. Step increases apply in your first four years. Promotions apply at specified years with a one-time salary bump.
-- Investment returns are constant each year by default. Enable the Monte Carlo toggle to simulate year-to-year volatility around your average rate.
-- Does not model vesting cliffs, employer match, spousal/survivor benefits, disability protections, behavioral investing patterns, or tax implications.
-- The pension allowance estimator uses a hard-coded formula of my choice. Other pension formulas require switching to manual input.
-
-This tool is for educational and exploratory use only. It is not a comprehensive actuarial model and should not substitute for professional financial advice.
-
 ## Disclaimer
 
-This calculator does not constitute financial advice. Consult a licensed financial advisor or retirement specialist before making any pension or investment decisions.
+This calculator does not constitute financial advice. It operates on limitations and assumptions. Consult a licensed financial advisor or retirement specialist before making any pension or investment decisions.
 
 ## Comments, Suggestions, Questions
 
