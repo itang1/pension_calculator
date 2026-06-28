@@ -347,7 +347,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
-<br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate — meaning the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
+<br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
 <br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.</em>
 </div>
 """, unsafe_allow_html=True)
@@ -581,7 +581,7 @@ This calculator operates in annual periods. Within each year:
         help="How many years you expect to spend in retirement before you die."
     )
     index_returns_rate = st.number_input(
-        "Index Returns Rate (%)",
+        "Average Index Returns Rate (%)",
         value=10.0, min_value=0.0, max_value=25.0, step=0.1,
         help="Expected annual return on Option B's investment account, in nominal terms (before subtracting inflation). Use a nominal figure here because salaries and pension payments in this calculator are also nominal, growing with your COLA rate. The S&P 500 has averaged about 10% nominally over the long run; a diversified balanced portfolio might return 6 to 8%."
     ) / 100 + 1
@@ -668,22 +668,10 @@ with _ctl1:
     )
 with _ctl2:
     _mc_on = st.checkbox(
-        "Monte Carlo: simulate year-by-year market swings",
+        "Monte Carlo: consider that returns actually change every year",
         value=False,
         help=(
-            "The main chart pretends the market returns the exact same percentage every year with "
-            "no surprises. That is not how it works. Some years the market is up 30%, some years "
-            "it is down 20%, and nobody knows in advance which years will be which. This matters "
-            "because if the market tanks right when you retire and you have to keep pulling money "
-            "out to live, your fund takes a hit it may never recover from. "
-            "This option uses a technique called the Monte Carlo method to run 1,000 simulations "
-            "of your retirement, each with a different random sequence of good years and bad years, "
-            "all averaging out to the return rate you entered. Some simulations go well. Some don't. "
-            "Three colored bands appear on the chart: red for unlucky runs (bad years at the worst "
-            "times), teal for the most likely middle range, and green for lucky runs (good years at "
-            "the right times). Together they cover 9 in 10 simulations. "
-            "The bold teal line stays on the chart as the no-surprises version so you can see "
-            "how much your real outcome could differ from the clean estimate."
+            f"The teal line assumes the market returns exactly {(index_returns_rate-1)*100:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {(index_returns_rate-1)*100:.1f}% over the long run. Check this box to run a Monte Carlo simulation, which generates 1,000 of those year-by-year sequences and, so you can see the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against."
         ),
     )
 
@@ -694,14 +682,14 @@ with st.sidebar:
         st.divider()
         st.markdown("**Monte Carlo: Market Swing Scenarios**")
         _mc_std_pct = st.slider(
-            "How much do returns swing year to year?",
+            "Range of yearly ups and downs",
             min_value=0.0, max_value=30.0, value=15.0, step=0.5,
             key="mc_std",
             help=(
-                "This controls how wild the ups and downs are in the 1,000 scenarios. "
-                "At 15%, most years will land somewhere between -5% and +25% "
-                "if your average return is 10%, which is pretty typical for the US stock market. "
-                "Lower = calmer, steadier returns. Higher = wilder swings."
+                "This controls how wide the range of yearly returns can be. "
+                "At 15% (the historical norm for the US stock market), if your average "
+                "return is 10%, most individual years will fall somewhere in the range of -5% to +25%. "
+                "Drag lower to narrow the range (calmer markets). Drag higher to widen it (wilder swings)."
             ),
         )
 
@@ -730,21 +718,21 @@ if _mc_on and _mc_pcts is not None:
         y=list(_mc_pcts[0]) + list(_mc_pcts[2])[::-1],
         fill="toself", fillcolor="rgba(220,38,38,0.18)",
         line=dict(color="rgba(0,0,0,0)"),
-        name="Unlucky range (bottom 1 in 5 simulations)", hoverinfo="skip",
+        name="You get unlucky (worst 20% of outcomes)", hoverinfo="skip",
     ))
     fig.add_trace(go.Scatter(
         x=_xf + _xr,
         y=list(_mc_pcts[2]) + list(_mc_pcts[4])[::-1],
-        fill="toself", fillcolor="rgba(13,148,136,0.22)",
+        fill="toself", fillcolor="rgba(59,130,246,0.18)",
         line=dict(color="rgba(0,0,0,0)"),
-        name="Most likely range (middle half of simulations)", hoverinfo="skip",
+        name="Most likely (middle 50% of outcomes)", hoverinfo="skip",
     ))
     fig.add_trace(go.Scatter(
         x=_xf + _xr,
         y=list(_mc_pcts[4]) + list(_mc_pcts[6])[::-1],
         fill="toself", fillcolor="rgba(22,163,74,0.18)",
         line=dict(color="rgba(0,0,0,0)"),
-        name="Lucky range (top 1 in 5 simulations)", hoverinfo="skip",
+        name="You get lucky (best 20% of outcomes)", hoverinfo="skip",
     ))
 
 _annual_payments = [h[1] for h in hover_data]
@@ -758,7 +746,7 @@ fig.add_trace(go.Scatter(
     customdata=_annual_payments,
     hovertemplate=(
         "<b>Year %{x}</b><br>"
-        "This year: $%{customdata:,.0f}<br>"
+        "This year paid out: $%{customdata:,.0f}<br>"
         "Running total paid out: $%{y:,.0f}"
         "<extra></extra>"
     ),
@@ -809,7 +797,7 @@ fig.update_layout(
 
 fig.add_vrect(
     x0=-0.5, x1=int(work_years) + 0.5,
-    fillcolor="rgba(148,163,184,0.10)", layer="below", line_width=0,
+    fillcolor="rgba(0,0,0,0)", layer="below", line_width=0,
     annotation_text="<b>Working Years</b>", annotation_position="top left",
     annotation=dict(
         font_size=13, font_color="#1E3A5F",
@@ -818,7 +806,7 @@ fig.add_vrect(
 )
 fig.add_vrect(
     x0=int(work_years) + 0.5, x1=len(years) - 0.5,
-    fillcolor="rgba(217,119,6,0.08)", layer="below", line_width=0,
+    fillcolor="rgba(0,0,0,0)", layer="below", line_width=0,
     annotation_text="<b>Retirement Years</b>", annotation_position="top left",
     annotation=dict(
         font_size=13, font_color="#7C2D12",
@@ -832,26 +820,6 @@ fig.add_hline(y=0, line_width=2, line_color="#666666",
           annotation_position="bottom right")
 
 st.plotly_chart(fig, use_container_width=True)
-
-with st.sidebar:
-    if _mc_on and _mc_surv is not None:
-        st.metric(
-            "Chance you don't run out of money before you die",
-            f"{_mc_surv:.0f}%",
-            help=(
-                "Out of 1,000 simulations of your retirement, this is the percentage where your "
-                "personal fund still has money left the day you die. In the rest, your account hits "
-                "zero while you are still alive. You would have nothing left to live on from Option B "
-                "for however many years remain. The pension (Option A) keeps paying no matter what."
-            ),
-        )
-        st.caption(
-            f"All 1,000 simulations use {(index_returns_rate-1)*100:.1f}% average returns "
-            f"but with randomly different good and bad years. "
-            f"**Red band** = unlucky runs (bottom 1 in 5 simulations). "
-            f"**Teal band** = most likely range (middle half). "
-            f"**Green band** = lucky runs (top 1 in 5 simulations)."
-        )
 
 render_result_banner(
     personal_balance, retirement_years, _depletion_year,
