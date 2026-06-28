@@ -17,8 +17,8 @@ _FEEDBACK_HEADERS = [
     "Timestamp", "Feedback",
     "Starting Wage", "Work Years", "Retirement Years",
     "COLA %", "Index Returns %", "Pension Contribution %", "First-Year Allowance",
-    "Pension Contributed", "Pension Received", "Fund at Retirement",
-    "Final Fund Balance", "Break-even Rate %", "Years Fund Covers", "Winner",
+    "Pension Contributed", "Pension Received", "Personal Fund at Retirement",
+    "Final Personal Fund Balance", "Break-even Rate %", "Years Personal Fund Covers", "Winner",
     "IP", "Country", "Region", "City", "Zip", "Lat", "Lon",
     "Timezone", "ISP", "VPN/Proxy", "Mobile Network",
     "Accept-Language", "Referrer", "Platform", "Mobile Browser",
@@ -624,7 +624,7 @@ with st.expander("How to read this chart"):
 Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does the Personal Fund (Option B) run out of money before you die?**
 
 - **Bold teal line (Option B)** = the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, Option B wins. If it hits zero, Option A wins.
-- **Purple line (optional)** = how much money is paid out each year. Option A pays this to you as a pension; Option B withdraws the same amount from your fund. Toggle it on/off with the checkbox below the chart.
+- **Purple line (optional)** = how much money is paid out each year. Option A pays this to you as a pension; Option B withdraws the same amount from your personal fund. Toggle it on/off with the checkbox below the chart.
 - **Colored bands (optional, Monte Carlo)** = the range of possible Option B balances if the market does not return the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. Toggle on with the Monte Carlo checkbox below the chart.
 - **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
 - **Red dashed vertical line** = the year retirement begins.
@@ -764,7 +764,7 @@ fig.add_trace(go.Scatter(
         "Deposit this year: $%{customdata[2]:,.0f}<br>"
         "Withdrawal this year: $%{customdata[3]:,.0f}<br>"
         "Market returns this year: $%{customdata[4]:,.0f}<br>"
-        "Fund balance: $%{y:,.0f}"
+        "Personal fund balance: $%{y:,.0f}"
         "<extra></extra>"
     ),
 ))
@@ -831,23 +831,27 @@ _current_rate_pct = (index_returns_rate - 1) * 100
 _rate_buffer = _current_rate_pct - _breakeven_rate
 _years_covered = int(retirement_years) if _depletion_year is None else _depletion_year - 1
 
+st.markdown(
+    "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from the personal fund. The metrics below mirror each other on both sides.*"
+)
+
 mc1, mc2, mc3 = st.columns(3)
 with mc1:
     st.metric(
         label="Pension Contributed",
         value=f"${pension_contribution_total:,.0f}",
-        help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years."
+        help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. The personal fund deposits this same amount."
     )
 with mc2:
     st.metric(
         label="Pension Received",
         value=f"${pension_redeemed_total:,.0f}",
         delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
-        help="The total pension income paid out over all retirement years, including annual COLA increases. The delta shows how much more you received than you put in."
+        help="The total pension income paid out over all retirement years, including annual COLA increases. The personal fund withdraws this same amount. The delta shows how much more you received than you put in."
     )
 with mc3:
     st.metric(
-        label="Fund at Retirement",
+        label="Personal Fund at Retirement",
         value=f"${personal_fund_values[int(work_years)]:,.0f}",
         help="The balance of your hypothetical personal investment account on the day you retire, after years of contributions and market growth."
     )
@@ -856,14 +860,14 @@ mc4, mc5, mc6 = st.columns(3)
 with mc4:
     if personal_balance > 0:
         st.metric(
-            label="Final Fund Balance at Death",
+            label="Final Personal Fund Balance at Death",
             value=f"${personal_balance:,.0f}",
             delta="Did not run out ✓",
             help="The personal fund still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
         )
     else:
         st.metric(
-            label="Final Fund Balance at Death",
+            label="Final Personal Fund Balance at Death",
             value=f"${personal_balance:,.0f}",
             delta="Ran out before death ✗",
             delta_color="inverse",
@@ -875,11 +879,11 @@ with mc5:
         value=f"{_breakeven_rate:.1f}%",
         delta=f"{_rate_buffer:+.1f}pp vs. your {_current_rate_pct:.1f}% assumption",
         delta_color="normal",
-        help="The minimum annual investment return at which the personal fund survives your full retirement period. Compare this to your Average Index Returns Rate input.",
+        help="The minimum that the market needs to return in order for your personal fund survives your full retirement period. Compare this to your Average Index Returns Rate input.",
     )
 with mc6:
     st.metric(
-        label="Years Fund Covers",
+        label="Years Personal Fund Covers",
         value=f"{_years_covered} / {int(retirement_years)} yrs",
         delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {int(retirement_years) - _years_covered} yrs early ✗",
         delta_color="normal" if _depletion_year is None else "inverse",
