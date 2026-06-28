@@ -334,9 +334,8 @@ def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
         history[work_years + ry] = history[work_years + ry - 1] * mults[:, work_years + ry - 1] - pension_redeemed
         pension_redeemed *= cola_increase
 
-    pcts = np.percentile(history, [5, 10, 25, 50, 75, 90, 95], axis=1)
-    survival_prob = float(np.mean(history[total_years] > 0) * 100)
-    return {"percentiles": pcts, "survival_prob": survival_prob}
+    pcts = np.percentile(history, [5, 25, 75, 95], axis=1)
+    return {"percentiles": pcts}
 
 
 def render_result_banner(personal_balance, retirement_years, depletion_year,
@@ -411,28 +410,23 @@ Instead of contributing to the pension, imagine that you deposit that same amoun
 </div>
 """, unsafe_allow_html=True)
 
-with st.expander("Limitations & Assumptions of the Tool"):
+with st.expander("Limitations & Assumptions"):
     st.markdown("""
-This calculator is an educational tool, not a comprehensive financial model. The inputs you provide are applied with several simplifying assumptions:
+This calculator is an educational tool, not a comprehensive financial model. Keep these caveats in mind when reading the results:
 
-**Constant input rates.** The investment return, COLA, and step increase you enter are treated as fixed values applied every year. Real markets and salary schedules fluctuate, and a few bad return years early in retirement hurt far more than a steady average suggests.
+**The return rate is the single biggest factor.** A 1% difference in long-term returns shifts the outcome dramatically between Option A and Option B. The break-even rate in the results shows the minimum return Option B needs to survive your full retirement.
+
+**Constant inputs.** The investment return, COLA, and step increase you enter are treated as fixed values applied every year. Real markets and salary schedules fluctuate, and a few bad return years early in retirement hurt far more than a steady average suggests. The Monte Carlo toggle above the chart simulates this for the return rate; COLA and step increases remain flat.
+
+**Both options pay the same annual income.** This is not a comparison about how much you receive each year. The question is whether Option B has money left over after covering all those payments through retirement. The same COLA rate is applied to both the Option A pension payment and the Option B withdrawal amount; in practice they can differ.
 
 **Equal tax treatment for both options.** The contribution rate is applied to the personal account on the same pre-tax basis as the pension. This is fine if you have room in a 457(b) plan (a tax-advantaged account available to government employees, similar to a 401k), which has its own contribution limit separate from your pension. But if you have no tax-advantaged space available, the personal account is actually disadvantaged in a way that is not factored in here.
 
-**Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods, which is a simplification. See the *Timing Assumptions* note on the sidebar for the exact ordering used.
+**Vesting matters.** If you leave before your pension vests, you may receive little or nothing. This calculator assumes you work your full stated career and collect the full benefit. Survivor and disability benefits are not modeled.
 
-**Steady contribution and withdrawal amounts.** Contributions follow your salary inputs, and withdrawals match the pension allowance exactly. The tool does not model any deviations such as irregular saving, retiring in the middle of the year, or altering your withdrawal rate from year to year.
+**Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the sidebar for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
 
 *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
-""")
-
-with st.expander("Limitations on the Results"):
-    st.markdown("""
-- **The return rate is the biggest factor.** A 1% difference in long-term returns shifts the outcome dramatically between Option A and Option B. Check the break-even rate in the results to see the minimum market return Option B needs to survive retirement.
-- **Return sequence is not modeled.** Retiring into a market downturn draws down Option B's fund much faster than a stable average return suggests. This calculator applies the same return rate every year, which is a simplification.
-- **Vesting matters for Option A.** If you leave before your pension vests, you may receive little or nothing. This calculator assumes you work your full stated career and collect the full benefit.
-- **Both options pay the same annual income.** This is not a comparison about how much you receive each year. Both options pay the same amount. The question is whether Option B has money left over after covering all those payments through retirement.
-- **COLA may differ between options.** This model applies the same COLA rate to both the Option A pension payment and the Option B withdrawal amount. In practice they can differ.
 """)
 
 with st.sidebar:
@@ -468,7 +462,7 @@ This calculator operates in annual periods. Within each year:
     cola_increase = st.number_input(
         "Cost of Living Adjustment (%)",
         value=3.0, min_value=2.5, max_value=5.5, step=0.1,
-        help="Annual salary adjustment announced each October, typically between 2\u20133.5%."
+        help="Annual salary adjustment announced each October, typically between 2-3.5%."
     ) / 100 + 1
     step_increase = st.number_input(
         "Step Increase (%)",
@@ -512,26 +506,26 @@ This calculator operates in annual periods. Within each year:
     manual_override = (_allowance_mode == "Enter manually")
 
     if not manual_override:
-        # Auto-determine Tier 2 factor from age and years of service
-        _t2_age = int(retirement_age)
-        _t2_yrs = int(work_years)
-        if _t2_age >= 63 and _t2_yrs >= 30:
-            _t2_factor = 0.021
+        # Auto-determine retirement factor from age and years of service
+        _age = int(retirement_age)
+        _yrs = int(work_years)
+        if _age >= 63 and _yrs >= 30:
+            _factor = 0.021
             _is_reduced = False
-        elif _t2_age >= 60 and _t2_yrs >= 30:
-            _t2_factor = 0.020
+        elif _age >= 60 and _yrs >= 30:
+            _factor = 0.020
             _is_reduced = False
-        elif _t2_age >= 55 and _t2_yrs >= 30:
-            _t2_factor = 0.020
+        elif _age >= 55 and _yrs >= 30:
+            _factor = 0.020
             _is_reduced = False
-        elif _t2_yrs >= 30:
-            _t2_factor = 0.020
+        elif _yrs >= 30:
+            _factor = 0.020
             _is_reduced = True
-        elif _t2_age >= 63 and _t2_yrs >= 5:
-            _t2_factor = 0.020
+        elif _age >= 63 and _yrs >= 5:
+            _factor = 0.020
             _is_reduced = False
         else:
-            _t2_factor = 0.015
+            _factor = 0.015
             _is_reduced = False
 
         if _is_reduced:
@@ -547,7 +541,7 @@ This calculator operates in annual periods. Within each year:
         _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
                            _promo_yrs, promotion_increase)
         _reduction = 1.0 - _early_red / 100.0
-        _computed_allowance = work_years * _fas * _t2_factor * _reduction
+        _computed_allowance = work_years * _fas * _factor * _reduction
 
         st.number_input(
             "First-year annual pension allowance ($)",
@@ -580,11 +574,18 @@ This calculator operates in annual periods. Within each year:
         value=30, min_value=1, max_value=60, step=1,
         help="How many years you expect to spend in retirement before you die."
     )
-    index_returns_rate = st.number_input(
-        "Average Index Returns Rate (%)",
-        value=10.0, min_value=0.0, max_value=25.0, step=0.1,
-        help="Expected annual return on Option B's investment account, in nominal terms (before subtracting inflation). Use a nominal figure here because salaries and pension payments in this calculator are also nominal, growing with your COLA rate. The S&P 500 has averaged about 10% nominally over the long run; a diversified balanced portfolio might return 6 to 8%."
-    ) / 100 + 1
+    index_returns_rate = (
+        st.number_input(
+            "Average Index Returns Rate (%)",
+            value=10.0,
+            min_value=0.0,
+            max_value=25.0,
+            step=0.5,
+            help="Expected annual return on Option B's investment account (not inflation-adjusted).",
+        )
+        / 100
+        + 1
+    )
 
 
 promotion_years = tuple(int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit())
@@ -622,11 +623,12 @@ with st.expander("How to read this chart"):
     st.markdown("""
 Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does the Personal Fund (Option B) run out of money before you die?**
 
-- **Bold teal line (Option B)** = the personal fund balance using the exact return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, Option B wins. If it hits zero, Option A wins.
-- **Purple line** = how much is paid out each year. Option A pays this to you as a pension; Option B withdraws this same amount from your fund. Both options pay the same amount each year. Toggle it on/off with the checkbox below.
-- **Background shading** = the blue-gray region is your working years; the warm amber region is retirement.
+- **Bold teal line (Option B)** = the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, Option B wins. If it hits zero, Option A wins.
+- **Purple line (optional)** = how much money is paid out each year. Option A pays this to you as a pension; Option B withdraws the same amount from your fund. Toggle it on/off with the checkbox below the chart.
+- **Colored bands (optional, Monte Carlo)** = the range of possible Option B balances if the market does not return the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. Toggle on with the Monte Carlo checkbox below the chart.
+- **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
 - **Red dashed vertical line** = the year retirement begins.
-- **Horizontal gray line** = the $0 mark. If the teal line crosses this, Option B has run out of money.
+- **Horizontal gray line** = the $0 mark. If the teal line crosses below it, Option B has run out of money.
 """)
 
 # Adaptive x-axis
@@ -671,7 +673,7 @@ with _ctl2:
         "Monte Carlo: consider that returns actually change every year",
         value=False,
         help=(
-            f"The teal line assumes the market returns exactly {(index_returns_rate-1)*100:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {(index_returns_rate-1)*100:.1f}% over the long run. Check this box to run a Monte Carlo simulation, which generates 1,000 of those year-by-year sequences and, so you can see the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against."
+            f"The teal line assumes the market returns exactly {(index_returns_rate-1)*100:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {(index_returns_rate-1)*100:.1f}% over the long run. Check this box to run a Monte Carlo simulation, which generates 1,000 of those sequences (each one a different possible market history spanning your {int(work_years)} years of working plus {int(retirement_years)} years of retirement) so you can see the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against."
         ),
     )
 
@@ -682,7 +684,7 @@ with st.sidebar:
         st.divider()
         st.markdown("**Monte Carlo: Market Swing Scenarios**")
         _mc_std_pct = st.slider(
-            "Range of yearly ups and downs",
+            "Range of yearly market swings",
             min_value=0.0, max_value=30.0, value=15.0, step=0.5,
             key="mc_std",
             help=(
@@ -694,18 +696,15 @@ with st.sidebar:
         )
 
 _mc_pcts = None
-_mc_surv = None
 if _mc_on:
-    _mc = run_monte_carlo(
+    _mc_pcts = run_monte_carlo(
         starting_wage, int(work_years), cola_increase, step_increase,
         promotion_years, promotion_increase, pension_contribution_rate,
         starting_allowance, int(retirement_years),
         mean_return=index_returns_rate - 1,
         std_return=_mc_std_pct / 100.0,
         n_simulations=1000,
-    )
-    _mc_pcts = _mc["percentiles"]
-    _mc_surv = _mc["survival_prob"]
+    )["percentiles"]
 
 fig = go.Figure()
 
@@ -715,21 +714,21 @@ _xr = list(years)[::-1]
 if _mc_on and _mc_pcts is not None:
     fig.add_trace(go.Scatter(
         x=_xf + _xr,
-        y=list(_mc_pcts[0]) + list(_mc_pcts[2])[::-1],
+        y=list(_mc_pcts[0]) + list(_mc_pcts[1])[::-1],
         fill="toself", fillcolor="rgba(220,38,38,0.18)",
         line=dict(color="rgba(0,0,0,0)"),
         name="You get unlucky (worst 20% of outcomes)", hoverinfo="skip",
     ))
     fig.add_trace(go.Scatter(
         x=_xf + _xr,
-        y=list(_mc_pcts[2]) + list(_mc_pcts[4])[::-1],
+        y=list(_mc_pcts[1]) + list(_mc_pcts[2])[::-1],
         fill="toself", fillcolor="rgba(59,130,246,0.18)",
         line=dict(color="rgba(0,0,0,0)"),
         name="Most likely (middle 50% of outcomes)", hoverinfo="skip",
     ))
     fig.add_trace(go.Scatter(
         x=_xf + _xr,
-        y=list(_mc_pcts[4]) + list(_mc_pcts[6])[::-1],
+        y=list(_mc_pcts[2]) + list(_mc_pcts[3])[::-1],
         fill="toself", fillcolor="rgba(22,163,74,0.18)",
         line=dict(color="rgba(0,0,0,0)"),
         name="You get lucky (best 20% of outcomes)", hoverinfo="skip",
@@ -876,7 +875,7 @@ with mc5:
         value=f"{_breakeven_rate:.1f}%",
         delta=f"{_rate_buffer:+.1f}pp vs. your {_current_rate_pct:.1f}% assumption",
         delta_color="normal",
-        help="The minimum annual investment return at which the personal fund survives your full retirement period. Compare this to your Index Returns Rate input.",
+        help="The minimum annual investment return at which the personal fund survives your full retirement period. Compare this to your Average Index Returns Rate input.",
     )
 with mc6:
     st.metric(
@@ -942,7 +941,7 @@ Returns are calculated on the balance at the *start* of the year, before that ye
 
 with st.expander("Retirement Years"):
     st.markdown("""
-Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), the personal fund has run out. The year it first goes red is the year that the pension's lifetime guarantee starts to matter.
+Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), the personal fund has run out. The year it first goes red is the year that you will wish you had chosen the pension option, since the pension provides a lifetime guarantee.
 """)
     col1, col2 = st.columns(2)
     with col1:
