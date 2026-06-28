@@ -39,9 +39,9 @@ streamlit run pension_calculator.py
 ## Assumptions and Limitations
 
 - Salary grows annually by COLA. Step increases apply in configurable years. Promotions apply at specified years with a one-time salary bump.
-- Investment returns are assumed constant each year — no market volatility or sequence-of-returns risk.
-- Does not model vesting cliffs, employer match, mortality risk pooling, spousal/survivor benefits, disability protections, behavioral investing patterns, or tax implications.
-- The pension allowance estimator targets Tier 2 / PEPRA-style formulas (2% × years × FAS). Other pension formulas require manual input.
+- Investment returns are assumed constant each year with no consideration of market volatility or other risks.
+- Does not model vesting cliffs, employer match, spousal/survivor benefits, disability protections, behavioral investing patterns, or tax implications.
+- The pension allowance estimator is based on a hard-coded formula of my choice. Other pension formulas require manual input.
 
 This tool is for educational and exploratory use only. It is not a comprehensive actuarial model and should not substitute for professional financial advice.
 

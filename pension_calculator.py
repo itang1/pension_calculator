@@ -3,6 +3,7 @@ import math
 import time
 import urllib.request
 from datetime import datetime
+import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -164,7 +165,7 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     def _bold_total(row):
         return ["font-weight: 700;" if row["Year"] == "Total" else "" for _ in row]
 
-    styler = table.style.format("${:,.0f}", subset=money_cols, na_rep="—")
+    styler = table.style.format("${:,.0f}", subset=money_cols, na_rep="-")
     styler = styler.apply(_bold_total, axis=1)
     if balance_col is not None:
         styler = styler.map(_highlight_negative, subset=[balance_col])
@@ -302,23 +303,61 @@ def compute_breakeven_rate(starting_wage, work_years, cola_increase, step_increa
     return hi * 100
 
 
+@st.cache_data
+def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
+                    promotion_years, promotion_increase, pension_contribution_rate,
+                    starting_allowance, retirement_years, mean_return, std_return,
+                    n_simulations, seed=42):
+    rng = np.random.default_rng(seed)
+    total_years = work_years + retirement_years
+
+    # Annual return multipliers: shape (n_simulations, total_years), clipped so can't lose >100%
+    raw = rng.normal(mean_return, std_return, (n_simulations, total_years))
+    mults = np.clip(1.0 + raw, 0.0, None)
+
+    # history[year, sim] = fund balance at end of that year
+    history = np.zeros((total_years + 1, n_simulations))
+
+    salary = starting_wage
+    for wy in range(1, work_years + 1):
+        eff_sal = salary * (1 + step_increase) / 2 if wy == 1 else salary
+        contribution = eff_sal * pension_contribution_rate
+        history[wy] = history[wy - 1] * mults[:, wy - 1] + contribution
+        salary *= cola_increase
+        if 1 <= wy < 5:
+            salary *= step_increase
+        if wy in promotion_years:
+            salary *= promotion_increase
+
+    pension_redeemed = starting_allowance
+    for ry in range(1, retirement_years + 1):
+        history[work_years + ry] = history[work_years + ry - 1] * mults[:, work_years + ry - 1] - pension_redeemed
+        pension_redeemed *= cola_increase
+
+    pcts = np.percentile(history, [5, 10, 25, 50, 75, 90, 95], axis=1)
+    survival_prob = float(np.mean(history[total_years] > 0) * 100)
+    return {"percentiles": pcts, "survival_prob": survival_prob}
+
+
 def render_result_banner(personal_balance, retirement_years, depletion_year,
                           breakeven_rate, current_rate_pct):
     rate_buffer = current_rate_pct - breakeven_rate
     if personal_balance > 0:
         st.markdown(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>Based on your inputs, Option B (personal fund) comes out ahead.</strong><br><br>
+<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
-<br><br><em>At your {current_rate_pct:.1f}% return assumption, you are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate.</em>
+<br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate — meaning the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.</em>
 </div>
 """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>Based on your inputs, Option A (pension) comes out ahead.</strong><br><br>
-Before your {int(retirement_years)}-year retirement was over, Option B would have fully depleted in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years without coverage. The investment returns on Option B cannot sustain that many years of withdrawals, so Option A's lifetime guarantee is the more reliable choice.
-<br><br><em>Your fund would need at least a {breakeven_rate:.1f}% annual return (you entered {current_rate_pct:.1f}%) to last the full retirement period.</em>
+<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
+Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
+<br><br><em>Option B would need the market to average at least {breakeven_rate:.1f}% every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.</em>
 </div>
 """, unsafe_allow_html=True)
 
@@ -577,40 +616,18 @@ _breakeven_rate = compute_breakeven_rate(
     starting_allowance, int(retirement_years),
 )
 
-fig = go.Figure()
+st.header("Pension vs. Personal Retirement Fund Over Time")
 
-_annual_payments = [h[1] for h in hover_data]
-fig.add_trace(go.Scatter(
-    x=years,
-    y=pension_fund_values,
-    mode="lines",
-    name="Total paid out to date (same for both options)",
-    line=dict(color="#78716C", dash="dot", width=1.5),
-    customdata=_annual_payments,
-    hovertemplate=(
-        "<b>Year %{x}</b><br>"
-        "This year: $%{customdata:,.0f}<br>"
-        "Total: $%{y:,.0f}"
-        "<extra></extra>"
-    ),
-))
+with st.expander("How to read this chart"):
+    st.markdown("""
+Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does the Personal Fund (Option B) run out of money before you die?**
 
-fig.add_trace(go.Scatter(
-    x=years,
-    y=personal_fund_values,
-    mode="lines+markers",
-    name="Personal fund: money left in the account",
-    line=dict(color="#0D9488"),
-    customdata=hover_data,
-    hovertemplate=(
-        "<b>Year %{x}</b><br>"
-        "Deposit this year: $%{customdata[2]:,.0f}<br>"
-        "Withdrawal this year: $%{customdata[3]:,.0f}<br>"
-        "Market returns this year: $%{customdata[4]:,.0f}<br>"
-        "Fund balance: $%{y:,.0f}"
-        "<extra></extra>"
-    ),
-))
+- **Bold teal line (Option B)** = the personal fund balance using the exact return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, Option B wins. If it hits zero, Option A wins.
+- **Purple line** = how much is paid out each year. Option A pays this to you as a pension; Option B withdraws this same amount from your fund. Both options pay the same amount each year. Toggle it on/off with the checkbox below.
+- **Background shading** = the blue-gray region is your working years; the warm amber region is retirement.
+- **Red dashed vertical line** = the year retirement begins.
+- **Horizontal gray line** = the $0 mark. If the teal line crosses this, Option B has run out of money.
+""")
 
 # Adaptive x-axis
 total_years = len(years)
@@ -636,6 +653,136 @@ else:
     nice = 10
 y_tick_interval = nice * magnitude
 
+_ctl1, _ctl2 = st.columns(2)
+with _ctl1:
+    _show_ref_line = st.checkbox(
+        "Show annual payout reference line",
+        value=False,
+        help=(
+            "Adds a purple line showing how much money changes hands each year. "
+            "In retirement, Option A sends you this amount as your pension check. "
+            "Option B takes this exact same amount out of your personal fund. "
+            "It is the same number for both options every year. "
+            "This line just lets you see what that dollar amount looks like on the chart."
+        ),
+    )
+with _ctl2:
+    _mc_on = st.checkbox(
+        "Monte Carlo: simulate year-by-year market swings",
+        value=False,
+        help=(
+            "The main chart pretends the market returns the exact same percentage every year with "
+            "no surprises. That is not how it works. Some years the market is up 30%, some years "
+            "it is down 20%, and nobody knows in advance which years will be which. This matters "
+            "because if the market tanks right when you retire and you have to keep pulling money "
+            "out to live, your fund takes a hit it may never recover from. "
+            "This option uses a technique called the Monte Carlo method to run 1,000 simulations "
+            "of your retirement, each with a different random sequence of good years and bad years, "
+            "all averaging out to the return rate you entered. Some simulations go well. Some don't. "
+            "Three colored bands appear on the chart: red for unlucky runs (bad years at the worst "
+            "times), teal for the most likely middle range, and green for lucky runs (good years at "
+            "the right times). Together they cover 9 in 10 simulations. "
+            "The bold teal line stays on the chart as the no-surprises version so you can see "
+            "how much your real outcome could differ from the clean estimate."
+        ),
+    )
+
+# Slider lives in the sidebar so the chart doesn't shift when toggled
+_mc_std_pct = 15.0
+with st.sidebar:
+    if _mc_on:
+        st.divider()
+        st.markdown("**Monte Carlo: Market Swing Scenarios**")
+        _mc_std_pct = st.slider(
+            "How much do returns swing year to year?",
+            min_value=0.0, max_value=30.0, value=15.0, step=0.5,
+            key="mc_std",
+            help=(
+                "This controls how wild the ups and downs are in the 1,000 scenarios. "
+                "At 15%, most years will land somewhere between -5% and +25% "
+                "if your average return is 10%, which is pretty typical for the US stock market. "
+                "Lower = calmer, steadier returns. Higher = wilder swings."
+            ),
+        )
+
+_mc_pcts = None
+_mc_surv = None
+if _mc_on:
+    _mc = run_monte_carlo(
+        starting_wage, int(work_years), cola_increase, step_increase,
+        promotion_years, promotion_increase, pension_contribution_rate,
+        starting_allowance, int(retirement_years),
+        mean_return=index_returns_rate - 1,
+        std_return=_mc_std_pct / 100.0,
+        n_simulations=1000,
+    )
+    _mc_pcts = _mc["percentiles"]
+    _mc_surv = _mc["survival_prob"]
+
+fig = go.Figure()
+
+_xf = list(years)
+_xr = list(years)[::-1]
+
+if _mc_on and _mc_pcts is not None:
+    fig.add_trace(go.Scatter(
+        x=_xf + _xr,
+        y=list(_mc_pcts[0]) + list(_mc_pcts[2])[::-1],
+        fill="toself", fillcolor="rgba(220,38,38,0.18)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="Unlucky range (bottom 1 in 5 simulations)", hoverinfo="skip",
+    ))
+    fig.add_trace(go.Scatter(
+        x=_xf + _xr,
+        y=list(_mc_pcts[2]) + list(_mc_pcts[4])[::-1],
+        fill="toself", fillcolor="rgba(13,148,136,0.22)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="Most likely range (middle half of simulations)", hoverinfo="skip",
+    ))
+    fig.add_trace(go.Scatter(
+        x=_xf + _xr,
+        y=list(_mc_pcts[4]) + list(_mc_pcts[6])[::-1],
+        fill="toself", fillcolor="rgba(22,163,74,0.18)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="Lucky range (top 1 in 5 simulations)", hoverinfo="skip",
+    ))
+
+_annual_payments = [h[1] for h in hover_data]
+fig.add_trace(go.Scatter(
+    x=years,
+    y=pension_fund_values,
+    mode="lines+markers",
+    name="Annual payout amount (same for both options)",
+    line=dict(color="#A855F7", width=2),
+    marker=dict(color="#A855F7", size=5, symbol="circle"),
+    customdata=_annual_payments,
+    hovertemplate=(
+        "<b>Year %{x}</b><br>"
+        "This year: $%{customdata:,.0f}<br>"
+        "Running total paid out: $%{y:,.0f}"
+        "<extra></extra>"
+    ),
+    visible=_show_ref_line,
+))
+
+fig.add_trace(go.Scatter(
+    x=years,
+    y=personal_fund_values,
+    mode="lines+markers",
+    name=f"Option B: personal fund balance (fixed {(index_returns_rate-1)*100:.1f}% return from sidebar)",
+    line=dict(color="#0D9488", width=3),
+    customdata=hover_data,
+    hovertemplate=(
+        "<b>Year %{x}</b><br>"
+        "Deposit this year: $%{customdata[2]:,.0f}<br>"
+        "Withdrawal this year: $%{customdata[3]:,.0f}<br>"
+        "Market returns this year: $%{customdata[4]:,.0f}<br>"
+        "Fund balance: $%{y:,.0f}"
+        "<extra></extra>"
+    ),
+))
+
+_y_pad = data_range * 0.12
 fig.update_layout(
     xaxis_title="Year (W = Working, R = Retirement)",
     yaxis_title="Dollar Amount ($)",
@@ -653,6 +800,7 @@ fig.update_layout(
         dtick=y_tick_interval,
         tickformat=",",
         separatethousands=True,
+        range=[data_min - _y_pad, data_max + _y_pad],
     ),
     plot_bgcolor="white",
     legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
@@ -661,15 +809,21 @@ fig.update_layout(
 
 fig.add_vrect(
     x0=-0.5, x1=int(work_years) + 0.5,
-    fillcolor="rgba(148,163,184,0.08)", layer="below", line_width=0,
-    annotation_text="Working Years", annotation_position="top left",
-    annotation=dict(font_size=11, font_color="#64748B"),
+    fillcolor="rgba(148,163,184,0.10)", layer="below", line_width=0,
+    annotation_text="<b>Working Years</b>", annotation_position="top left",
+    annotation=dict(
+        font_size=13, font_color="#1E3A5F",
+        bgcolor="rgba(255,255,255,0.75)", borderpad=5,
+    ),
 )
 fig.add_vrect(
     x0=int(work_years) + 0.5, x1=len(years) - 0.5,
-    fillcolor="rgba(217,119,6,0.06)", layer="below", line_width=0,
-    annotation_text="Retirement Years", annotation_position="top left",
-    annotation=dict(font_size=11, font_color="#D97706"),
+    fillcolor="rgba(217,119,6,0.08)", layer="below", line_width=0,
+    annotation_text="<b>Retirement Years</b>", annotation_position="top left",
+    annotation=dict(
+        font_size=13, font_color="#7C2D12",
+        bgcolor="rgba(255,255,255,0.75)", borderpad=5,
+    ),
 )
 fig.add_vline(x=int(work_years), line_width=2, line_dash="dash", line_color="#DC2626")
 _fund_depletes = min(personal_fund_values) < 0
@@ -677,23 +831,27 @@ fig.add_hline(y=0, line_width=2, line_color="#666666",
           annotation_text="$0 = personal fund depleted" if _fund_depletes else "$0",
           annotation_position="bottom right")
 
-st.header("Pension vs. Personal Retirement Fund Over Time")
-
-with st.expander("How to read this chart"):
-    st.markdown("""
-Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does the Personal Fund (Option B) run out of money before you die?**
-
-- **Teal line (Option B)** = how much remains in the personal fund after each annual withdrawal. If it stays above zero through all retirement years, Option B wins. If it hits zero, Option A wins.
-- **Dotted gray line** = the annual payment amount: what Option A pays each year, which is also exactly what you withdraw from Option B each year. Toggle it on/off with the checkbox below.
-- **Background shading** = the blue-gray region is your working years; the warm region is retirement.
-- **Red dashed line** = the year retirement begins.
-- **Horizontal gray line** = the $0 mark. If the teal line crosses this, Option B has run out of money.
-""")
-
-_show_ref_line = st.checkbox("Show annual withdrawal reference line", value=False)
-fig.data[0].visible = _show_ref_line
-
 st.plotly_chart(fig, use_container_width=True)
+
+with st.sidebar:
+    if _mc_on and _mc_surv is not None:
+        st.metric(
+            "Chance you don't run out of money before you die",
+            f"{_mc_surv:.0f}%",
+            help=(
+                "Out of 1,000 simulations of your retirement, this is the percentage where your "
+                "personal fund still has money left the day you die. In the rest, your account hits "
+                "zero while you are still alive. You would have nothing left to live on from Option B "
+                "for however many years remain. The pension (Option A) keeps paying no matter what."
+            ),
+        )
+        st.caption(
+            f"All 1,000 simulations use {(index_returns_rate-1)*100:.1f}% average returns "
+            f"but with randomly different good and bad years. "
+            f"**Red band** = unlucky runs (bottom 1 in 5 simulations). "
+            f"**Teal band** = most likely range (middle half). "
+            f"**Green band** = lucky runs (top 1 in 5 simulations)."
+        )
 
 render_result_banner(
     personal_balance, retirement_years, _depletion_year,
@@ -749,7 +907,7 @@ with mc5:
         label="Break-even Return Rate",
         value=f"{_breakeven_rate:.1f}%",
         delta=f"{_rate_buffer:+.1f}pp vs. your {_current_rate_pct:.1f}% assumption",
-        delta_color="normal" if _rate_buffer >= 0 else "inverse",
+        delta_color="normal",
         help="The minimum annual investment return at which the personal fund survives your full retirement period. Compare this to your Index Returns Rate input.",
     )
 with mc6:
@@ -894,6 +1052,7 @@ Bob is a civil servant who starts at \\$65,000 and works a steady 20 years with 
 
 The pension option tends to come out ahead when returns are low, retirement is long, or the personal fund didn't have enough working years to grow.
 """)
+
 
 st.divider()
 st.header("Share Your Feedback")
