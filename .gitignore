@@ -17,9 +17,14 @@ env/
 # Environment variables
 .env
 
-# Type checkers / linters
+# Type checkers / linters / tests
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
+
+# Internal audit doc — not needed to run the app, and it enumerates
+# still-open security findings, so keep it out of the pushed repo.
+AUDIT_BLUEPRINT.md
 
 # macOS
 .DS_Store

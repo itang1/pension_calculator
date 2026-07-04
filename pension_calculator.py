@@ -225,6 +225,73 @@ Before your {int(retirement_years)}-year retirement was over, Option B would hav
 """)
 
 
+def render_mc_risk_note(depletion_prob, current_rate_pct):
+    """Reconcile the flat-rate winner banner with the Monte Carlo ruin risk.
+
+    The banner answers "on average, does Option B end with money?" The depletion
+    probability answers "how often does Option B run out once returns vary?"
+    Those are different questions, and a favorable flat-rate result can coexist
+    with an unacceptably high chance of ruin. This note turns the two numbers
+    into a single risk-tiered recommendation.
+    """
+    pct = depletion_prob * 100
+    one_in = round(1 / depletion_prob) if depletion_prob > 0 else 0
+
+    if depletion_prob <= 0.001:
+        bg, bar = "#CCFBF1", "#0D9488"
+        verdict = "Option B looks robust, not just favorable on average."
+        body = (
+            f"Even after accounting for realistic year-to-year market swings, "
+            f"<strong>none</strong> of the 1,000 simulated futures ran out of money. "
+            f"The flat-{current_rate_pct:.1f}% conclusion holds up under volatility."
+        )
+    elif depletion_prob <= 0.10:
+        bg, bar = "#CCFBF1", "#0D9488"
+        verdict = "Option B is the reasonable choice, with a small tail risk."
+        body = (
+            f"Only <strong>{pct:.0f}%</strong> (about 1 in {one_in}) of simulated futures "
+            f"ran out of money. Option B's flat-rate advantage mostly survives real market "
+            f"volatility — just keep a cash buffer for the unlucky minority of outcomes."
+        )
+    elif depletion_prob <= 0.25:
+        bg, bar = "#FEF3C7", "#D97706"
+        verdict = "Genuine trade-off — neither option is clearly correct."
+        body = (
+            f"At a flat {current_rate_pct:.1f}% return Option B wins, but once volatility is "
+            f"considered <strong>{pct:.0f}%</strong> of futures (about 1 in {one_in}) run out "
+            f"of money. You are weighing Option B's higher <em>expected</em> outcome against "
+            f"Option A's guarantee that you can never run out. If running out would be "
+            f"catastrophic for you, Option A's certainty can be worth the lower expected value."
+        )
+    elif depletion_prob <= 0.50:
+        bg, bar = "#FEE2E2", "#DC2626"
+        verdict = "Lean toward Option A, despite the flat-rate headline."
+        body = (
+            f"The flat-{current_rate_pct:.1f}% line says Option B &ldquo;wins,&rdquo; but a "
+            f"constant return is an optimistic assumption. Accounting for realistic ups and "
+            f"downs, <strong>{pct:.0f}%</strong> of futures (roughly 1 in {one_in}) run out of "
+            f"money before the end of retirement. A near coin-flip risk of ruin is usually not "
+            f"worth the extra upside — Option A's lifetime guarantee is the safer call here."
+        )
+    else:
+        bg, bar = "#FEE2E2", "#DC2626"
+        verdict = "Option A is the safer choice."
+        body = (
+            f"Even though a flat {current_rate_pct:.1f}% return would favor Option B, "
+            f"<strong>{pct:.0f}%</strong> of realistic market futures run out of money. When "
+            f"most simulated outcomes end in ruin, the pension's guaranteed lifetime income is "
+            f"clearly the more reliable choice."
+        )
+
+    render_html(f"""
+<div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b; margin-top:0.6rem;">
+<strong>Adding volatility to the picture: {verdict}</strong><br><br>
+{body}
+<br><br><em>Why this can differ from the banner above: the banner assumes the market returns exactly {current_rate_pct:.1f}% every single year. The Monte Carlo assumes the same {current_rate_pct:.1f}% <u>average</u> but with realistic year-to-year swings. Losses hurt compounding more than equal-sized gains help, and a few bad years early in retirement do lasting damage, so the typical outcome is worse than the flat line and a share of futures run out. The banner tells you the average-case winner; this depletion percentage tells you the risk. For a retirement decision, the risk usually matters more.</em>
+</div>
+""")
+
+
 if "session_tracked" not in st.session_state:
     st.session_state.session_tracked = True
     components.html("""
@@ -696,15 +763,15 @@ fig.add_hline(y=0, line_width=2, line_color="#666666",
 
 st.plotly_chart(fig, use_container_width=True)
 
-if _mc_on and _mc_depletion_prob is not None:
-    st.caption(
-        f"In the Monte Carlo simulation, **{_mc_depletion_prob*100:.0f}% of the\n1,000 simulated futures ran out of money** before the end of retirement.\n(Depleted paths are held at $0, so the lower bands never dip below zero.)"
-    )
-
 render_result_banner(
     personal_balance, retirement_years, _depletion_year,
     _breakeven_rate, index_return_pct,
 )
+
+# When Monte Carlo is on, follow the flat-rate winner banner with a note that
+# reconciles it against the simulated ruin risk, so the two don't contradict.
+if _mc_on and _mc_depletion_prob is not None:
+    render_mc_risk_note(_mc_depletion_prob, index_return_pct)
 
 st.space("small")
 
