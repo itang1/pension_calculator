@@ -21,12 +21,9 @@ This Streamlit app compares the long-term financial outcomes of a **traditional 
 
 ## How to Use
 
-Visit **[pensioncalc.streamlit.app](https://pensioncalc.streamlit.app)** or run locally:
+The app is hosted at **[pensioncalc.streamlit.app](https://pensioncalc.streamlit.app)**.
 
-```bash
-pip install -r requirements.txt
-streamlit run pension_calculator.py
-```
+> **Source-available, not open-source.** This repository is published for viewing only. Per the [LICENSE](LICENSE), no permission is granted to copy, modify, redistribute, or run this code without the author's written permission.
 
 ## Disclaimer
 

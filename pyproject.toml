@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# The Streamlit app intentionally runs code at module scope and embeds very
+# long help/markdown strings, so E501 (line length) is not meaningful here.
+ignore = ["E501"]

@@ -1,15 +1,15 @@
 import json
 import math
-import time
 import urllib.request
-from datetime import datetime
-import numpy as np
+from datetime import datetime, timezone
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 from plotly import graph_objects as go
 import gspread
 from user_agents import parse as _parse_ua
+
+import simulation
 
 _SPREADSHEET_ID = "1-H0MxbLs4QhES0tbXT4EztNm-5y-GY_jOzwJnwprP1M"
 
@@ -27,11 +27,29 @@ _FEEDBACK_HEADERS = [
 
 
 @st.cache_resource
-def _get_feedback_sheet():
+def _get_spreadsheet():
     return gspread.service_account_from_dict(
         dict(st.secrets["gcp_service_account"]),
         scopes=["https://www.googleapis.com/auth/spreadsheets"],
-    ).open_by_key(_SPREADSHEET_ID).sheet1
+    ).open_by_key(_SPREADSHEET_ID)
+
+
+def _ensure_headers(ws, headers):
+    """Insert the header row once if it is missing.
+
+    Called only from the cached worksheet getters, so it runs at most once per
+    server process instead of on every write. This removes the per-write
+    `acell` read and shrinks the check-then-act race to a single startup call.
+    """
+    if ws.acell("A1").value != headers[0]:
+        ws.insert_row(headers, 1)
+
+
+@st.cache_resource
+def _get_feedback_sheet():
+    ws = _get_spreadsheet().sheet1
+    _ensure_headers(ws, _FEEDBACK_HEADERS)
+    return ws
 
 
 def _client_metadata():
@@ -94,10 +112,7 @@ def _client_metadata():
 
 def _append_feedback(row: list):
     try:
-        ws = _get_feedback_sheet()
-        if ws.acell("A1").value != "Timestamp":
-            ws.insert_row(_FEEDBACK_HEADERS, 1)
-        ws.append_row(row)
+        _get_feedback_sheet().append_row(row, value_input_option="RAW")
         return None
     except Exception as e:
         return str(e)
@@ -114,27 +129,41 @@ _VISIT_HEADERS = [
 
 @st.cache_resource
 def _get_visit_sheet():
-    ss = gspread.service_account_from_dict(
-        dict(st.secrets["gcp_service_account"]),
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
-    ).open_by_key(_SPREADSHEET_ID)
+    ss = _get_spreadsheet()
     try:
-        return ss.worksheet("Visits")
+        ws = ss.worksheet("Visits")
     except gspread.exceptions.WorksheetNotFound:
-        return ss.add_worksheet(title="Visits", rows=5000, cols=len(_VISIT_HEADERS))
+        ws = ss.add_worksheet(title="Visits", rows=5000, cols=len(_VISIT_HEADERS))
+    _ensure_headers(ws, _VISIT_HEADERS)
+    return ws
 
 
 def _log_visit():
     try:
-        ws = _get_visit_sheet()
-        if ws.acell("A1").value != "Timestamp":
-            ws.insert_row(_VISIT_HEADERS, 1)
-        ws.append_row([datetime.now().isoformat(timespec="seconds"), *_client_metadata()])
+        _get_visit_sheet().append_row(
+            [datetime.now(timezone.utc).isoformat(timespec="seconds"), *_client_metadata()],
+            value_input_option="RAW",
+        )
     except Exception:
         pass
 
 
 st.set_page_config(layout="wide")
+
+# The math lives in simulation.py with no Streamlit dependency,
+# so it is unit-testable; caching is applied here at the app boundary.
+run_simulation = st.cache_data(simulation.run_simulation)
+compute_breakeven_rate = st.cache_data(simulation.compute_breakeven_rate)
+run_monte_carlo = st.cache_data(simulation.run_monte_carlo)
+compute_fas = simulation.compute_fas
+
+
+def render_html(html: str):
+    """
+    Every ``unsafe_allow_html`` render routes through here. Only ever
+    interpolate computed numbers into these strings, never user-supplied text.
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
@@ -144,11 +173,12 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
 
     money_cols = [c for c in table.columns if c != "Year"]
 
+    # These sets don't depend on `col`; compute once, not per column.
+    renamed_running = {rename_map.get(k, k) for k in (
+        "Pension Contribution Total", "Pension Redeemed Total")}
+    renamed_balance = {rename_map.get(k, k) for k in ("Balance",)}
     total_row = {"Year": "Total"}
     for col in money_cols:
-        renamed_running = {rename_map.get(k, k) for k in (
-            "Pension Contribution Total", "Pension Redeemed Total")}
-        renamed_balance = {rename_map.get(k, k) for k in ("Balance",)}
         if col in renamed_running or col in renamed_balance:
             total_row[col] = table[col].iloc[-1] if len(table) else 0.0
         elif col == rename_map.get("Salary", "Salary") or col == rename_map.get("Start Balance", "Start Balance"):
@@ -172,193 +202,27 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     return styler
 
 
-@st.cache_data
-def run_simulation(starting_wage, work_years, cola_increase, step_increase,
-                   promotion_years, promotion_increase, pension_contribution_rate,
-                   starting_allowance, retirement_years, index_returns_rate):
-    pension_contribution_total = 0
-    pension_redeemed_total = 0
-    personal_balance = 0
-    salary = starting_wage
-    pension_redeemed = starting_allowance
-
-    years = ["W0"]
-    pension_fund_values = [0]
-    personal_fund_values = [0]
-    hover_data = [[0, 0, 0, 0, 0]]
-    rows = []
-
-    # Work phase
-    for work_year in range(1, work_years + 1):
-        if work_year == 1:
-            effective_salary = salary * (1 + step_increase) / 2
-        else:
-            effective_salary = salary
-
-        pension_contribution_this_year = effective_salary * pension_contribution_rate
-        pension_contribution_total += pension_contribution_this_year
-
-        start_balance = personal_balance
-        market_returns = personal_balance * (index_returns_rate - 1)
-        personal_balance = personal_balance + market_returns + pension_contribution_this_year
-
-        years.append(f"W{work_year}")
-        pension_fund_values.append(0)
-        personal_fund_values.append(personal_balance)
-        hover_data.append([pension_contribution_this_year, 0, pension_contribution_this_year, 0, market_returns])
-
-        rows.append({
-            "Year": f"W{work_year}",
-            "Salary": effective_salary,
-            "Start Balance": start_balance,
-            "Pension Contribution": pension_contribution_this_year,
-            "Pension Contribution Total": pension_contribution_total,
-            "Pension Redeemed": 0.0,
-            "Pension Redeemed Total": 0.0,
-            "Market Returns": market_returns,
-            "Balance": personal_balance,
-        })
-
-        salary *= cola_increase
-        if 1 <= work_year < 5:
-            salary *= step_increase
-        if work_year in promotion_years:
-            salary *= promotion_increase
-
-    # Retirement phase
-    for ret_year in range(1, retirement_years + 1):
-        pension_redeemed_total += pension_redeemed
-
-        start_balance = personal_balance
-        market_returns = personal_balance * (index_returns_rate - 1)
-        personal_balance = personal_balance - pension_redeemed + market_returns
-
-        years.append(f"R{ret_year}")
-        pension_fund_values.append(pension_redeemed_total)
-        personal_fund_values.append(personal_balance)
-        hover_data.append([0, pension_redeemed, 0, pension_redeemed, market_returns])
-
-        rows.append({
-            "Year": f"R{ret_year}",
-            "Salary": float("nan"),
-            "Start Balance": start_balance,
-            "Pension Contribution": 0.0,
-            "Pension Contribution Total": 0.0,
-            "Pension Redeemed": pension_redeemed,
-            "Pension Redeemed Total": pension_redeemed_total,
-            "Market Returns": market_returns,
-            "Balance": personal_balance,
-        })
-
-        pension_redeemed *= cola_increase
-
-    yearly_data = pd.DataFrame(rows)
-
-    return {
-        "years": years,
-        "pension_fund_values": pension_fund_values,
-        "personal_fund_values": personal_fund_values,
-        "hover_data": hover_data,
-        "yearly_data": yearly_data,
-        "pension_contribution_total": pension_contribution_total,
-        "pension_redeemed_total": pension_redeemed_total,
-        "personal_balance": personal_balance,
-    }
-
-
-def compute_fas(starting_wage, work_years, cola_increase, step_increase,
-                promotion_years, promotion_increase):
-    sim_sal = starting_wage
-    sal_hist = []
-    for yr in range(1, work_years + 1):
-        eff = sim_sal * (1 + step_increase) / 2 if yr == 1 else sim_sal
-        sal_hist.append(eff)
-        sim_sal *= cola_increase
-        if 1 <= yr < 5:
-            sim_sal *= step_increase
-        if yr in promotion_years:
-            sim_sal *= promotion_increase
-    if len(sal_hist) >= 3:
-        return max(sum(sal_hist[i:i + 3]) / 3 for i in range(len(sal_hist) - 2))
-    return sum(sal_hist) / len(sal_hist) if sal_hist else starting_wage
-
-
-def compute_breakeven_rate(starting_wage, work_years, cola_increase, step_increase,
-                            promotion_years, promotion_increase, pension_contribution_rate,
-                            starting_allowance, retirement_years):
-    sim_args = (starting_wage, work_years, cola_increase, step_increase,
-                promotion_years, promotion_increase, pension_contribution_rate,
-                starting_allowance, retirement_years)
-    if run_simulation(*sim_args, 1.0)["personal_balance"] > 0:
-        return 0.0
-    if run_simulation(*sim_args, 1.25)["personal_balance"] <= 0:
-        return 25.0
-    lo, hi = 0.0, 0.25
-    for _ in range(30):
-        mid = (lo + hi) / 2
-        if run_simulation(*sim_args, 1.0 + mid)["personal_balance"] > 0:
-            hi = mid
-        else:
-            lo = mid
-    return hi * 100
-
-
-@st.cache_data
-def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
-                    promotion_years, promotion_increase, pension_contribution_rate,
-                    starting_allowance, retirement_years, mean_return, std_return,
-                    n_simulations, seed=42):
-    rng = np.random.default_rng(seed)
-    total_years = work_years + retirement_years
-
-    # Annual return multipliers: shape (n_simulations, total_years), clipped so can't lose >100%
-    raw = rng.normal(mean_return, std_return, (n_simulations, total_years))
-    mults = np.clip(1.0 + raw, 0.0, None)
-
-    # history[year, sim] = fund balance at end of that year
-    history = np.zeros((total_years + 1, n_simulations))
-
-    salary = starting_wage
-    for wy in range(1, work_years + 1):
-        eff_sal = salary * (1 + step_increase) / 2 if wy == 1 else salary
-        contribution = eff_sal * pension_contribution_rate
-        history[wy] = history[wy - 1] * mults[:, wy - 1] + contribution
-        salary *= cola_increase
-        if 1 <= wy < 5:
-            salary *= step_increase
-        if wy in promotion_years:
-            salary *= promotion_increase
-
-    pension_redeemed = starting_allowance
-    for ry in range(1, retirement_years + 1):
-        history[work_years + ry] = history[work_years + ry - 1] * mults[:, work_years + ry - 1] - pension_redeemed
-        pension_redeemed *= cola_increase
-
-    pcts = np.percentile(history, [5, 25, 75, 95], axis=1)
-    return {"percentiles": pcts}
-
-
 def render_result_banner(personal_balance, retirement_years, depletion_year,
                           breakeven_rate, current_rate_pct):
     rate_buffer = current_rate_pct - breakeven_rate
     if personal_balance > 0:
-        st.markdown(f"""
+        render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
 <br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
 <br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.</em>
 </div>
-""", unsafe_allow_html=True)
+""")
     else:
-        st.markdown(f"""
+        render_html(f"""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
 Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
 <br><br><em>Option B would need the market to average at least {breakeven_rate:.1f}% every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
 <br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.</em>
 </div>
-""", unsafe_allow_html=True)
+""")
 
 
 if "session_tracked" not in st.session_state:
@@ -382,13 +246,12 @@ Many public employees (such as teachers, law enforcement officers, and civil ser
 In this calculator, we ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which option would produce better outcomes for them?**
 """)
 
-st.markdown(
+render_html(
     """
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <em>&larr; On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.</em>
 </div>
-""",
-    unsafe_allow_html=True,
+"""
 )
 
 st.space("small")
@@ -396,19 +259,19 @@ st.space("small")
 with st.expander("Explanation of the Two Options"):
     col_a, col_b = st.columns(2)
     with col_a:
-        st.markdown("""
+        render_html("""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option A: Traditional Pension</strong><br><br>
 Each year, a fixed percentage of your paycheck (e.g. 10%) is automatically deducted and funneled directly into your organization's pension system. The funds are then managed by professional fund managers who ensure its long-term stability and growth. In return, once you retire, the pension program will pay you a guaranteed annual payment for the rest of your life, regardless of broad market performance. (The specific amount will depend on your salary, years of service, and the pension formula used by your organization.)
 </div>
-""", unsafe_allow_html=True)
+""")
     with col_b:
-        st.markdown("""
+        render_html("""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option B: Personal Retirement Account</strong><br><br>
 Instead of contributing to the pension, imagine that you deposit that same amount (e.g. 10%) each year into your own personal investment account. You have total control over how to invest the funds, and the balance will grow with market returns depending on your investment choices. Imagine that in retirement, you choose to withdraw the same annual amount that the pension would have paid. Additionally, any remaining balance in your account at the end of your life is yours to keep or donate as well.
 </div>
-""", unsafe_allow_html=True)
+""")
 
 with st.expander("Limitations & Assumptions"):
     st.markdown("""
@@ -456,13 +319,13 @@ This calculator operates in annual periods. Within each year:
     )
     retirement_age = st.number_input(
         "Age at Retirement",
-        value=55, min_value=40, max_value=75, step=1,
+        value=55, min_value=18, max_value=75, step=1,
         help="Your age on the day you expect to retire."
     )
     cola_increase = st.number_input(
         "Cost of Living Adjustment (%)",
-        value=3.0, min_value=2.5, max_value=5.5, step=0.1,
-        help="Annual salary adjustment announced each October, typically between 2-3.5%."
+        value=3.0, min_value=0.0, max_value=5.5, step=0.1,
+        help="Annual salary adjustment announced each October, typically between 2-3.5%. Set to 0 for plans with no COLA."
     ) / 100 + 1
     step_increase = st.number_input(
         "Step Increase (%)",
@@ -474,14 +337,17 @@ This calculator operates in annual periods. Within each year:
         value="10, 20",
         help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
     )
+    # Parse promotion years exactly once.
     _promo_tokens = [t.strip() for t in promotion_years_input.split(",") if t.strip()]
     _promo_bad = [t for t in _promo_tokens if not t.isdigit()]
-    _promo_valid_raw = [int(t) for t in _promo_tokens if t.isdigit()]
-    _promo_oob = [y for y in _promo_valid_raw if y < 1 or y > int(work_years)]
+    promotion_years = tuple(int(t) for t in _promo_tokens if t.isdigit())
+    _promo_oob = [y for y in promotion_years if y < 1 or y > int(work_years)]
     if _promo_bad:
-        st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only.")
-    elif _promo_oob:
-        st.error(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career.")
+        st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only, then results will update.")
+        st.stop()
+    if _promo_oob:
+        st.error(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career. Fix or remove them to continue.")
+        st.stop()
     promotion_increase = st.number_input(
         "Promotion Increase (%)",
         value=8.0, step=1.,
@@ -537,9 +403,8 @@ This calculator operates in annual periods. Within each year:
         else:
             _early_red = 0.0
 
-        _promo_yrs = tuple(int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit())
         _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
-                           _promo_yrs, promotion_increase)
+                           promotion_years, promotion_increase)
         _reduction = 1.0 - _early_red / 100.0
         _computed_allowance = work_years * _fas * _factor * _reduction
 
@@ -588,8 +453,6 @@ This calculator operates in annual periods. Within each year:
     )
 
 
-promotion_years = tuple(int(y.strip()) for y in promotion_years_input.split(",") if y.strip().isdigit())
-
 result = run_simulation(
     starting_wage, int(work_years), cola_increase, step_increase,
     promotion_years, promotion_increase, pension_contribution_rate,
@@ -598,16 +461,21 @@ result = run_simulation(
 years = result["years"]
 pension_fund_values = result["pension_fund_values"]
 personal_fund_values = result["personal_fund_values"]
-hover_data = result["hover_data"]
 yearly_data = result["yearly_data"]
 pension_contribution_total = result["pension_contribution_total"]
 pension_redeemed_total = result["pension_redeemed_total"]
 personal_balance = result["personal_balance"]
 
-# First retirement year where personal fund goes negative (1-indexed), or None
+# Display-only percentages
+index_return_pct = (index_returns_rate - 1) * 100
+cola_pct = (cola_increase - 1) * 100
+step_pct = (step_increase - 1) * 100
+promotion_pct = (promotion_increase - 1) * 100
+
+# First retirement year where the personal fund is depleted
 _depletion_year = next(
     (k for k in range(1, int(retirement_years) + 1)
-     if personal_fund_values[int(work_years) + k] < 0),
+     if personal_fund_values[int(work_years) + k] <= 0),
     None,
 )
 
@@ -673,7 +541,7 @@ with _ctl2:
         "Monte Carlo: consider that returns actually change every year",
         value=False,
         help=(
-            f"The teal line assumes the market returns exactly {(index_returns_rate-1)*100:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {(index_returns_rate-1)*100:.1f}% over the long run. Check this box to run a Monte Carlo simulation, which generates 1,000 of those sequences (each one a different possible market history spanning your {int(work_years)} years of working plus {int(retirement_years)} years of retirement) so you can see the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against."
+            f"The teal line assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run. Check this box to run a Monte Carlo simulation, which generates 1,000 of those sequences (each one a different possible market history spanning your {int(work_years)} years of working plus {int(retirement_years)} years of retirement) so you can see the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against."
         ),
     )
 
@@ -696,15 +564,18 @@ with st.sidebar:
         )
 
 _mc_pcts = None
+_mc_depletion_prob = None
 if _mc_on:
-    _mc_pcts = run_monte_carlo(
+    _mc_result = run_monte_carlo(
         starting_wage, int(work_years), cola_increase, step_increase,
         promotion_years, promotion_increase, pension_contribution_rate,
         starting_allowance, int(retirement_years),
         mean_return=index_returns_rate - 1,
         std_return=_mc_std_pct / 100.0,
         n_simulations=1000,
-    )["percentiles"]
+    )
+    _mc_pcts = _mc_result["percentiles"]
+    _mc_depletion_prob = _mc_result["depletion_prob"]
 
 fig = go.Figure()
 
@@ -734,7 +605,12 @@ if _mc_on and _mc_pcts is not None:
         name="You get lucky (best 20% of outcomes)", hoverinfo="skip",
     ))
 
-_annual_payments = [h[1] for h in hover_data]
+# Hover arrays
+_deposits = [0.0] + yearly_data["Pension Contribution"].tolist()
+_withdrawals = [0.0] + yearly_data["Pension Redeemed"].tolist()
+_returns = [0.0] + yearly_data["Market Returns"].tolist()
+_personal_customdata = list(zip(_deposits, _withdrawals, _returns))
+
 fig.add_trace(go.Scatter(
     x=years,
     y=pension_fund_values,
@@ -742,7 +618,7 @@ fig.add_trace(go.Scatter(
     name="Annual payout amount (same for both options)",
     line=dict(color="#A855F7", width=2),
     marker=dict(color="#A855F7", size=5, symbol="circle"),
-    customdata=_annual_payments,
+    customdata=_withdrawals,
     hovertemplate=(
         "<b>Year %{x}</b><br>"
         "This year paid out: $%{customdata:,.0f}<br>"
@@ -756,14 +632,14 @@ fig.add_trace(go.Scatter(
     x=years,
     y=personal_fund_values,
     mode="lines+markers",
-    name=f"Option B: personal fund balance (fixed {(index_returns_rate-1)*100:.1f}% return from sidebar)",
+    name=f"Option B: personal fund balance (fixed {index_return_pct:.1f}% return from sidebar)",
     line=dict(color="#0D9488", width=3),
-    customdata=hover_data,
+    customdata=_personal_customdata,
     hovertemplate=(
         "<b>Year %{x}</b><br>"
-        "Deposit this year: $%{customdata[2]:,.0f}<br>"
-        "Withdrawal this year: $%{customdata[3]:,.0f}<br>"
-        "Market returns this year: $%{customdata[4]:,.0f}<br>"
+        "Deposit this year: $%{customdata[0]:,.0f}<br>"
+        "Withdrawal this year: $%{customdata[1]:,.0f}<br>"
+        "Market returns this year: $%{customdata[2]:,.0f}<br>"
         "Personal fund balance: $%{y:,.0f}"
         "<extra></extra>"
     ),
@@ -820,14 +696,19 @@ fig.add_hline(y=0, line_width=2, line_color="#666666",
 
 st.plotly_chart(fig, use_container_width=True)
 
+if _mc_on and _mc_depletion_prob is not None:
+    st.caption(
+        f"In the Monte Carlo simulation, **{_mc_depletion_prob*100:.0f}% of the\n1,000 simulated futures ran out of money** before the end of retirement.\n(Depleted paths are held at $0, so the lower bands never dip below zero.)"
+    )
+
 render_result_banner(
     personal_balance, retirement_years, _depletion_year,
-    _breakeven_rate, (index_returns_rate - 1) * 100,
+    _breakeven_rate, index_return_pct,
 )
 
 st.space("small")
 
-_current_rate_pct = (index_returns_rate - 1) * 100
+_current_rate_pct = index_return_pct
 _rate_buffer = _current_rate_pct - _breakeven_rate
 _years_covered = int(retirement_years) if _depletion_year is None else _depletion_year - 1
 
@@ -879,7 +760,7 @@ with mc5:
         value=f"{_breakeven_rate:.1f}%",
         delta=f"{_rate_buffer:+.1f}pp vs. your {_current_rate_pct:.1f}% assumption",
         delta_color="normal",
-        help="The minimum that the market needs to return in order for your personal fund survives your full retirement period. Compare this to your Average Index Returns Rate input.",
+        help="The minimum that the market needs to return in order for your personal fund to survive your full retirement period. Compare this to your Average Index Returns Rate input.",
     )
 with mc6:
     st.metric(
@@ -913,12 +794,12 @@ During your working years, a fixed percentage of your salary is contributed annu
         st.markdown(f"""
 Each year, {pension_contribution_rate*100:.0f}% of your salary is deducted and paid into the pension. The **Contribution** column shows that deduction. The **Total Contributed** column is a running sum of all contributions to date.
 
-Salary grows each year by your COLA ({(cola_increase-1)*100:.1f}%), plus a step increase ({(step_increase-1)*100:.1f}%) in your first 4 years, plus a {(promotion_increase-1)*100:.0f}% bump in any promotion years ({str(promotion_years).strip("[]") if promotion_years else "none entered"}). Year 1 is a special case: it averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months in.
+Salary grows each year by your COLA ({cola_pct:.1f}%), plus a step increase ({step_pct:.1f}%) in your first 4 years, plus a {promotion_pct:.0f}% bump in any promotion years ({str(promotion_years).strip("[]") if promotion_years else "none entered"}). Year 1 is a special case: it averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months in.
 """)
     with col2:
         st.markdown("**Option B: Personal Fund**")
         st.markdown(f"""
-Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: the **Start Balance** earns **+ Returns** (investment growth at {(index_returns_rate-1)*100:.1f}%/year), then the **+ Deposit** (same as the pension contribution) is added, producing the **= Balance** at year-end.
+Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: the **Start Balance** earns **+ Returns** (investment growth at {index_return_pct:.1f}%/year), then the **+ Deposit** (same as the pension contribution) is added, producing the **= Balance** at year-end.
 
 Returns are calculated on the balance at the *start* of the year, before that year's deposit is added.
 """)
@@ -951,12 +832,12 @@ Once you retire, contributions stop. The pension begins paying you a fixed annua
     with col1:
         st.markdown("**Option A: Pension**")
         st.markdown(f"""
-The pension pays a set annual amount, growing by {(cola_increase-1)*100:.1f}% each year (COLA). **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
+The pension pays a set annual amount, growing by {cola_pct:.1f}% each year (COLA). **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
 """)
     with col2:
         st.markdown("**Option B: Personal Fund**")
         st.markdown(f"""
-Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the **Start Balance** earns **+ Returns** ({(index_returns_rate-1)*100:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
+Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the **Start Balance** earns **+ Returns** ({index_return_pct:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
 """)
     col1, col2 = st.columns(2)
     with col1:
@@ -1051,11 +932,11 @@ with st.form("feedback_form"):
                 browser, browser_ver, os_name, os_ver, device,
             ) = _client_metadata()
             err = _append_feedback([
-                datetime.now().isoformat(timespec="seconds"),
+                datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 feedback_text.strip(),
                 starting_wage, int(work_years), int(retirement_years),
-                round((cola_increase - 1) * 100, 2),
-                round((index_returns_rate - 1) * 100, 2),
+                round(cola_pct, 2),
+                round(index_return_pct, 2),
                 round(pension_contribution_rate * 100, 2),
                 round(starting_allowance, 2),
                 round(pension_contribution_total, 2),
@@ -1080,8 +961,7 @@ with st.form("feedback_form"):
             st.warning("Please enter some feedback before submitting.")
 
 if st.session_state.feedback_success:
-    _msg = st.empty()
-    _msg.markdown(
+    render_html(
         """
         <div style="background:#d4edda;border:1px solid #c3e6cb;color:#155724;
                     padding:.75rem 1.25rem;border-radius:.375rem;margin:.25rem 0;
@@ -1089,9 +969,6 @@ if st.session_state.feedback_success:
             ✓ &nbsp;Thank you. Your feedback is noted.
         </div>
         <style>@keyframes fb_fade{from{opacity:1}to{opacity:0}}</style>
-        """,
-        unsafe_allow_html=True,
+        """
     )
-    time.sleep(3)
-    _msg.empty()
     st.session_state.feedback_success = False
