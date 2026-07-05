@@ -17,7 +17,7 @@ This Streamlit app compares the long-term financial outcomes of a **traditional 
 - **Pension allowance estimator**: enter your career details and the app estimates your first-year allowance using a formula of my choice
 - **Configurable assumptions**: starting salary, COLA, step increases, promotion years, pension contribution rate, index return rate, retirement age, and retirement length
 - **Case studies** showing scenario where each option wins, with full settings to reproduce in the calculator
-- **Anonymous feedback form** to submit questions and comments
+- **Feedback form** to submit questions and comments
 
 ## How to Use
 
