@@ -258,15 +258,19 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
 
 
 def render_result_banner(personal_balance, retirement_years, depletion_year,
-                          breakeven_rate, current_rate_pct):
+                          breakeven_rate, current_rate_pct, mc_on=False):
     rate_buffer = current_rate_pct - breakeven_rate
+    if mc_on:
+        _mc_pointer = "The Monte Carlo analysis below shows how a realistic sequence of ups and downs changes this picture."
+    else:
+        _mc_pointer = 'To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.'
     if personal_balance > 0:
         render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
 <br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
-<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.</em>
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. {_mc_pointer}</em>
 </div>
 """)
     else:
@@ -275,7 +279,7 @@ After {int(retirement_years)} years of retirement, Option B would still have <st
 <strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
 Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
 <br><br><em>Option B would need the market to average at least {breakeven_rate:.1f}% every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
-<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. To see how a realistic sequence of ups and downs could change this outcome, check the "Monte Carlo" box above the chart.</em>
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. {_mc_pointer}</em>
 </div>
 """)
 
@@ -614,8 +618,8 @@ with st.expander("How to read this chart"):
 Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does the Personal Fund (Option B) run out of money before you die?**
 
 - **Bold teal line (Option B)** = the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, Option B wins. If it hits zero, Option A wins.
-- **Purple line (optional)** = how much money is paid out each year. Option A pays this to you as a pension; Option B withdraws the same amount from your personal fund. Toggle it on/off with the checkbox below the chart.
-- **Colored bands (optional, Monte Carlo)** = the range of possible Option B balances if the market does not return the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. Toggle on with the Monte Carlo checkbox below the chart.
+- **Colored bands (Monte Carlo, shown by default)** = the range of possible Option B balances once the market stops returning the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. The best-case band can extend past the top of the chart; the y-axis is fitted to the likely region. Uncheck the Monte Carlo box above the chart for the simpler flat-rate-only view.
+- **Purple line (optional)** = how much money is paid out each year. Option A pays this to you as a pension; Option B withdraws the same amount from your personal fund. Toggle it on/off with the checkbox above the chart.
 - **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the $0 mark. If the teal line crosses below it, Option B has run out of money.
@@ -624,26 +628,6 @@ Both options pay you the **same income every year in retirement**. The compariso
 # Adaptive x-axis
 total_years = len(years)
 x_tick_step = max(5, int(math.ceil(total_years / 12 / 5) * 5))
-
-# Adaptive y-axis
-all_values = [v for v in personal_fund_values if v is not None]
-data_min = min(all_values, default=0)
-data_max = max(all_values, default=1)
-data_range = max(data_max - data_min, 1)
-raw_interval = data_range / 10
-magnitude = 10 ** math.floor(math.log10(raw_interval))
-normalized = raw_interval / magnitude
-if normalized <= 1:
-    nice = 1
-elif normalized <= 2:
-    nice = 2
-elif normalized <= 2.5:
-    nice = 2.5
-elif normalized <= 5:
-    nice = 5
-else:
-    nice = 10
-y_tick_interval = nice * magnitude
 
 _ctl1, _ctl2 = st.columns(2)
 with _ctl1:
@@ -659,11 +643,14 @@ with _ctl1:
         ),
     )
 with _ctl2:
+    # On by default: the depletion risk is the decision-relevant picture, so
+    # users should not have to opt in to see it. Unchecking gives the simpler
+    # flat-rate-only view.
     _mc_on = st.checkbox(
-        "Monte Carlo: consider that returns actually change every year",
-        value=False,
+        "Monte Carlo: simulate realistic year-to-year market swings",
+        value=True,
         help=(
-            f"The teal line assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run. Check this box to run a Monte Carlo simulation, which generates 1,000 of those sequences (each one a different possible market history spanning your {int(work_years)} years of working plus {int(retirement_years)} years of retirement) so you can see the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against."
+            f"The teal line assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run. The colored bands come from a Monte Carlo simulation: 1,000 of those sequences (each one a different possible market history spanning your {int(work_years)} years of working plus {int(retirement_years)} years of retirement), showing the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against. Uncheck to hide the bands and see only the flat-rate view."
         ),
     )
 
@@ -698,6 +685,31 @@ if _mc_on:
     )
     _mc_pcts = _mc_result["percentiles"]
     _mc_depletion_prob = _mc_result["depletion_prob"]
+
+# Adaptive y-axis. When Monte Carlo is on, the range also covers the middle
+# 50% band (25th-75th percentiles) so the "most likely" region is fully
+# visible; the extreme-luck tails (5th/95th) are allowed to clip rather than
+# letting a 20x-lucky path squash the flat line into the bottom of the chart.
+all_values = [v for v in personal_fund_values if v is not None]
+if _mc_pcts is not None:
+    all_values = all_values + list(_mc_pcts[1]) + list(_mc_pcts[2])
+data_min = min(all_values, default=0)
+data_max = max(all_values, default=1)
+data_range = max(data_max - data_min, 1)
+raw_interval = data_range / 10
+magnitude = 10 ** math.floor(math.log10(raw_interval))
+normalized = raw_interval / magnitude
+if normalized <= 1:
+    nice = 1
+elif normalized <= 2:
+    nice = 2
+elif normalized <= 2.5:
+    nice = 2.5
+elif normalized <= 5:
+    nice = 5
+else:
+    nice = 10
+y_tick_interval = nice * magnitude
 
 fig = go.Figure()
 
@@ -768,7 +780,19 @@ fig.add_trace(go.Scatter(
 ))
 
 _y_pad = data_range * 0.12
+if _mc_on and _mc_pcts is not None:
+    _chart_title = (
+        f"Option B Personal Fund Balance: flat {index_return_pct:.1f}%/yr line "
+        f"vs. 1,000 simulated market futures"
+    )
+else:
+    _chart_title = f"Option B Personal Fund Balance at a flat {index_return_pct:.1f}% annual return"
 fig.update_layout(
+    title=dict(
+        text=f"<b>{_chart_title}</b>",
+        x=0.5, xanchor="center",
+        font=dict(size=16, color="#1e293b"),
+    ),
     xaxis_title="Year (W = Working, R = Retirement)",
     yaxis_title="Dollar Amount ($)",
     xaxis=dict(
@@ -789,7 +813,7 @@ fig.update_layout(
     ),
     plot_bgcolor="white",
     legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
-    margin=dict(l=40, r=20, t=20, b=120),
+    margin=dict(l=40, r=20, t=50, b=120),
 )
 
 fig.add_vrect(
@@ -821,6 +845,7 @@ st.plotly_chart(fig, use_container_width=True)
 render_result_banner(
     personal_balance, retirement_years, _depletion_year,
     _breakeven_rate, index_return_pct,
+    mc_on=(_mc_on and _mc_depletion_prob is not None),
 )
 
 # When Monte Carlo is on, follow the flat-rate winner banner with a note that
