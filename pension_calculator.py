@@ -1,5 +1,9 @@
+import ipaddress
 import json
+import logging
 import math
+import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 import streamlit as st
@@ -11,7 +15,13 @@ from user_agents import parse as _parse_ua
 
 import simulation
 
+_logger = logging.getLogger(__name__)
+
 _SPREADSHEET_ID = "1-H0MxbLs4QhES0tbXT4EztNm-5y-GY_jOzwJnwprP1M"
+
+# Abuse controls for the feedback write path (see [H-3]).
+_FEEDBACK_MAX_CHARS = 2000
+_FEEDBACK_COOLDOWN_SECONDS = 30
 
 _FEEDBACK_HEADERS = [
     "Timestamp", "Feedback",
@@ -52,6 +62,44 @@ def _get_feedback_sheet():
     return ws
 
 
+_GEO_FIELDS = "status,country,regionName,city,zip,lat,lon,timezone,isp,proxy,mobile"
+
+
+def _geo_lookup_url(ip: str):
+    """Return a safe, encrypted geolocation URL for ``ip`` or ``None``.
+
+    Addresses two audit findings:
+
+    * [H-1] The IP originates from a client-controlled ``X-Forwarded-For``
+      header. We parse it with :func:`ipaddress.ip_address` and discard
+      anything that is not a real address, so no attacker-supplied text can
+      ever be interpolated into the outbound URL.
+    * [C-2] The free ip-api.com endpoint is plaintext HTTP and its terms
+      restrict production use. We only ever call the paid HTTPS endpoint, and
+      only when an API key is configured in ``st.secrets["ip_api_key"]``.
+      Without a key we skip the lookup entirely rather than leak the visitor's
+      IP over an unencrypted, terms-violating channel.
+    """
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return None
+    if addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_unspecified:
+        return None
+
+    try:
+        key = st.secrets["ip_api_key"]
+    except Exception:
+        key = None
+    if not key:
+        return None
+
+    return (
+        f"https://pro.ip-api.com/json/{addr}"
+        f"?fields={_GEO_FIELDS}&key={urllib.parse.quote(str(key), safe='')}"
+    )
+
+
 def _client_metadata():
     ip = ua_str = lang = referrer = platform_hdr = mobile_hdr = "unknown"
     country = region = city = zip_code = timezone = isp = "unknown"
@@ -70,12 +118,10 @@ def _client_metadata():
     except Exception:
         pass
 
-    if ip not in ("unknown", "127.0.0.1", "::1"):
+    geo_url = _geo_lookup_url(ip)
+    if geo_url is not None:
         try:
-            fields = "status,country,regionName,city,zip,lat,lon,timezone,isp,proxy,mobile"
-            with urllib.request.urlopen(
-                f"http://ip-api.com/json/{ip}?fields={fields}", timeout=3
-            ) as r:
+            with urllib.request.urlopen(geo_url, timeout=3) as r:
                 geo = json.loads(r.read())
             if geo.get("status") == "success":
                 country = geo.get("country", "unknown")
@@ -89,7 +135,9 @@ def _client_metadata():
                 is_vpn = geo.get("proxy", "unknown")
                 is_mobile_net = geo.get("mobile", "unknown")
         except Exception:
-            pass
+            # Geolocation is best-effort; log for observability but never fail
+            # the request over it (previously a silent bare `except: pass`).
+            _logger.debug("Geolocation lookup failed", exc_info=True)
 
     if ua_str != "unknown":
         try:
@@ -111,11 +159,18 @@ def _client_metadata():
 
 
 def _append_feedback(row: list):
+    """Append a feedback row. Returns ``None`` on success, else ``True``.
+
+    [H-2] The raw exception is logged server-side only. gspread errors can
+    contain the spreadsheet ID, service-account email, and API payloads, so we
+    never surface the exception text to end users.
+    """
     try:
         _get_feedback_sheet().append_row(row, value_input_option="RAW")
         return None
-    except Exception as e:
-        return str(e)
+    except Exception:
+        _logger.exception("Failed to append feedback row")
+        return True
 
 
 _VISIT_HEADERS = [
@@ -981,17 +1036,30 @@ if "feedback_key" not in st.session_state:
     st.session_state.feedback_key = 0
 if "feedback_success" not in st.session_state:
     st.session_state.feedback_success = False
+if "feedback_last_submit" not in st.session_state:
+    st.session_state.feedback_last_submit = 0.0
 
 with st.form("feedback_form"):
     feedback_text = st.text_area(
         "Your feedback",
         height=120,
+        max_chars=_FEEDBACK_MAX_CHARS,
         placeholder="e.g. I wish it showed the impact of leaving before vesting, or the chart was hard to read...",
         label_visibility="collapsed",
         key=f"feedback_text_{st.session_state.feedback_key}",
     )
     if st.form_submit_button("Submit"):
-        if feedback_text.strip():
+        # [H-3] Abuse controls: enforce a length cap (belt-and-suspenders with
+        # the widget's max_chars) and a per-session cooldown so a single client
+        # cannot flood the shared Google Sheet and exhaust its write quota.
+        elapsed = time.monotonic() - st.session_state.feedback_last_submit
+        cleaned = feedback_text.strip()[:_FEEDBACK_MAX_CHARS]
+        if not cleaned:
+            st.warning("Please enter some feedback before submitting.")
+        elif elapsed < _FEEDBACK_COOLDOWN_SECONDS:
+            wait = int(_FEEDBACK_COOLDOWN_SECONDS - elapsed) + 1
+            st.warning(f"Thanks! Please wait {wait}s before submitting again.")
+        else:
             (
                 ip, country, region, city, zip_code, lat, lon,
                 timezone, isp, is_vpn, is_mobile_net,
@@ -1000,7 +1068,7 @@ with st.form("feedback_form"):
             ) = _client_metadata()
             err = _append_feedback([
                 datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                feedback_text.strip(),
+                cleaned,
                 starting_wage, int(work_years), int(retirement_years),
                 round(cola_pct, 2),
                 round(index_return_pct, 2),
@@ -1019,13 +1087,12 @@ with st.form("feedback_form"):
                 browser, browser_ver, os_name, os_ver, device,
             ])
             if err:
-                st.warning(f"Could not save feedback: {err}")
+                st.warning("Sorry, we couldn't save your feedback right now. Please try again later.")
             else:
+                st.session_state.feedback_last_submit = time.monotonic()
                 st.session_state.feedback_key += 1
                 st.session_state.feedback_success = True
                 st.rerun()
-        else:
-            st.warning("Please enter some feedback before submitting.")
 
 if st.session_state.feedback_success:
     render_html(
