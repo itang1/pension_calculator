@@ -14,6 +14,22 @@ import view_market_swings
 
 st.set_page_config(layout="wide")
 
+# st.page_link renders its label on one non-wrapping line and truncates what
+# doesn't fit. The banner pointer under the result banner is a full sentence,
+# so let page-link labels wrap. (Sidebar nav items use a different testid and
+# are unaffected; their titles are short anyway.)
+common.render_html(
+    """<style>
+    [data-testid="stPageLink"] a,
+    [data-testid="stPageLink"] p {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        height: auto !important;
+    }
+    </style>"""
+)
+
 # Keep page-local widget state alive across page switches. Streamlit drops the
 # state of any widget that is not rendered during a rerun, so widgets that live
 # in a page body (not the always-rendered sidebar) need this re-assignment pin.
