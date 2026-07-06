@@ -386,4 +386,4 @@ Bob is a civil servant who starts at \\$65,000 and works a steady 20 years with 
 The pension option tends to come out ahead when returns are low, retirement is long, or the personal fund didn't have enough working years to grow.
 """)
 
-    render_feedback_form()
+    render_feedback_form("comparison")

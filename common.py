@@ -44,6 +44,9 @@ _FEEDBACK_HEADERS = [
     "Timezone", "ISP", "VPN/Proxy", "Mobile Network",
     "Accept-Language", "Referrer", "Platform", "Mobile Browser",
     "Browser", "Browser Version", "OS", "OS Version", "Device",
+    # Added with the two-page split: which page the feedback came from, and
+    # the Monte Carlo settings/result the user was looking at.
+    "Page", "MC Volatility %", "MC Depletion %",
 ]
 
 
@@ -56,14 +59,19 @@ def _get_spreadsheet():
 
 
 def _ensure_headers(ws, headers):
-    """Insert the header row once if it is missing.
+    """Insert or extend the header row once if needed.
 
     Called only from the cached worksheet getters, so it runs at most once per
-    server process instead of on every write. This removes the per-write
-    `acell` read and shrinks the check-then-act race to a single startup call.
+    server process instead of on every write. This keeps the check-then-act
+    race to a single startup call. When new columns are appended to a headers
+    list (e.g. the page-context columns), the existing sheet's header row is
+    extended in place so old and new rows stay aligned.
     """
-    if ws.acell("A1").value != headers[0]:
+    first_row = ws.row_values(1)
+    if not first_row or first_row[0] != headers[0]:
         ws.insert_row(headers, 1)
+    elif len(first_row) < len(headers):
+        ws.update(values=[headers], range_name="A1")
 
 
 @st.cache_resource
@@ -760,8 +768,13 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     return styler
 
 
-def render_feedback_form():
-    """Shared feedback form. Reads current inputs/results from session_state."""
+def render_feedback_form(page_name):
+    """Shared feedback form. Reads current inputs/results from session_state.
+
+    ``page_name`` and the current Monte Carlo context are recorded with each
+    submission so feedback about the risk page can be read alongside the
+    volatility and depletion numbers the user was actually looking at.
+    """
     inputs = st.session_state["_inputs"]
     res = st.session_state["_results"]
 
@@ -822,6 +835,9 @@ def render_feedback_form():
                     timezone, isp, is_vpn, is_mobile_net,
                     lang, referrer, platform_hdr, mobile_hdr,
                     browser, browser_ver, os_name, os_ver, device,
+                    page_name,
+                    round(st.session_state.get("mc_std", 15.0), 1),
+                    round(get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))["depletion_prob"] * 100, 1),
                 ])
                 if err:
                     st.warning("Sorry, we couldn't save your feedback right now. Please try again later.")

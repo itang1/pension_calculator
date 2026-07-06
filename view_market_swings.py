@@ -261,4 +261,4 @@ One honest limitation: real markets have slightly fatter tails than a bell curve
 
     st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to the comparison**", icon="⚖️")
 
-    render_feedback_form()
+    render_feedback_form("market-swings")
