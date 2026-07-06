@@ -101,6 +101,7 @@ Suppose your $1,000 earns <strong>+50% one year</strong> (now $1,500) and <stron
 </div>
 """)
 
+    st.space()
     st.markdown(f"""
 The results below come from **1,000 of those sequences** (each one a different possible market history spanning your {work_years} years of working plus {retirement_years} years of retirement), showing the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against.
 """)
@@ -268,7 +269,7 @@ Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, her
         )
         st.plotly_chart(timing, width="stretch")
 
-    with st.expander("How we computed this (for the curious)"):
+    with st.expander("How this was computed"):
         st.markdown(f"""
 This page runs a **Monte Carlo simulation**, a standard technique for understanding risk by testing many randomized scenarios instead of one fixed one.
 

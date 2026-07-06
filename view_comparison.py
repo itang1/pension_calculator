@@ -42,9 +42,7 @@ Before your {int(retirement_years)}-year retirement was over, Option B would hav
     st.page_link(
         st.session_state["_pages"]["market"],
         label=(
-            f'*Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year '
-            f'without fail. Real markets have good years and bad years. To see how a realistic sequence '
-            f'of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*'
+            f'*To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*'
         ),
         icon="🎢",
     )
