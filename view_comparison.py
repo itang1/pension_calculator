@@ -21,10 +21,6 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
                          breakeven_rate, current_rate_pct):
     """The page's answer, before any chart or table."""
     rate_buffer = current_rate_pct - breakeven_rate
-    _mc_link = (
-        '🎢 <a href="market-swings" target="_self">To see how a realistic sequence of ups and downs '
-        'could change this outcome, visit the "What If the Market Has Bad Years?" page →</a>'
-    )
     if personal_balance > 0:
         render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
@@ -32,7 +28,6 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
 <br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
 <br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years.</em>
-<br><br>{_mc_link}
 </div>
 """)
     else:
@@ -42,9 +37,15 @@ After {int(retirement_years)} years of retirement, Option B would still have <st
 Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
 <br><br><em>Option B would need the market to average at least {breakeven_rate:.1f}% every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
 <br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years.</em>
-<br><br>{_mc_link}
 </div>
 """)
+    # st.page_link (not an HTML anchor inside the banner) so navigation stays
+    # client-side and the visitor's sidebar inputs survive the page switch.
+    st.page_link(
+        st.session_state["_pages"]["market"],
+        label='*To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*',
+        icon="🎢",
+    )
 
 
 def render():
