@@ -251,7 +251,7 @@ This calculator operates in annual periods. Within each year:
 - **Promotions**: Applied at the end of the year you specify, taking effect the following year.
 """)
 
-        st.subheader("Career")
+        st.subheader("About your job")
         starting_wage = st.number_input(
             "Starting Annual Wage ($)",
             value=50000, min_value=0, step=2500,
@@ -271,10 +271,10 @@ This calculator operates in annual periods. Within each year:
             help="Your age on the day you expect to retire."
         )
         cola_increase = st.number_input(
-            "Cost of Living Adjustment (%)",
+            "Yearly Cost-of-Living Raise — \"COLA\" (%)",
             value=3.0, min_value=0.0, max_value=5.5, step=0.1,
             key="in_cola",
-            help="Annual salary adjustment announced each October, typically between 2-3.5%. Set to 0 for plans with no COLA."
+            help="The yearly raise everyone gets to keep up with prices (announced each October, typically between 2-3.5%). In retirement, your pension check grows by this same percentage each year. Set to 0 for plans with no COLA."
         ) / 100 + 1
         step_increase = st.number_input(
             "Step Increase (%)",
@@ -306,7 +306,7 @@ This calculator operates in annual periods. Within each year:
             help="Expected salary bump each time you are promoted."
         ) / 100 + 1
 
-        st.subheader("Pension")
+        st.subheader("About your pension plan")
         pension_contribution_rate = st.number_input(
             "Pension Contribution Rate (%)",
             value=10.0, step=1.,
@@ -388,7 +388,7 @@ This calculator operates in annual periods. Within each year:
             )
             starting_allowance = manual_allowance
 
-        st.subheader("Retirement")
+        st.subheader("About your retirement")
         retirement_years = st.number_input(
             "Years in Retirement Before Death",
             value=30, min_value=1, max_value=60, step=1,
@@ -397,13 +397,18 @@ This calculator operates in annual periods. Within each year:
         )
         index_returns_rate = (
             st.number_input(
-                "Average Index Returns Rate (%)",
+                "Average Yearly Investment Return (%)",
                 value=10.0,
                 min_value=0.0,
                 max_value=25.0,
                 step=0.5,
                 key="in_returns",
-                help="Expected annual return on Option B's investment account (not inflation-adjusted).",
+                help=(
+                    "How much the personal account (Option B) grows per year, on average, before inflation. "
+                    "⚠ This number matters more than any other input on this page — "
+                    "a 1% change can flip the winner. The US stock market has "
+                    "historically averaged about 10% per year before inflation."
+                ),
             )
             / 100
             + 1
@@ -477,8 +482,15 @@ def get_monte_carlo(inputs, std_pct, n_simulations=1000):
     )
 
 
-def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None):
-    """Build the fund-over-time chart, optionally with Monte Carlo bands."""
+def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
+                     verdict_annotation=False):
+    """Build the fund-over-time chart, optionally with Monte Carlo bands.
+
+    With ``verdict_annotation=True`` the chart states its own conclusion at
+    the spot where it happens (money left over at the end, or the year the
+    fund runs dry), so a reader who never touches the legend still gets the
+    answer.
+    """
     years = res["years"]
     personal_fund_values = res["personal_fund_values"]
     pension_fund_values = res["pension_fund_values"]
@@ -639,6 +651,27 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None):
     fig.add_hline(y=0, line_width=2, line_color="#666666",
                   annotation_text="$0 = personal fund depleted" if _fund_depletes else "$0",
                   annotation_position="bottom right")
+
+    if verdict_annotation:
+        if _fund_depletes:
+            _dep_idx = next(i for i, v in enumerate(personal_fund_values) if v < 0)
+            fig.add_annotation(
+                x=years[_dep_idx], y=0,
+                text=f"<b>✗ Runs out here — {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
+                showarrow=True, arrowhead=2, arrowcolor="#DC2626",
+                ax=-40, ay=-60,
+                font=dict(size=13, color="#DC2626"),
+                bgcolor="rgba(255,255,255,0.85)", borderpad=4,
+            )
+        else:
+            fig.add_annotation(
+                x=years[-1], y=personal_fund_values[-1],
+                text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over — yours to keep</b>",
+                showarrow=True, arrowhead=2, arrowcolor="#0D9488",
+                ax=-90, ay=-40,
+                font=dict(size=13, color="#0D9488"),
+                bgcolor="rgba(255,255,255,0.85)", borderpad=4,
+            )
 
     return fig
 

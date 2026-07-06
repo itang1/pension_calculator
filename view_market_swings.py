@@ -113,7 +113,7 @@ This page runs your exact scenario through **1,000 different possible versions o
             f"vs. 1,000 simulated market futures"
         ),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     with st.expander("How to read this chart"):
         st.markdown("""
