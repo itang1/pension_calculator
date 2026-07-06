@@ -39,6 +39,7 @@ st.title("Is Your Pension Worth It?")
 # Sidebar inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from
 # session_state rather than importing from here (which would re-run the script).
+common.apply_pending_preset()
 inputs = common.render_sidebar()
 st.session_state["_inputs"] = inputs
 st.session_state["_results"] = common.compute_results(inputs)

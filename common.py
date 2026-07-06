@@ -230,6 +230,54 @@ def render_html(html: str):
     st.markdown(html, unsafe_allow_html=True)
 
 
+# One-click scenarios for the case studies. Keys/types must match the sidebar
+# widgets exactly (int widgets need ints, float widgets floats).
+PRESETS = {
+    "alice": {
+        "label": "Alice — personal fund wins",
+        "values": {
+            "in_wage": 120000, "in_work_years": 30, "in_retirement_age": 55,
+            "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 20",
+            "in_promo_pct": 8.0, "in_contrib": 10.0,
+            "in_allowance_mode": "Enter manually", "allowance_manual": 70458,
+            "in_retirement_years": 30, "in_returns": 7.0,
+        },
+    },
+    "bob": {
+        "label": "Bob — pension wins",
+        "values": {
+            "in_wage": 65000, "in_work_years": 20, "in_retirement_age": 55,
+            "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
+            "in_promo_pct": 8.0, "in_contrib": 10.0,
+            "in_allowance_mode": "Enter manually", "allowance_manual": 27000,
+            "in_retirement_years": 40, "in_returns": 5.0,
+        },
+    },
+}
+
+
+def queue_preset(preset_id):
+    """Ask the entry script to load a preset on the next rerun.
+
+    Widget state can only be written before the widget is instantiated, and
+    the sidebar widgets render at the top of every run — so a button handler
+    (which fires mid-run) parks the preset here and the entry script applies
+    it first thing on the rerun.
+    """
+    st.session_state["_pending_preset"] = preset_id
+    st.rerun()
+
+
+def apply_pending_preset():
+    """Apply a queued preset to the sidebar widget state. Call before render_sidebar()."""
+    preset_id = st.session_state.pop("_pending_preset", None)
+    if preset_id:
+        preset = PRESETS[preset_id]
+        for k, v in preset["values"].items():
+            st.session_state[k] = v
+        st.toast(f"Loaded the scenario: {preset['label']}. The whole page now shows these numbers.", icon="✅")
+
+
 def render_sidebar():
     """Render all shared inputs in the sidebar and return them as a dict.
 
