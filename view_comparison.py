@@ -27,7 +27,6 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
 <strong>✓ Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
 <br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
-<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years.</em>
 </div>
 """)
     else:
@@ -36,14 +35,17 @@ After {int(retirement_years)} years of retirement, Option B would still have <st
 <strong>✗ Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
 Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
 <br><br><em>Option B would need the market to average at least {breakeven_rate:.1f}% every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
-<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years.</em>
 </div>
 """)
     # st.page_link (not an HTML anchor inside the banner) so navigation stays
     # client-side and the visitor's sidebar inputs survive the page switch.
     st.page_link(
         st.session_state["_pages"]["market"],
-        label='*To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*',
+        label=(
+            f'*Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year '
+            f'without fail. Real markets have good years and bad years. To see how a realistic sequence '
+            f'of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*'
+        ),
         icon="🎢",
     )
 
