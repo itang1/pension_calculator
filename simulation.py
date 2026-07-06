@@ -172,6 +172,23 @@ def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
         pension_redeemed *= cola_increase
 
     pcts = np.percentile(history, [5, 25, 75, 95], axis=1)
+    median_path = np.percentile(history, 50, axis=1)
+
+    # Per-path first retirement year with a $0 balance (0 = never ran out).
+    # Depletion is absorbing (see above), so "hit $0 at any point" and "ended
+    # at $0" are the same set of paths.
+    ret_hist = history[work_years + 1:]
+    ran_out = ret_hist <= 0
+    any_out = ran_out.any(axis=0)
+    depletion_years = np.where(any_out, ran_out.argmax(axis=0) + 1, 0)
+
     # Share of simulated futures that ran out of money by the end of retirement.
-    depletion_prob = float((history[-1] <= 0).mean())
-    return {"percentiles": pcts, "depletion_prob": depletion_prob}
+    depletion_prob = float(any_out.mean())
+
+    return {
+        "percentiles": pcts,
+        "depletion_prob": depletion_prob,
+        "median_path": median_path,
+        "final_balances": history[-1],
+        "depletion_years": depletion_years,
+    }

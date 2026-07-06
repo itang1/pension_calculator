@@ -123,3 +123,36 @@ def test_monte_carlo_is_deterministic_for_fixed_seed():
     a = s.run_monte_carlo(**CASE_B, mean_return=0.05, std_return=0.15, n_simulations=500)
     b = s.run_monte_carlo(**CASE_B, mean_return=0.05, std_return=0.15, n_simulations=500)
     assert a["depletion_prob"] == b["depletion_prob"]
+
+
+def test_monte_carlo_distribution_outputs_are_consistent():
+    n = 400
+    mc = s.run_monte_carlo(**CASE_B, mean_return=0.05, std_return=0.15, n_simulations=n)
+    total_years = CASE_B["work_years"] + CASE_B["retirement_years"]
+
+    assert mc["final_balances"].shape == (n,)
+    assert mc["depletion_years"].shape == (n,)
+    assert mc["median_path"].shape == (total_years + 1,)
+
+    # Depletion is absorbing, so "has a depletion year" and "ended at $0" are
+    # the same set of paths, and both must match the reported probability.
+    assert (mc["depletion_years"] > 0).mean() == pytest.approx(mc["depletion_prob"])
+    assert (mc["final_balances"] <= 0).mean() == pytest.approx(mc["depletion_prob"])
+
+    # Depletion years fall inside the retirement window (0 = never ran out).
+    assert mc["depletion_years"].min() >= 0
+    assert mc["depletion_years"].max() <= CASE_B["retirement_years"]
+
+    # The median path sits inside the 25th-75th percentile band everywhere.
+    pcts = mc["percentiles"]
+    assert (mc["median_path"] >= pcts[1] - 1e-9).all()
+    assert (mc["median_path"] <= pcts[2] + 1e-9).all()
+
+
+def test_monte_carlo_zero_volatility_distribution_matches_deterministic():
+    det = _run(CASE_A, 1.07)["personal_balance"]
+    mc = s.run_monte_carlo(**CASE_A, mean_return=0.07, std_return=0.0, n_simulations=100)
+    # Every path is the flat-rate path: same final balance, nobody runs out.
+    assert mc["median_path"][-1] == pytest.approx(det, rel=1e-6)
+    assert mc["final_balances"][0] == pytest.approx(det, rel=1e-6)
+    assert (mc["depletion_years"] == 0).all()
