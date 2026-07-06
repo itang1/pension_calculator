@@ -54,7 +54,7 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct):
             f"catastrophic for you, Option A's certainty can be worth the lower expected value."
         )
     elif depletion_prob <= 0.50:
-        bg, bar, symbol = "#FEE2E2", "#DC2626", "✗"
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
         verdict = "Lean toward Option A, despite the flat-rate headline."
         body = (
             f"The flat-{current_rate_pct:.1f}% line says Option B &ldquo;wins,&rdquo; but a "
@@ -64,7 +64,7 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct):
             f"worth the extra upside; Option A's lifetime guarantee is the safer call here."
         )
     else:
-        bg, bar, symbol = "#FEE2E2", "#DC2626", "✗"
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
         verdict = "Option A is the safer choice."
         body = (
             f"Even though a flat {current_rate_pct:.1f}% return would favor Option B, "
