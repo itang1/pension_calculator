@@ -129,6 +129,10 @@ Both options pay you the **same income every year in retirement**. The compariso
     fig = build_fund_chart(inputs, res, _show_ref_line, verdict_annotation=True)
     st.plotly_chart(fig, width="stretch")
 
+    st.markdown(
+        "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from the personal fund. The metrics below mirror each other on both sides.*"
+    )
+
     render_result_banner(
         personal_balance, retirement_years, res["depletion_year"],
         res["breakeven_rate"], index_return_pct,
@@ -142,10 +146,6 @@ Both options pay you the **same income every year in retirement**. The compariso
     _depletion_year = res["depletion_year"]
     pension_contribution_total = res["pension_contribution_total"]
     pension_redeemed_total = res["pension_redeemed_total"]
-
-    st.markdown(
-        "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from the personal fund. The metrics below mirror each other on both sides.*"
-    )
 
     mc1, mc2, mc3 = st.columns(3)
     with mc1:
