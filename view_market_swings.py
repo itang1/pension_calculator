@@ -21,64 +21,63 @@ def render_risk_verdict(depletion_prob, current_rate_pct):
     The depletion probability answers "how often does Option B run out once
     returns vary?" Those are different questions, and a favorable flat-rate
     result can coexist with an unacceptably high chance of ruin. This banner
-    turns the two numbers into a single risk-tiered recommendation, phrased
-    as natural frequencies (N out of 100) rather than probabilities.
+    turns the two numbers into a single risk-tiered recommendation, with a
+    ✓/⚠/✗ status so the tier is readable without relying on color alone.
     """
     pct = depletion_prob * 100
     one_in = round(1 / depletion_prob) if depletion_prob > 0 else 0
 
     if depletion_prob <= 0.001:
-        bg, bar = "#CCFBF1", "#0D9488"
-        verdict = "✓ Your answer: the personal fund looks sturdy, not just good on average."
+        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
+        verdict = "Option B looks robust, not just favorable on average."
         body = (
-            f"Even with realistic good years and bad years, the money never ran out in "
-            f"<strong>any of the 1,000 futures</strong> we tested. The steady-{current_rate_pct:.1f}% "
-            f"conclusion from the comparison page holds up."
+            f"Even after accounting for realistic year-to-year market swings, "
+            f"<strong>none</strong> of the 1,000 simulated futures ran out of money. "
+            f"The flat-{current_rate_pct:.1f}% conclusion holds up under volatility."
         )
     elif depletion_prob <= 0.10:
-        bg, bar = "#CCFBF1", "#0D9488"
-        verdict = "✓ Your answer: the personal fund is the reasonable choice, with a small risk."
+        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
+        verdict = "Option B is the reasonable choice, with a small tail risk."
         body = (
-            f"The money ran out early in only <strong>{pct:.0f} out of every 100 futures</strong> "
-            f"(about 1 in {one_in}). The personal fund's advantage mostly survives real market "
-            f"ups and downs — just keep a cash cushion for the unlucky minority of outcomes."
+            f"Only <strong>{pct:.0f}%</strong> (about 1 in {one_in}) of simulated futures "
+            f"ran out of money. Option B's flat-rate advantage mostly survives real market "
+            f"volatility — just keep a cash buffer for the unlucky minority of outcomes."
         )
     elif depletion_prob <= 0.25:
-        bg, bar = "#FEF3C7", "#D97706"
-        verdict = "⚠ Your answer: a genuine trade-off — neither option is clearly correct."
+        bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
+        verdict = "Genuine trade-off — neither option is clearly correct."
         body = (
-            f"If the market returned a steady {current_rate_pct:.1f}%, the personal fund would win. "
-            f"But once the swings are included, the money runs out early in "
-            f"<strong>{pct:.0f} out of every 100 futures</strong> (about 1 in {one_in}). "
-            f"You are weighing a probably-bigger inheritance against the pension's promise that "
-            f"you can never run out. If running out would be catastrophic for you, the pension's "
-            f"certainty can be worth more than the extra upside."
+            f"At a flat {current_rate_pct:.1f}% return Option B wins, but once volatility is "
+            f"considered <strong>{pct:.0f}%</strong> of futures (about 1 in {one_in}) run out "
+            f"of money. You are weighing Option B's higher <em>expected</em> outcome against "
+            f"Option A's guarantee that you can never run out. If running out would be "
+            f"catastrophic for you, Option A's certainty can be worth the lower expected value."
         )
     elif depletion_prob <= 0.50:
-        bg, bar = "#FEE2E2", "#DC2626"
-        verdict = "✗ Your answer: lean toward the pension, despite the steady-market headline."
+        bg, bar, symbol = "#FEE2E2", "#DC2626", "✗"
+        verdict = "Lean toward Option A, despite the flat-rate headline."
         body = (
-            f"A steady {current_rate_pct:.1f}% return would favor the personal fund, but a steady "
-            f"return is an optimistic assumption. With realistic ups and downs, the money runs out "
-            f"early in <strong>{pct:.0f} out of every 100 futures</strong> (roughly 1 in {one_in}). "
-            f"A near coin-flip chance of running out of money in old age is usually not worth the "
-            f"extra upside — the pension's lifetime guarantee is the safer call here."
+            f"The flat-{current_rate_pct:.1f}% line says Option B &ldquo;wins,&rdquo; but a "
+            f"constant return is an optimistic assumption. Accounting for realistic ups and "
+            f"downs, <strong>{pct:.0f}%</strong> of futures (roughly 1 in {one_in}) run out of "
+            f"money before the end of retirement. A near coin-flip risk of ruin is usually not "
+            f"worth the extra upside — Option A's lifetime guarantee is the safer call here."
         )
     else:
-        bg, bar = "#FEE2E2", "#DC2626"
-        verdict = "✗ Your answer: the pension is the safer choice."
+        bg, bar, symbol = "#FEE2E2", "#DC2626", "✗"
+        verdict = "Option A is the safer choice."
         body = (
-            f"Even though a steady {current_rate_pct:.1f}% return would favor the personal fund, "
-            f"the money runs out early in <strong>{pct:.0f} out of every 100 realistic futures</strong>. "
-            f"When most of the tested futures end with the account empty, the pension's guaranteed "
-            f"lifetime income is clearly the more reliable choice."
+            f"Even though a flat {current_rate_pct:.1f}% return would favor Option B, "
+            f"<strong>{pct:.0f}%</strong> of realistic market futures run out of money. When "
+            f"most simulated outcomes end in ruin, the pension's guaranteed lifetime income is "
+            f"clearly the more reliable choice."
         )
 
     render_html(f"""
 <div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>{verdict}</strong><br><br>
+<strong>{symbol} Adding volatility to the picture: {verdict}</strong><br><br>
 {body}
-<br><br><em>Why this can disagree with the comparison page: that page tells you the average-case winner. This page tells you the risk. For a retirement decision, the risk usually matters more.</em>
+<br><br><em>Why this can differ from the flat-rate result: the comparison page assumes the market returns exactly {current_rate_pct:.1f}% every single year. This page assumes the same {current_rate_pct:.1f}% <u>average</u> but with realistic year-to-year swings. Losses hurt compounding more than equal-sized gains help, and a few bad years early in retirement do lasting damage, so the typical outcome is worse than the flat line and a share of futures run out. The flat-rate result tells you the average-case winner; this depletion percentage tells you the risk. For a retirement decision, the risk usually matters more.</em>
 </div>
 """)
 
@@ -91,7 +90,7 @@ def render():
     retirement_years = inputs["retirement_years"]
 
     st.markdown(f"""
-The comparison page assumes the market returns exactly {index_return_pct:.1f}% every year, forever. Real markets don't do that. A real decade looks more like +18%, −4%, +25%, −2%, +11% — a different number every year, even when it averages out to {index_return_pct:.1f}% over the long run.
+The comparison page assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run.
 
 **Does that difference matter? Enormously — and here is the whole idea in one example:**
 """)
@@ -103,11 +102,11 @@ Suppose your $1,000 earns <strong>+50% one year</strong> (now $1,500) and <stron
 """)
 
     st.markdown(f"""
-To measure that risk for *your* scenario, we replayed it through **1,000 different possible versions of the future** — each one a different market history spanning your {work_years} working years plus {retirement_years} retirement years, all averaging the same {index_return_pct:.1f}% you assumed. Then we simply counted what happened.
+The results below come from **1,000 of those sequences** (each one a different possible market history spanning your {work_years} years of working plus {retirement_years} years of retirement), showing the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against.
 """)
 
     _mc_std_pct = st.slider(
-        "How wild are the market's yearly swings?",
+        "Range of yearly market swings",
         min_value=0.0, max_value=30.0, value=15.0, step=0.5,
         key="mc_std",
         help=(
@@ -145,14 +144,14 @@ To measure that risk for *your* scenario, we replayed it through **1,000 differe
         )
     with m3:
         st.metric(
-            label="The steady-market page says",
+            label="The flat-rate result says",
             value=f"${max(flat_final, 0):,.0f}",
-            help="The ending balance from the comparison page, where the market returns the same rate every single year. Compare it to the typical outcome on the left — steadiness flatters the result.",
+            help="The ending balance from the comparison page, where the market returns the same flat rate every single year. Compare it to the typical outcome on the left — a flat rate flatters the result.",
         )
 
     if flat_final > 0 and median_final < flat_final:
         st.markdown(f"""
-*Notice that the typical outcome (**${median_final:,.0f}**) is smaller than the steady-market answer (**${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% average return. That's the +50%/−50% effect from the example above, compounded over a lifetime. A steady average always paints a rosier picture than the bumpy reality it summarizes.*
+*Notice that the typical outcome (**${median_final:,.0f}**) is smaller than the flat-rate answer (**${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% average return. That's the +50%/−50% effect from the example above, compounded over a lifetime. A flat average always paints a rosier picture than the bumpy reality it summarizes.*
 """)
 
     st.header("All 1,000 futures on one chart")
@@ -160,18 +159,18 @@ To measure that risk for *your* scenario, we replayed it through **1,000 differe
     fig = build_fund_chart(
         inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"],
         title=(
-            f"Your personal fund in 1,000 possible futures "
-            f"(vs. the steady {index_return_pct:.1f}%/yr line)"
+            f"Option B Personal Fund Balance: flat {index_return_pct:.1f}%/yr line "
+            f"vs. 1,000 simulated market futures"
         ),
     )
     st.plotly_chart(fig, width="stretch")
 
     with st.expander("How to read this chart"):
         st.markdown("""
-- **Bold teal line** = the steady-market baseline from the comparison page: the same return every single year.
-- **Colored bands** = where the 1,000 simulated futures actually landed. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. The best-case band can extend past the top of the chart; the y-axis is fitted to the likely region.
+- **Bold teal line** = the flat-rate baseline from the comparison page: the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year.
+- **Colored bands** = the range of possible Option B balances once the market stops returning the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. The best-case band can extend past the top of the chart; the y-axis is fitted to the likely region.
 - **Red dashed vertical line** = the year retirement begins.
-- **Horizontal gray line** = the $0 mark. Once a future hits $0, it has run out of money for good.
+- **Horizontal gray line** = the $0 mark. Once a simulated future hits $0, it has run out of money for good.
 """)
 
     st.header("How the 1,000 futures ended")
@@ -206,7 +205,7 @@ To measure that risk for *your* scenario, we replayed it through **1,000 differe
     if flat_final > 0 and flat_final <= _cap:
         hist.add_vline(
             x=flat_final, line_width=2, line_dash="dash", line_color="#0D9488",
-            annotation_text="steady-market answer", annotation_position="top right",
+            annotation_text="flat-rate answer", annotation_position="top right",
             annotation_font_color="#0D9488",
         )
     hist.add_vline(

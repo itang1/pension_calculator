@@ -307,7 +307,7 @@ This calculator operates in annual periods. Within each year:
 - **Promotions**: Applied at the end of the year you specify, taking effect the following year.
 """)
 
-        st.subheader("About your job")
+        st.subheader("Career")
         starting_wage = st.number_input(
             "Starting Annual Wage ($)",
             value=50000, min_value=0, step=2500,
@@ -327,10 +327,10 @@ This calculator operates in annual periods. Within each year:
             help="Your age on the day you expect to retire."
         )
         cola_increase = st.number_input(
-            "Yearly Cost-of-Living Raise — \"COLA\" (%)",
+            "Cost of Living Adjustment (%)",
             value=3.0, min_value=0.0, max_value=5.5, step=0.1,
             key="in_cola",
-            help="The yearly raise everyone gets to keep up with prices (announced each October, typically between 2-3.5%). In retirement, your pension check grows by this same percentage each year. Set to 0 for plans with no COLA."
+            help="Annual salary adjustment announced each October, typically between 2-3.5%. Set to 0 for plans with no COLA. In retirement, your pension check grows by this same percentage each year."
         ) / 100 + 1
         step_increase = st.number_input(
             "Step Increase (%)",
@@ -362,7 +362,7 @@ This calculator operates in annual periods. Within each year:
             help="Expected salary bump each time you are promoted."
         ) / 100 + 1
 
-        st.subheader("About your pension plan")
+        st.subheader("Pension")
         pension_contribution_rate = st.number_input(
             "Pension Contribution Rate (%)",
             value=10.0, step=1.,
@@ -444,7 +444,7 @@ This calculator operates in annual periods. Within each year:
             )
             starting_allowance = manual_allowance
 
-        st.subheader("About your retirement")
+        st.subheader("Retirement")
         retirement_years = st.number_input(
             "Years in Retirement Before Death",
             value=30, min_value=1, max_value=60, step=1,
@@ -453,17 +453,15 @@ This calculator operates in annual periods. Within each year:
         )
         index_returns_rate = (
             st.number_input(
-                "Average Yearly Investment Return (%)",
+                "Average Index Returns Rate (%)",
                 value=10.0,
                 min_value=0.0,
                 max_value=25.0,
                 step=0.5,
                 key="in_returns",
                 help=(
-                    "How much the personal account (Option B) grows per year, on average, before inflation. "
-                    "⚠ This number matters more than any other input on this page — "
-                    "a 1% change can flip the winner. The US stock market has "
-                    "historically averaged about 10% per year before inflation."
+                    "Expected annual return on Option B's investment account (not inflation-adjusted). "
+                    "⚠ This number matters more than any other input — a 1% change can flip the winner."
                 ),
             )
             / 100

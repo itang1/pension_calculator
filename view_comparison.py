@@ -20,22 +20,25 @@ from common import (
 
 def render_result_banner(personal_balance, retirement_years, depletion_year,
                          breakeven_rate, current_rate_pct):
-    """The page's answer, in plain words, before any chart or table."""
+    """The page's answer, before any chart or table."""
     rate_buffer = current_rate_pct - breakeven_rate
+    _mc_pointer = 'To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page.'
     if personal_balance > 0:
         render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>✓ Your answer: the personal fund (Option B) comes out ahead — if the market really does return {current_rate_pct:.1f}% every single year.</strong><br><br>
-Both options pay you the exact same income for all {int(retirement_years)} years of your retirement. The difference is what's left at the end: the personal fund would still hold <strong>${personal_balance:,.0f}</strong> that belongs to you — to spend, donate, or leave to your family. The pension stops paying when you die and leaves nothing behind (besides survivor benefits, if your plan has them).
-<br><br><em>How comfortable is this win? The market only needs to average {breakeven_rate:.1f}% a year for the personal fund to last your whole retirement, and you assumed {current_rate_pct:.1f}% — a cushion of {rate_buffer:.1f} points. The smaller that cushion, the shakier the win.</em>
+<strong>✓ Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
+After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
+<br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. {_mc_pointer}</em>
 </div>
 """)
     else:
         render_html(f"""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>✗ Your answer: the pension (Option A) comes out ahead — the personal fund runs out of money {int(retirement_years) - depletion_year} years too early.</strong><br><br>
-Both options pay you the exact same income each year. But at a {current_rate_pct:.1f}% yearly return, the personal fund runs dry in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money coming in. The pension keeps paying for as long as you live, no matter what — that guarantee is exactly what it is for.
-<br><br><em>For the personal fund to last your full retirement, the market would need to average at least {breakeven_rate:.1f}% every year. You assumed {current_rate_pct:.1f}%.</em>
+<strong>✗ Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
+Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
+<br><br><em>Option B would need the market to average at least {breakeven_rate:.1f}% every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. {_mc_pointer}</em>
 </div>
 """)
 
@@ -64,7 +67,7 @@ def render_risk_teaser(inputs, current_rate_pct):
             freq = f"about {pct:.0f} out of every 100"
         render_html(f"""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.6rem 1.2rem; border-radius:0.5rem; color:#1e293b; margin-top:0.6rem;">
-<strong>⚠ Reality check:</strong> the result above assumes the market returns exactly {current_rate_pct:.1f}% every single year. It won't. When we test this exact scenario against 1,000 realistic market histories, with good years and bad years, the money runs out early in <strong>{freq}</strong> of them.
+<strong>⚠ Reality check:</strong> when we test this exact scenario against 1,000 realistic market histories — same {current_rate_pct:.1f}% average, but with good years and bad years — the money runs out early in <strong>{freq}</strong> of them.
 </div>
 """)
     st.page_link(
@@ -92,20 +95,22 @@ def render():
     promotion_pct = res["promotion_pct"]
 
     st.markdown("""
-Many public employees — teachers, police officers, civil servants — must put part of each paycheck into a pension plan. In return, the pension pays them a guaranteed income in retirement for life. This calculator asks one question: **if you could invest that same money in your own retirement account instead, would you end up better off?**
+Many public employees (such as teachers, law enforcement officers, and civil servants) are required to contribute part of each paycheck to a pension plan (e.g. a flat 10%). In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
+
+In this calculator, we ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which option would produce better outcomes for them?**
 """)
 
     render_html(
         """
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<em>&larr; The answer below is based on the numbers in the left sidebar. Change them to match your own job and plan — the whole page updates instantly.</em>
+<em>&larr; On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.</em>
 </div>
 """
     )
 
     st.space("small")
 
-    with st.expander("What exactly are the two options?"):
+    with st.expander("Explanation of the Two Options"):
         col_a, col_b = st.columns(2)
         with col_a:
             render_html("""
@@ -130,7 +135,7 @@ Instead of contributing to the pension, imagine that you deposit that same amoun
 
     st.space("small")
 
-    st.header("See it on a chart")
+    st.header("Pension vs. Personal Retirement Fund Over Time")
 
     with st.expander("How to read this chart"):
         st.markdown("""
@@ -217,7 +222,7 @@ Both options pay you the **same income every year in retirement**. The compariso
             value=f"{res['breakeven_rate']:.1f}%",
             delta=f"{_rate_buffer:+.1f}pp vs. your {_current_rate_pct:.1f}% assumption",
             delta_color="normal",
-            help="The minimum that the market needs to return in order for your personal fund to survive your full retirement period. Compare this to your Average Yearly Investment Return input.",
+            help="The minimum that the market needs to return in order for your personal fund to survive your full retirement period. Compare this to your Average Index Returns Rate input.",
         )
     with mc6:
         st.metric(
@@ -234,7 +239,7 @@ Both options pay you the **same income every year in retirement**. The compariso
 - With **Option A (pension)**, payments stop when you die (unless you elected a survivor benefit, which is a reduced annual payment to a spouse or dependent after your death). This calculator does not model survivor benefits.
 """)
 
-    with st.expander("What this calculator leaves out (worth reading before you decide anything)"):
+    with st.expander("Limitations & Assumptions"):
         st.markdown("""
 This calculator is an educational tool, not a comprehensive financial model. Keep these caveats in mind when reading the results:
 
@@ -343,7 +348,7 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
     st.header("Case Studies")
 
     st.markdown("""
-Not sure what numbers to enter? The two examples below show one scenario where each option wins. Click a **Try this scenario** button and the whole calculator switches to that person's numbers, so you can explore a complete example before entering your own.
+The two examples below show one scenario where each option wins. To see the full charts and tables for either, click its **Try this scenario** button (or copy the listed settings into the calculator above).
 """)
 
     with st.expander("Case Study A: Personal Fund Wins"):
