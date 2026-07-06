@@ -152,7 +152,7 @@ The results below come from **1,000 of those sequences** (each one a different p
 
     if flat_final > 0 and median_final < flat_final:
         st.markdown(
-            f"Notice that the typical outcome (**\${median_final:,.0f}**) is smaller than the flat-rate answer (**\${max(flat_final, 0):,.0f}**), even though both use the same {{index_return_pct:.1f}}% average return. That's the +50%/−50% effect from the example above, compounded over a lifetime. A flat average always paints a rosier picture than the bumpy reality it summarizes."
+            f"Notice that the typical outcome (**\${median_final:,.0f}**) is smaller than the flat-rate answer (**\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% average return. That's the +50%/−50% effect from the example above, compounded over a lifetime. A flat average always paints a rosier picture than the bumpy reality it summarizes."
         )
 
     st.header("All 1,000 futures on one chart")
