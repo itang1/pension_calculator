@@ -46,7 +46,7 @@ st.session_state["_results"] = common.compute_results(inputs)
 
 _comparison_page = st.Page(
     view_comparison.render,
-    title="The Comparison",
+    title="Base Comparison: Flat Rate",
     icon="⚖️",
     url_path="comparison",
     default=True,

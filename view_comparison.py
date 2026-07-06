@@ -10,7 +10,6 @@ import streamlit as st
 
 from common import (
     build_fund_chart,
-    get_monte_carlo,
     queue_preset,
     render_breakdown_table,
     render_feedback_form,
@@ -22,14 +21,13 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
                          breakeven_rate, current_rate_pct):
     """The page's answer, before any chart or table."""
     rate_buffer = current_rate_pct - breakeven_rate
-    _mc_pointer = 'To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page.'
     if personal_balance > 0:
         render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>✓ Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong> remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
 <br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
-<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. {_mc_pointer}</em>
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years.</em>
 </div>
 """)
     else:
@@ -38,41 +36,12 @@ After {int(retirement_years)} years of retirement, Option B would still have <st
 <strong>✗ Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
 Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
 <br><br><em>Option B would need the market to average at least {breakeven_rate:.1f}% every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
-<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years. {_mc_pointer}</em>
-</div>
-""")
-
-
-def render_risk_teaser(inputs, current_rate_pct):
-    """One honest sentence about volatility risk, phrased as a frequency.
-
-    The full analysis lives on the market-swings page; this callout makes sure
-    the risk signal itself is never more than one glance away from the
-    flat-rate verdict. Uses the same volatility the user last set over there
-    (or the 15% historical default), so the two pages always agree.
-    """
-    mc = get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))
-    prob = mc["depletion_prob"]
-    if prob <= 0:
-        render_html("""
-<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.6rem 1.2rem; border-radius:0.5rem; color:#1e293b; margin-top:0.6rem;">
-<strong>Reality check:</strong> the market never returns the same number every year. So we also tested this exact scenario against 1,000 realistic market histories, with good years and bad years, and the money never ran out in any of them. This result looks sturdy.
-</div>
-""")
-    else:
-        pct = prob * 100
-        if pct < 0.5:
-            freq = "fewer than 1 out of every 100"
-        else:
-            freq = f"about {pct:.0f} out of every 100"
-        render_html(f"""
-<div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.6rem 1.2rem; border-radius:0.5rem; color:#1e293b; margin-top:0.6rem;">
-<strong>⚠ Reality check:</strong> when we test this exact scenario against 1,000 realistic market histories (same {current_rate_pct:.1f}% average, but with good years and bad years), the money runs out early in <strong>{freq}</strong> of them.
+<br><br><em>Note: this result assumes the market returns exactly {current_rate_pct:.1f}% every year without fail. Real markets have good years and bad years.</em>
 </div>
 """)
     st.page_link(
         st.session_state["_pages"]["market"],
-        label="**See what happens when the market has good years and bad years →**",
+        label='To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →',
         icon="🎢",
     )
 
@@ -110,28 +79,28 @@ In this calculator, we ask the question: **Instead of participating in the pensi
 
     st.space("small")
 
-    with st.expander("Explanation of the Two Options"):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            render_html("""
+    st.subheader("Explanation of the Two Options")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        render_html("""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option A: Traditional Pension</strong><br><br>
 Each year, a fixed percentage of your paycheck (e.g. 10%) is automatically deducted and funneled directly into your organization's pension system. The funds are then managed by professional fund managers who ensure its long-term stability and growth. In return, once you retire, the pension program will pay you a guaranteed annual payment for the rest of your life, regardless of broad market performance. (The specific amount will depend on your salary, years of service, and the pension formula used by your organization.)
 </div>
 """)
-        with col_b:
-            render_html("""
+    with col_b:
+        render_html("""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option B: Personal Retirement Account</strong><br><br>
 Instead of contributing to the pension, imagine that you deposit that same amount (e.g. 10%) each year into your own personal investment account. You have total control over how to invest the funds, and the balance will grow with market returns depending on your investment choices. Imagine that in retirement, you choose to withdraw the same annual amount that the pension would have paid. Additionally, any remaining balance in your account at the end of your life is yours to keep or donate as well.
 </div>
 """)
+    st.space("small")
 
     render_result_banner(
         personal_balance, retirement_years, res["depletion_year"],
         res["breakeven_rate"], index_return_pct,
     )
-    render_risk_teaser(inputs, index_return_pct)
 
     st.space("small")
 

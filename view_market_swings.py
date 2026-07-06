@@ -14,7 +14,7 @@ from plotly import graph_objects as go
 from common import build_fund_chart, get_monte_carlo, render_feedback_form, render_html
 
 
-def render_risk_verdict(depletion_prob, current_rate_pct):
+def render_risk_verdict(depletion_prob, current_rate_pct, std_pct):
     """The page's answer: a traffic-light verdict on the ruin risk.
 
     The comparison page answers "on average, does Option B end with money?"
@@ -75,9 +75,9 @@ def render_risk_verdict(depletion_prob, current_rate_pct):
 
     render_html(f"""
 <div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>{symbol} Adding volatility to the picture: {verdict}</strong><br><br>
+<strong>{symbol} Adding {std_pct:g}% volatility to the picture: {verdict}</strong><br><br>
 {body}
-<br><br><em>Why this can differ from the flat-rate result: the comparison page assumes the market returns exactly {current_rate_pct:.1f}% every single year. This page assumes the same {current_rate_pct:.1f}% <u>average</u> but with realistic year-to-year swings. Losses hurt compounding more than equal-sized gains help, and a few bad years early in retirement do lasting damage, so the typical outcome is worse than the flat line and a share of futures run out. The flat-rate result tells you the average-case winner; this depletion percentage tells you the risk. For a retirement decision, the risk usually matters more.</em>
+<br><br><em>Why this can differ from the flat-rate result: the Base Comparison page assumes the market returns exactly {current_rate_pct:.1f}% every single year. This page assumes the same {current_rate_pct:.1f}% <u>average</u> but with realistic year-to-year swings. Losses hurt compounding more than equal-sized gains help, and a few bad years early in retirement do lasting damage, so the typical outcome is worse than the flat line and a share of futures run out. The flat-rate result tells you the average-case winner; this depletion percentage tells you the risk. For a retirement decision, the risk usually matters more.</em>
 </div>
 """)
 
@@ -90,7 +90,7 @@ def render():
     retirement_years = inputs["retirement_years"]
 
     st.markdown(f"""
-The comparison page assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run.
+The Base Comparison page assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run.
 
 **Does that difference matter? Enormously. Here is the whole idea in one example:**
 """)
@@ -123,7 +123,7 @@ The results below come from **1,000 of those sequences** (each one a different p
     median_final = float(np.percentile(final_balances, 50))
     flat_final = res["personal_balance"]
 
-    render_risk_verdict(depletion_prob, index_return_pct)
+    render_risk_verdict(depletion_prob, index_return_pct, _mc_std_pct)
 
     st.space("small")
 
@@ -146,7 +146,7 @@ The results below come from **1,000 of those sequences** (each one a different p
         st.metric(
             label="The flat-rate result says",
             value=f"${max(flat_final, 0):,.0f}",
-            help="The ending balance from the comparison page, where the market returns the same flat rate every single year. Compare it to the typical outcome on the left; a flat rate flatters the result.",
+            help="The ending balance from the Base Comparison page, where the market returns the same flat rate every single year. Compare it to the typical outcome on the left; a flat rate flatters the result.",
         )
 
     if flat_final > 0 and median_final < flat_final:
@@ -167,7 +167,7 @@ The results below come from **1,000 of those sequences** (each one a different p
 
     with st.expander("How to read this chart"):
         st.markdown("""
-- **Bold teal line** = the flat-rate baseline from the comparison page: the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year.
+- **Bold teal line** = the flat-rate baseline from the Base Comparison page: the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year.
 - **Colored bands** = the range of possible Option B balances once the market stops returning the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. The best-case band can extend past the top of the chart; the y-axis is fitted to the likely region.
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the $0 mark. Once a simulated future hits $0, it has run out of money for good.
@@ -175,13 +175,41 @@ The results below come from **1,000 of those sequences** (each one a different p
 
     st.header("How the 1,000 futures ended")
 
+    # Explicit bins instead of plotly autobinning. The futures that ran out
+    # pile up at exactly $0 and the luckiest tail stretches far past the
+    # likely region, so a naive histogram renders as one giant spike next to
+    # a wall of near-empty bins. Instead: the ran-out futures get their own
+    # red bar just left of the $0 line, survivors are binned up to the 95th
+    # percentile, and the luckiest 5% are left out (noted in the caption)
+    # rather than piled into a fake spike at the cutoff.
+    ran_out_count = int((final_balances <= 0).sum())
+    survivors = final_balances[final_balances > 0]
     _cap = float(np.percentile(final_balances, 95))
-    _clipped = np.minimum(final_balances, _cap)
     hist = go.Figure()
-    hist.add_trace(go.Histogram(
-        x=_clipped, nbinsx=40, marker_color="#3B82F6",
-        hovertemplate="Ending balance range: $%{x:,.0f}<br>Number of futures: %{y}<extra></extra>",
-    ))
+    _w = 1.0
+    if len(survivors) > 0 and _cap > 0:
+        shown = survivors[survivors <= _cap]
+        counts, edges = np.histogram(shown, bins=30, range=(0.0, _cap))
+        _w = _cap / 30
+        centers = (edges[:-1] + edges[1:]) / 2
+        hist.add_trace(go.Bar(
+            x=centers, y=counts, width=_w * 0.92, marker_color="#3B82F6",
+            hovertemplate="Ending balance near $%{x:,.0f}<br>Number of futures: %{y}<extra></extra>",
+        ))
+    elif len(survivors) > 0:
+        _w = max(float(survivors.max()) / 30, 1.0)
+    if ran_out_count > 0:
+        hist.add_trace(go.Bar(
+            x=[-_w / 2], y=[ran_out_count], width=_w * 0.92, marker_color="#DC2626",
+            hovertemplate="Ran out of money ($0)<br>Number of futures: %{y}<extra></extra>",
+        ))
+        hist.add_annotation(
+            x=-_w / 2, y=ran_out_count,
+            text=f"<b>✗ {ran_out_count} futures ran out ($0)</b>",
+            showarrow=True, arrowhead=2, arrowcolor="#DC2626",
+            ax=80, ay=-30, font=dict(size=12, color="#DC2626"),
+            bgcolor="rgba(255,255,255,0.85)", borderpad=4,
+        )
     hist.update_layout(
         title=dict(
             text="<b>Ending balance at death, across all 1,000 futures</b>",
@@ -189,35 +217,29 @@ The results below come from **1,000 of those sequences** (each one a different p
         ),
         xaxis_title="Money left at the end of retirement ($)",
         yaxis_title="Number of futures",
+        xaxis=dict(tickformat=",", separatethousands=True),
         plot_bgcolor="white",
-        bargap=0.05,
+        barmode="overlay",
         margin=dict(l=40, r=20, t=50, b=60),
         showlegend=False,
     )
-    if depletion_prob > 0:
-        hist.add_annotation(
-            x=0, y=float((final_balances <= 0).sum()),
-            text=f"<b>✗ {round(depletion_prob * 1000)} futures ran out ($0)</b>",
-            showarrow=True, arrowhead=2, arrowcolor="#DC2626",
-            ax=60, ay=-40, font=dict(size=12, color="#DC2626"),
-            bgcolor="rgba(255,255,255,0.85)", borderpad=4,
-        )
     if flat_final > 0 and flat_final <= _cap:
         hist.add_vline(
             x=flat_final, line_width=2, line_dash="dash", line_color="#0D9488",
             annotation_text="flat-rate answer", annotation_position="top right",
             annotation_font_color="#0D9488",
         )
-    hist.add_vline(
-        x=median_final, line_width=2, line_dash="dot", line_color="#1e293b",
-        annotation_text="typical outcome", annotation_position="top left",
-        annotation_font_color="#1e293b",
-    )
+    if median_final > 0:
+        hist.add_vline(
+            x=median_final, line_width=2, line_dash="dot", line_color="#1e293b",
+            annotation_text="typical outcome", annotation_position="top left",
+            annotation_font_color="#1e293b",
+        )
     st.plotly_chart(hist, width="stretch")
     st.caption(
-        "The tallest bars show the most common outcomes. The luckiest 5% of futures "
-        "extend beyond the right edge of this chart; they are cut off so the likely "
-        "region stays readable."
+        "The tallest bars show the most common outcomes. The red bar left of $0 counts "
+        "the futures that ran out of money. The luckiest 5% of futures extend beyond "
+        "the right edge of this chart; they are left out so the likely region stays readable."
     )
 
     _dep_years = mc["depletion_years"]
@@ -258,6 +280,6 @@ This page runs a **Monte Carlo simulation**, a standard technique for understand
 One honest limitation: real markets have slightly fatter tails than a bell curve (extreme years are a bit more common than this model assumes), and returns can cluster (crashes are often followed by recoveries). This simulation is a big step more realistic than a flat rate, but it is still a simplification.
 """)
 
-    st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to the comparison**", icon="⚖️")
+    st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to Base Comparison: Flat Rate**", icon="⚖️")
 
     render_feedback_form("market-swings")

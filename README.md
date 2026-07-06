@@ -8,7 +8,7 @@ This Streamlit app compares the long-term financial outcomes of a **traditional 
 
 The app has two pages that share the same sidebar inputs and link to each other:
 
-- **The Comparison** (default): assumes the market returns one flat rate every year and answers which option wins, and by how much.
+- **Base Comparison: Flat Rate** (default): assumes the market returns one flat rate every year and answers which option wins, and by how much.
 - **What If the Market Has Bad Years?** (`/market-swings`): replays the same scenario through 1,000 simulated market histories (Monte Carlo) and answers how often the personal fund runs out of money.
 
 ## Features
