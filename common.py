@@ -5,7 +5,7 @@ the sidebar inputs, cached simulation wrappers, the fund chart builder, and
 the feedback form. Page-specific copy and layout live in the view modules.
 
 Per-user data is passed between the entry script and the views via
-``st.session_state`` (keys ``_inputs`` and ``_results``) — never via module
+``st.session_state`` (keys ``_inputs`` and ``_results``), never via module
 globals, which are process-wide and would leak between sessions.
 """
 
@@ -242,7 +242,7 @@ def render_html(html: str):
 # widgets exactly (int widgets need ints, float widgets floats).
 PRESETS = {
     "alice": {
-        "label": "Alice — personal fund wins",
+        "label": "Alice: personal fund wins",
         "values": {
             "in_wage": 120000, "in_work_years": 30, "in_retirement_age": 55,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 20",
@@ -252,7 +252,7 @@ PRESETS = {
         },
     },
     "bob": {
-        "label": "Bob — pension wins",
+        "label": "Bob: pension wins",
         "values": {
             "in_wage": 65000, "in_work_years": 20, "in_retirement_age": 55,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
@@ -268,7 +268,7 @@ def queue_preset(preset_id):
     """Ask the entry script to load a preset on the next rerun.
 
     Widget state can only be written before the widget is instantiated, and
-    the sidebar widgets render at the top of every run — so a button handler
+    the sidebar widgets render at the top of every run, so a button handler
     (which fires mid-run) parks the preset here and the entry script applies
     it first thing on the rerun.
     """
@@ -461,7 +461,7 @@ This calculator operates in annual periods. Within each year:
                 key="in_returns",
                 help=(
                     "Expected annual return on Option B's investment account (not inflation-adjusted). "
-                    "⚠ This number matters more than any other input — a 1% change can flip the winner."
+                    "⚠ This number matters more than any other input: a 1% change can flip the winner."
                 ),
             )
             / 100
@@ -711,7 +711,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             _dep_idx = next(i for i, v in enumerate(personal_fund_values) if v < 0)
             fig.add_annotation(
                 x=years[_dep_idx], y=0,
-                text=f"<b>✗ Runs out here — {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
+                text=f"<b>✗ Runs out here: {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
                 showarrow=True, arrowhead=2, arrowcolor="#DC2626",
                 ax=-40, ay=-60,
                 font=dict(size=13, color="#DC2626"),
@@ -720,7 +720,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         else:
             fig.add_annotation(
                 x=years[-1], y=personal_fund_values[-1],
-                text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over — yours to keep</b>",
+                text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over, yours to keep</b>",
                 showarrow=True, arrowhead=2, arrowcolor="#0D9488",
                 ax=-90, ay=-40,
                 font=dict(size=13, color="#0D9488"),

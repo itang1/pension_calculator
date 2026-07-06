@@ -1,6 +1,6 @@
 """Regression tests for the pure simulation core.
 
-These run with no Streamlit context and no Google credentials — that is the
+These run with no Streamlit context and no Google credentials; that is the
 whole point of extracting simulation.py from the app (see AUDIT M-11). The two
 scenarios mirror the in-app Case Study A and Case Study B copy.
 """

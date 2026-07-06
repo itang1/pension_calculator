@@ -56,7 +56,7 @@ def render_risk_teaser(inputs, current_rate_pct):
     if prob <= 0:
         render_html("""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.6rem 1.2rem; border-radius:0.5rem; color:#1e293b; margin-top:0.6rem;">
-<strong>Reality check:</strong> the market never returns the same number every year. So we also tested this exact scenario against 1,000 realistic market histories, with good years and bad years — and the money never ran out in any of them. This result looks sturdy.
+<strong>Reality check:</strong> the market never returns the same number every year. So we also tested this exact scenario against 1,000 realistic market histories, with good years and bad years, and the money never ran out in any of them. This result looks sturdy.
 </div>
 """)
     else:
@@ -67,7 +67,7 @@ def render_risk_teaser(inputs, current_rate_pct):
             freq = f"about {pct:.0f} out of every 100"
         render_html(f"""
 <div style="background-color:#FEF3C7; border-left:5px solid #D97706; padding:0.6rem 1.2rem; border-radius:0.5rem; color:#1e293b; margin-top:0.6rem;">
-<strong>⚠ Reality check:</strong> when we test this exact scenario against 1,000 realistic market histories — same {current_rate_pct:.1f}% average, but with good years and bad years — the money runs out early in <strong>{freq}</strong> of them.
+<strong>⚠ Reality check:</strong> when we test this exact scenario against 1,000 realistic market histories (same {current_rate_pct:.1f}% average, but with good years and bad years), the money runs out early in <strong>{freq}</strong> of them.
 </div>
 """)
     st.page_link(

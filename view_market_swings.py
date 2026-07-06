@@ -2,7 +2,7 @@
 
 The comparison page assumes the market returns one flat rate every single
 year. This page re-runs the same scenario 1,000 times with realistic
-year-to-year swings (a Monte Carlo simulation — that term appears in the
+year-to-year swings (a Monte Carlo simulation; that term appears in the
 methodology expander, not in the main copy) and reports how often Option B
 runs out of money, when it happens, and what the typical outcome looks like.
 """
@@ -41,11 +41,11 @@ def render_risk_verdict(depletion_prob, current_rate_pct):
         body = (
             f"Only <strong>{pct:.0f}%</strong> (about 1 in {one_in}) of simulated futures "
             f"ran out of money. Option B's flat-rate advantage mostly survives real market "
-            f"volatility — just keep a cash buffer for the unlucky minority of outcomes."
+            f"volatility; just keep a cash buffer for the unlucky minority of outcomes."
         )
     elif depletion_prob <= 0.25:
         bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
-        verdict = "Genuine trade-off — neither option is clearly correct."
+        verdict = "Genuine trade-off: neither option is clearly correct."
         body = (
             f"At a flat {current_rate_pct:.1f}% return Option B wins, but once volatility is "
             f"considered <strong>{pct:.0f}%</strong> of futures (about 1 in {one_in}) run out "
@@ -61,7 +61,7 @@ def render_risk_verdict(depletion_prob, current_rate_pct):
             f"constant return is an optimistic assumption. Accounting for realistic ups and "
             f"downs, <strong>{pct:.0f}%</strong> of futures (roughly 1 in {one_in}) run out of "
             f"money before the end of retirement. A near coin-flip risk of ruin is usually not "
-            f"worth the extra upside — Option A's lifetime guarantee is the safer call here."
+            f"worth the extra upside; Option A's lifetime guarantee is the safer call here."
         )
     else:
         bg, bar, symbol = "#FEE2E2", "#DC2626", "✗"
@@ -92,12 +92,12 @@ def render():
     st.markdown(f"""
 The comparison page assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run.
 
-**Does that difference matter? Enormously — and here is the whole idea in one example:**
+**Does that difference matter? Enormously. Here is the whole idea in one example:**
 """)
 
     render_html("""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-Suppose your $1,000 earns <strong>+50% one year</strong> (now $1,500) and <strong>−50% the next</strong> (now $750). Your "average" return was 0% — but you lost a quarter of your money. <strong>Down years hurt more than up years help.</strong> And if the down years happen early in your retirement, while you're also withdrawing money, the damage is permanent. That is why a fund that wins with a steady return can still run out of money in the real world — and why this page exists.
+Suppose your $1,000 earns <strong>+50% one year</strong> (now $1,500) and <strong>−50% the next</strong> (now $750). Your "average" return was 0%, but you lost a quarter of your money. <strong>Down years hurt more than up years help.</strong> And if the down years happen early in your retirement, while you're also withdrawing money, the damage is permanent. That is why a fund that wins with a steady return can still run out of money in the real world, and why this page exists.
 </div>
 """)
 
@@ -134,7 +134,7 @@ The results below come from **1,000 of those sequences** (each one a different p
             label="Futures where the money ran out",
             value=(f"{_n_out} out of 100" if depletion_prob > 0 else "0 out of 1,000"),
             delta=None,
-            help="Out of 1,000 simulated market futures, the share where the personal fund hit $0 before the end of your retirement. The pension can never do this — it pays until you die.",
+            help="Out of 1,000 simulated market futures, the share where the personal fund hit $0 before the end of your retirement. The pension can never do this; it pays until you die.",
         )
     with m2:
         st.metric(
@@ -146,7 +146,7 @@ The results below come from **1,000 of those sequences** (each one a different p
         st.metric(
             label="The flat-rate result says",
             value=f"${max(flat_final, 0):,.0f}",
-            help="The ending balance from the comparison page, where the market returns the same flat rate every single year. Compare it to the typical outcome on the left — a flat rate flatters the result.",
+            help="The ending balance from the comparison page, where the market returns the same flat rate every single year. Compare it to the typical outcome on the left; a flat rate flatters the result.",
         )
 
     if flat_final > 0 and median_final < flat_final:
@@ -216,7 +216,7 @@ The results below come from **1,000 of those sequences** (each one a different p
     st.plotly_chart(hist, width="stretch")
     st.caption(
         "The tallest bars show the most common outcomes. The luckiest 5% of futures "
-        "extend beyond the right edge of this chart — they are cut off so the likely "
+        "extend beyond the right edge of this chart; they are cut off so the likely "
         "region stays readable."
     )
 
@@ -225,7 +225,7 @@ The results below come from **1,000 of those sequences** (each one a different p
     if len(_dep_years) > 0:
         st.header("When did the money run out?")
         st.markdown(f"""
-Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, here is *when* it happened. Running out in year {int(np.median(_dep_years))} of a {retirement_years}-year retirement is a very different problem than running out in the final year — this chart shows which one you'd be facing.
+Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, here is *when* it happened. Running out in year {int(np.median(_dep_years))} of a {retirement_years}-year retirement is a very different problem than running out in the final year; this chart shows which one you'd be facing.
 """)
         timing = go.Figure(go.Histogram(
             x=_dep_years, xbins=dict(size=1), marker_color="#DC2626",
@@ -248,11 +248,11 @@ Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, her
 
     with st.expander("How we computed this (for the curious)"):
         st.markdown(f"""
-This page runs a **Monte Carlo simulation** — a standard technique for understanding risk by testing many randomized scenarios instead of one fixed one.
+This page runs a **Monte Carlo simulation**, a standard technique for understanding risk by testing many randomized scenarios instead of one fixed one.
 
 - We generate 1,000 sequences of yearly market returns. Each year's return is drawn from a bell curve centered on your assumed {index_return_pct:.1f}% average, with the spread set by the swing slider above (a yearly return can never fall below −100%).
 - Each sequence is played through the exact same contribution and withdrawal schedule as the comparison page: same salary growth, same deposits while working, same yearly withdrawals in retirement.
-- Once a future's balance hits $0, it stays at $0 — you can't withdraw from an empty account.
+- Once a future's balance hits $0, it stays at $0; you can't withdraw from an empty account.
 - The same 1,000 sequences are reused every time, so results don't jump around between visits; they only change when you change an input.
 
 One honest limitation: real markets have slightly fatter tails than a bell curve (extreme years are a bit more common than this model assumes), and returns can cluster (crashes are often followed by recoveries). This simulation is a big step more realistic than a flat rate, but it is still a simplification.
