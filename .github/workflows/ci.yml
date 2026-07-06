@@ -12,7 +12,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # Must satisfy the pins in requirements.txt (numpy 2.5 needs >=3.12);
+          # matches the 3.14 venv used for local development.
+          python-version: "3.14"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
