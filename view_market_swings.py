@@ -171,18 +171,11 @@ The results below come from **1,000 of those sequences** (each one a different p
 - **Bold teal line** = the flat-rate baseline from the Base Comparison page: the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year.
 - **Colored bands** = the range of possible Option B balances once the market stops returning the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. The best-case band can extend past the top of the chart; the y-axis is fitted to the likely region.
 - **Red dashed vertical line** = the year retirement begins.
-- **Horizontal gray line** = the $0 mark. Once a simulated future hits $0, it has run out of money for good.
+- **Horizontal gray line** = the \$0 mark. Once a simulated future hits \$0, it has run out of money for good.
 """)
 
     st.header("How the 1,000 futures ended")
 
-    # Explicit bins instead of plotly autobinning. The futures that ran out
-    # pile up at exactly $0 and the luckiest tail stretches far past the
-    # likely region, so a naive histogram renders as one giant spike next to
-    # a wall of near-empty bins. Instead: the ran-out futures get their own
-    # red bar just left of the $0 line, survivors are binned up to the 95th
-    # percentile, and the luckiest 5% are left out (noted in the caption)
-    # rather than piled into a fake spike at the cutoff.
     ran_out_count = int((final_balances <= 0).sum())
     survivors = final_balances[final_balances > 0]
     _cap = float(np.percentile(final_balances, 95))
