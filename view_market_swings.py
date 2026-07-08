@@ -171,7 +171,7 @@ The results below come from **1,000 of those sequences** (each one a different p
 - **Bold teal line** = the flat-rate baseline from the Base Comparison page: the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year.
 - **Colored bands** = the range of possible Option B balances once the market stops returning the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. The best-case band can extend past the top of the chart; the y-axis is fitted to the likely region.
 - **Red dashed vertical line** = the year retirement begins.
-- **Horizontal gray line** = the \$0 mark. Once a simulated future hits \$0, it has run out of money for good.
+- **Horizontal gray line** = the \$0 mark. Once a simulated future hits \$0, it has run out of money permanently.
 """)
 
     st.header("How the 1,000 futures ended")
@@ -269,12 +269,12 @@ Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, her
         st.markdown(f"""
 This page runs a **Monte Carlo simulation**, a standard technique for understanding risk by testing many randomized scenarios instead of one fixed one.
 
-- We generate 1,000 sequences of yearly market returns. Each year's return is drawn from a bell curve centered on your assumed {index_return_pct:.1f}% average, with the spread set by the swing slider above (a yearly return can never fall below −100%).
+- We generated 1,000 sequences of yearly market returns. Each year's return is drawn from a bell curve centered on your assumed {index_return_pct:.1f}% average, with the spread set by the swing slider above (a yearly return can never fall below −100%).
 - Each sequence is played through the exact same contribution and withdrawal schedule as the comparison page: same salary growth, same deposits while working, same yearly withdrawals in retirement.
-- Once a future's balance hits $0, it stays at $0; you can't withdraw from an empty account.
+- Once a future's balance hits \$0, it stays at \$0; you can't withdraw from an empty account.
 - The same 1,000 sequences are reused every time, so results don't jump around between visits; they only change when you change an input.
 
-One honest limitation: real markets have slightly fatter tails than a bell curve (extreme years are a bit more common than this model assumes), and returns can cluster (crashes are often followed by recoveries). This simulation is a big step more realistic than a flat rate, but it is still a simplification.
+One limitation: real markets have slightly fatter tails than a bell curve (extreme years are a bit more common than this model assumes), and returns can cluster (crashes are often followed by recoveries). This simulation is more realistic than a flat rate, but it is still a simplification.
 """)
 
     st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to Base Comparison: Flat Rate**", icon="⚖️")
