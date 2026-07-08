@@ -42,7 +42,7 @@ Before your {int(retirement_years)}-year retirement was over, Option B would hav
     st.page_link(
         st.session_state["_pages"]["market"],
         label=(
-            f'*To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*'
+            '*To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*'
         ),
         icon="🎢",
     )
@@ -317,7 +317,7 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
     st.header("Case Studies")
 
     st.markdown("""
-The two examples below show one scenario where each option wins. To see the full charts and tables for either, click its **Try this scenario** button (or copy the listed settings into the calculator above).
+The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above).
 """)
 
     with st.expander("Case Study A: Personal Fund Wins"):
@@ -329,7 +329,7 @@ The two examples below show one scenario where each option wins. To see the full
         st.markdown("""
 ---
 
-Alice is a public school administrator who starts at \\$120,000. Across a 30-year career, her salary climbs through step increases, COLA adjustments, and two promotions. Every year, 10% of it goes into the pension.
+Alice is a civil servant who starts at \\$120,000. Across a 30-year career, her salary climbs through step increases, COLA adjustments, and two promotions. Every year, 10% of it goes into the pension.
 
 **The pension:** By the time Alice retires, she has paid about **\\$770,000** into the pension. In return, she gets an allowance that starts around \\$70,458 a year and rises 3% annually. Add up 30 years of those payments and she collects roughly **\\$3.35 million**.
 
@@ -358,6 +358,60 @@ Bob is a civil servant who starts at \\$65,000 and works a steady 20 years with 
 **Verdict:** The pension wins because Bob outlives his savings. At 5% returns, a \\$332,000 balance just cannot fund 40 years of withdrawals. What carries him through is the pension's promise to keep paying for as long as he lives. Without it, he runs out of money in his early 70s.
 
 The pension option tends to come out ahead when returns are low, retirement is long, or the personal fund didn't have enough working years to grow.
+""")
+
+    with st.expander("Case Study C: Personal Fund Wins"):
+        st.markdown("""
+**Settings:** Starting wage \\$80,000 · Step increase 5.5% · COLA 3% · Promotion at year 15 (8%) · Pension contribution rate 10% · Index returns 6% · Work years 35 · Retirement years 25 · First-year pension allowance \\$55,000
+""")
+        if st.button("Try Carol's scenario in the calculator", key="load_carol", icon="▶️"):
+            queue_preset("carol")
+        st.markdown("""
+---
+
+Carol is a civil servant who starts at \\$80,000 and works a long 35-year career, earning one promotion along the way. Every year, 10% of her salary goes into the pension. She retires and spends 25 years in retirement, with the market returning a steady 6% a year.
+
+**The pension:** Over 35 working years, Carol pays about **\\$628,000** into the pension. In return she collects an allowance that starts at \\$55,000 and rises 3% annually. Across 25 years of retirement those payments add up to roughly **\\$2 million**.
+
+**The personal fund:** Those same contributions, growing at 6% a year, would hold about **\\$1.6 million** by the time she retires. She then withdraws the same amount the pension would have paid each year. Because 6% growth stays ahead of what she takes out, the balance keeps rising through retirement and finishes near **\\$3 million**.
+
+**Verdict:** The personal fund wins. Both options pay Carol the identical \\$2 million of income across her retirement; the difference is that the personal fund still holds close to \\$3 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way.
+""")
+
+    with st.expander("Case Study D: Pension Wins"):
+        st.markdown("""
+**Settings:** Starting wage \\$95,000 · Step increase 5.5% · COLA 3% · No promotions · Pension contribution rate 10% · Index returns 4% · Work years 15 · Retirement years 35 · First-year pension allowance \\$42,000
+""")
+        if st.button("Try Dave's scenario in the calculator", key="load_dave", icon="▶️"):
+            queue_preset("dave")
+        st.markdown("""
+---
+
+Dave is a civil servant who starts at \\$95,000 but works only 15 years before retiring early. He then spends a long 35 years in retirement, and over that stretch the market returns a modest 4% a year.
+
+**The pension:** During his 15 working years, Dave pays about **\\$213,000** into the pension. In retirement he collects \\$42,000 the first year, rising 3% annually. Stretched over 35 years, that comes to roughly **\\$2.5 million**, more than ten times what he put in.
+
+**The personal fund:** Those same contributions, growing at 4% a year, would leave Dave with only about **\\$276,000** at retirement. Once he starts withdrawing \\$42,000 a year (rising 3% annually), a balance that small cannot keep up. The account runs dry in **year 8** of retirement, leaving nothing for his final 27 years.
+
+**Verdict:** The pension wins, and by a wide margin. A short 15-year career simply does not build enough to self-fund 35 years of retirement, especially at 4% returns. What carries Dave through is the pension's promise to keep paying for as long as he lives. This is Bob's problem in a sharper form: fewer working years, lower returns, and an even longer retirement.
+""")
+
+    with st.expander("Case Study E: Personal Fund Wins"):
+        st.markdown("""
+**Settings:** Starting wage \\$150,000 · Step increase 5.5% · COLA 3% · Promotions at years 10 and 18 (10% each) · Pension contribution rate 10% · Index returns 8% · Work years 25 · Retirement years 25 · First-year pension allowance \\$85,000
+""")
+        if st.button("Try Frank's scenario in the calculator", key="load_frank", icon="▶️"):
+            queue_preset("frank")
+        st.markdown("""
+---
+
+Frank is a civil servant who starts at \\$150,000 and earns two sizable promotions across a 25-year career. Every year, 10% of his salary goes into the pension. He then spends 25 years in retirement, with the market returning a strong 8% a year.
+
+**The pension:** Over 25 working years, Frank pays about **\\$742,000** into the pension. In return he collects an allowance that starts at \\$85,000 and rises 3% annually, adding up to roughly **\\$3.1 million** across retirement.
+
+**The personal fund:** Those same contributions, growing at 8% a year, would hold about **\\$1.8 million** by retirement. He then withdraws the same amount the pension would have paid. With 8% growth running well ahead of his withdrawals, the balance climbs throughout retirement and finishes above **\\$4.4 million**.
+
+**Verdict:** The personal fund wins decisively. The \\$3.1 million of pension income is matched dollar for dollar by the personal fund, which then leaves over \\$4.4 million on top for Frank to keep or pass on. High contributions paired with strong returns are the clearest case for the personal fund.
 """)
 
     render_feedback_form("comparison")

@@ -221,20 +221,23 @@ The results below come from **1,000 of those sequences** (each one a different p
         xaxis=dict(tickformat=",", separatethousands=True),
         plot_bgcolor="white",
         barmode="overlay",
-        margin=dict(l=40, r=20, t=50, b=60),
+        margin=dict(l=40, r=20, t=90, b=60),
         showlegend=False,
     )
+    # Both markers are labelled above the plot, on different rows, so the two
+    # captions never collide when the flat-rate and typical lines land close
+    # together (previously "flat-rate answer" and "typical outcome" overlapped).
     if flat_final > 0 and flat_final <= _cap:
         hist.add_vline(
             x=flat_final, line_width=2, line_dash="dash", line_color="#0D9488",
-            annotation_text="flat-rate answer", annotation_position="top right",
-            annotation_font_color="#0D9488",
+            annotation_text="flat-rate answer", annotation_position="top",
+            annotation_font_color="#0D9488", annotation_yshift=34,
         )
     if median_final > 0:
         hist.add_vline(
             x=median_final, line_width=2, line_dash="dot", line_color="#1e293b",
-            annotation_text="typical outcome", annotation_position="top left",
-            annotation_font_color="#1e293b",
+            annotation_text="typical outcome", annotation_position="top",
+            annotation_font_color="#1e293b", annotation_yshift=14,
         )
     st.plotly_chart(hist, width="stretch")
     st.caption(

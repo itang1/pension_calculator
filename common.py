@@ -261,6 +261,36 @@ PRESETS = {
             "in_retirement_years": 40, "in_returns": 5.0,
         },
     },
+    "carol": {
+        "label": "Carol: personal fund wins",
+        "values": {
+            "in_wage": 80000, "in_work_years": 35, "in_retirement_age": 60,
+            "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "15",
+            "in_promo_pct": 8.0, "in_contrib": 10.0,
+            "in_allowance_mode": "Enter manually", "allowance_manual": 55000,
+            "in_retirement_years": 25, "in_returns": 6.0,
+        },
+    },
+    "dave": {
+        "label": "Dave: pension wins",
+        "values": {
+            "in_wage": 95000, "in_work_years": 15, "in_retirement_age": 50,
+            "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
+            "in_promo_pct": 8.0, "in_contrib": 10.0,
+            "in_allowance_mode": "Enter manually", "allowance_manual": 42000,
+            "in_retirement_years": 35, "in_returns": 4.0,
+        },
+    },
+    "frank": {
+        "label": "Frank: personal fund wins",
+        "values": {
+            "in_wage": 150000, "in_work_years": 25, "in_retirement_age": 55,
+            "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 18",
+            "in_promo_pct": 10.0, "in_contrib": 10.0,
+            "in_allowance_mode": "Enter manually", "allowance_manual": 85000,
+            "in_retirement_years": 25, "in_returns": 8.0,
+        },
+    },
 }
 
 
