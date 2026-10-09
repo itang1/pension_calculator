@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="fund" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#0D9488"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="#F8FAFC"/>
+  <!-- personal fund: grows while working, drawn down in retirement -->
+  <path d="M150 810 C 390 800, 450 300, 590 280 C 730 262, 800 600, 874 810 Z" fill="url(#fund)"/>
+  <path d="M150 810 C 390 800, 450 300, 590 280 C 730 262, 800 600, 874 810" fill="none" stroke="#0F766E" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- retirement -->
+  <line x1="590" y1="170" x2="590" y2="800" stroke="#DC2626" stroke-width="18" stroke-dasharray="36 30" stroke-linecap="round"/>
+  <!-- pension: the same steady payment every year -->
+  <line x1="590" y1="590" x2="890" y2="590" stroke="#4F46E5" stroke-width="48" stroke-linecap="round"/>
+  <circle cx="590" cy="590" r="40" fill="#4F46E5" stroke="#F8FAFC" stroke-width="14"/>
+  <!-- axis -->
+  <line x1="120" y1="810" x2="904" y2="810" stroke="#1e293b" stroke-width="28" stroke-linecap="round"/>
+</svg>

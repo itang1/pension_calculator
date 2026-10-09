@@ -5,6 +5,8 @@ keeps working. Everything rendered here appears on every page; page-specific
 content lives in view_comparison.py and view_market_swings.py.
 """
 
+from pathlib import Path
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -12,7 +14,10 @@ import common
 import view_comparison
 import view_market_swings
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    layout="wide",
+    page_icon=str(Path(__file__).parent / "assets" / "icon.png"),
+)
 
 # st.page_link renders its label on one non-wrapping line and truncates what
 # doesn't fit. The banner pointer under the result banner is a full sentence,
