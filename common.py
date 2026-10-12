@@ -306,7 +306,7 @@ def inputs_summary_html(inputs, res):
         f"retire at {inputs['retirement_age']} · {inputs['retirement_years']} years retired · "
         f"{res['index_return_pct']:.1f}% returns.<br>"
         "<span style='font-size:0.9em'>On a phone, tap the » arrow at the top left to open the "
-        "sidebar. This page's link saves your inputs, so you can copy it to share or come back later.</span>"
+        "sidebar. To share these inputs or come back later, use <em>Share These Inputs</em> at the bottom of the sidebar.</span>"
     )
 
 
@@ -1034,6 +1034,8 @@ def apply_query_params():
     if st.session_state.get("_qp_applied"):
         return
     st.session_state["_qp_applied"] = True
+    if not st.query_params:
+        return
     for key, spec in _SHARE_SPEC.items():
         raw = st.query_params.get(_param_name(key))
         if raw is None:
@@ -1047,6 +1049,9 @@ def apply_query_params():
                                    st.session_state.get("in_retirement_age", 55))
         if hire_age is not None:
             st.session_state["in_hire_age"] = hire_age
+    # The address bar is cleared once the values are loaded, so it never keeps
+    # showing salary figures; links are made on request (render_share_section).
+    st.query_params.clear()
 
 
 def legacy_hire_age(work_years_raw, retirement_age):
@@ -1064,12 +1069,51 @@ def legacy_hire_age(work_years_raw, retirement_age):
     return hire_age if lo <= hire_age <= hi else None
 
 
-def sync_query_params():
-    """Mirror the current inputs into the URL so the address bar is shareable."""
-    params = {_param_name(k): str(st.session_state[k])
-              for k in _SHARE_SPEC if k in st.session_state}
-    if dict(st.query_params) != params:
-        st.query_params.from_dict(params)
+def active_share_params(inputs):
+    """URL parameters for the inputs that are actually in use right now.
+
+    Values for hidden choices (for example a manual pension amount while the
+    estimate is selected) are left out, so a link never carries more than it
+    needs to.
+    """
+    keys = ["in_hire_year", "in_hire_age", "in_retirement_age", "in_cola", "in_step",
+            "in_step_count", "in_step_midyear", "in_promo_years", "in_promo_pct", "in_contrib",
+            "in_allowance_mode", "in_retirement_years", "in_inflation", "in_returns", "in_real",
+            "mc_std"]
+    today_mode = (inputs["hire_year"] < CURRENT_YEAR
+                  and st.session_state.get("in_wage_mode") == "My wage today")
+    if inputs["hire_year"] < CURRENT_YEAR:
+        keys.append("in_wage_mode")
+    keys.append("in_current_wage" if today_mode else "in_wage")
+    if inputs["allowance_source"] == "manual":
+        keys += ["allowance_manual", "in_allowance_basis"]
+    return {_param_name(k): str(st.session_state[k]) for k in keys if k in st.session_state}
+
+
+def share_link(inputs):
+    """A full link that reopens the calculator with the current inputs."""
+    base = ""
+    try:
+        parts = urllib.parse.urlsplit(st.context.url or "")
+        if parts.scheme and parts.netloc:
+            base = f"{parts.scheme}://{parts.netloc}{parts.path}"
+    except Exception:
+        base = ""
+    return f"{base}?{urllib.parse.urlencode(active_share_params(inputs))}"
+
+
+def render_share_section(inputs):
+    """Sidebar control that makes a shareable link only when asked."""
+    with st.sidebar:
+        st.subheader("Share These Inputs")
+        if st.button("Create a shareable link", key="make_share_link"):
+            st.session_state["_show_share_link"] = True
+        if st.session_state.get("_show_share_link"):
+            st.code(share_link(inputs), language=None, wrap_lines=True)
+            st.caption(
+                "Copy this link to share or come back later. It includes your salary and pension "
+                "assumptions, so anyone with the link can see them. It updates as you change inputs."
+            )
 
 
 def build_rate_curve_chart(inputs, res):
@@ -1379,6 +1423,17 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     return styler
 
 
+def render_privacy_notice():
+    """What the site collects, shown at the bottom of every page."""
+    with st.expander("Privacy: what this site collects"):
+        st.markdown("""
+- **Page views** are counted with GoatCounter, which does not use cookies or follow you to other sites.
+- **Each visit** is recorded in a private Google Sheet that only the site owner can see: your IP address and, where available, the approximate location and internet provider it points to; your browser, device type, and language; and the page that linked you here.
+- **Feedback** you send is saved to the same sheet with those visit details. Your calculator inputs and results are included only if you tick the box on the form.
+- **Your calculator inputs** are not saved anywhere unless you include them with feedback. A shareable link contains them only if you create one, and anyone with that link can see them.
+""")
+
+
 def render_feedback_form(page_name):
     """Shared feedback form. Reads current inputs/results from session_state.
 
@@ -1410,6 +1465,15 @@ def render_feedback_form(page_name):
             label_visibility="collapsed",
             key=f"feedback_text_{st.session_state.feedback_key}",
         )
+        include_details = st.checkbox(
+            "Include my calculator inputs and results (helps me understand your feedback)",
+            value=False,
+            key=f"feedback_details_{st.session_state.feedback_key}",
+        )
+        st.caption(
+            "Feedback is saved to a private Google Sheet that only the site owner can see, along "
+            "with the basic visit details listed under Privacy at the bottom of the page."
+        )
         if st.form_submit_button("Submit"):
             # [H-3] Abuse controls: enforce a length cap (belt-and-suspenders with
             # the widget's max_chars) and a per-session cooldown so a single client
@@ -1424,13 +1488,15 @@ def render_feedback_form(page_name):
             else:
                 (
                     ip, country, region, city, zip_code, lat, lon,
-                    timezone, isp, is_vpn, is_mobile_net,
+                    # Not "timezone": that name would shadow datetime.timezone,
+                    # which the timestamp below needs (it used to crash here).
+                    visitor_tz, isp, is_vpn, is_mobile_net,
                     lang, referrer, platform_hdr, mobile_hdr,
                     browser, browser_ver, os_name, os_ver, device,
                 ) = _client_metadata()
-                err = _append_feedback([
-                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                    cleaned,
+                # Calculator details are stored only when the visitor opts in;
+                # otherwise those columns stay blank.
+                details = [
                     inputs["starting_wage"], inputs["work_years"], inputs["retirement_years"],
                     round(res["cola_pct"], 2),
                     round(res["index_return_pct"], 2),
@@ -1444,13 +1510,24 @@ def render_feedback_form(page_name):
                     "over cap" if math.isinf(res["breakeven_rate"]) else round(res["breakeven_rate"], 2),
                     res["years_covered"],
                     "Option A" if simulation.ran_short(res["personal_balance"]) else "Option B",
+                ]
+                swing_details = [
+                    round(st.session_state.get("mc_std", 15.0), 1),
+                    round(get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))["depletion_prob"] * 100, 1),
+                ]
+                if not include_details:
+                    details = [""] * len(details)
+                    swing_details = [""] * len(swing_details)
+                err = _append_feedback([
+                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    cleaned,
+                    *details,
                     ip, country, region, city, zip_code, lat, lon,
-                    timezone, isp, is_vpn, is_mobile_net,
+                    visitor_tz, isp, is_vpn, is_mobile_net,
                     lang, referrer, platform_hdr, mobile_hdr,
                     browser, browser_ver, os_name, os_ver, device,
                     page_name,
-                    round(st.session_state.get("mc_std", 15.0), 1),
-                    round(get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))["depletion_prob"] * 100, 1),
+                    *swing_details,
                 ])
                 if err:
                     st.warning("Sorry, we couldn't save your feedback right now. Please try again later.")

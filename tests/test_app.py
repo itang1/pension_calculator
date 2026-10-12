@@ -122,3 +122,40 @@ def test_case_study_button_sets_the_swings_its_figures_assume():
     assert at.session_state["mc_std"] == 15.0
     banner = next(m.value for m in at.markdown if "🏆" in m.value)
     assert "38 out of 100" in banner
+
+
+def test_loading_a_link_fills_inputs_then_clears_the_address_bar():
+    at = _app(wage="90000", hire_age="30", retirement_age="60")
+    assert at.session_state["in_wage"] == 90000 and at.session_state["in_hire_age"] == 30
+    assert dict(at.query_params) == {}
+
+
+def test_share_link_is_made_on_request_with_only_active_inputs():
+    at = _app()
+    assert not at.sidebar.code  # nothing until asked
+    next(b for b in at.sidebar.button if b.key == "make_share_link").click().run()
+    link = at.sidebar.code[0].value
+    assert "wage=120000" in link and "hire_age=25" in link
+    assert "allowance_manual" not in link and "current_wage" not in link
+    at.sidebar.radio(key="in_allowance_mode").set_value("Enter manually").run()
+    assert "allowance_manual=" in at.sidebar.code[0].value
+
+
+def test_privacy_notice_is_on_the_page():
+    at = _app()
+    assert any(e.label.startswith("Privacy") for e in at.expander)
+
+
+def test_feedback_leaves_calculator_details_out_unless_ticked(monkeypatch):
+    import common
+    rows = []
+    monkeypatch.setattr(common, "_append_feedback", lambda row: rows.append(row))
+    monkeypatch.setattr(common, "_client_metadata", lambda: ("x",) * 20)
+    at = _app()
+    at.text_area[0].input("Helpful, thanks").run()
+    next(b for b in at.button if b.label == "Submit").click().run()
+    assert rows, "feedback was not submitted"
+    row = rows[-1]
+    assert row[1] == "Helpful, thanks"
+    assert all(v == "" for v in row[2:16])          # calculator details left blank
+    assert row[-2:] == ["", ""]                     # swing details left blank

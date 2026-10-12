@@ -81,7 +81,7 @@ st.session_state["_inputs"] = inputs
 _nominal = common.compute_results(inputs)
 st.session_state["_results_nominal"] = _nominal
 st.session_state["_results"] = common.deflate_results(_nominal, inputs) if show_real else _nominal
-common.sync_query_params()
+common.render_share_section(inputs)
 
 _comparison_page = st.Page(
     view_comparison.render,
@@ -106,6 +106,7 @@ pg.run()
 
 # Analytics run after the page has rendered, so the visit logging (a
 # geolocation lookup plus a Sheets write) never delays the first paint.
+common.render_privacy_notice()
 common.count_pageview(pg)
 if "session_tracked" not in st.session_state:
     st.session_state.session_tracked = True
