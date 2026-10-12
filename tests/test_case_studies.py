@@ -77,6 +77,22 @@ def test_alice_breakeven_claim():
     assert 9.2 < _replay("alice")["breakeven"] < 9.3
 
 
+@pytest.mark.parametrize("preset,out_of_100", [("alice", 38), ("carol", 34), ("frank", 31)])
+def test_case_study_market_swing_claims(preset, out_of_100):
+    # Copy: "runs out in about N out of 100 possible futures" at the page's
+    # default 15% swings.
+    v = common.PRESETS[preset]["values"]
+    promo = tuple(int(x) for x in v["in_promo_years"].split(",") if x.strip())
+    cola, step, promo_inc = 1 + v["in_cola"] / 100, 1 + v["in_step"] / 100, 1 + v["in_promo_pct"] / 100
+    fas = s.compute_fas(v["in_wage"], v["in_work_years"], cola, step, promo, promo_inc)
+    allowance = s.plan_benefit(v["in_work_years"], v["in_retirement_age"], fas)["allowance"]
+    mc = s.run_monte_carlo(
+        v["in_wage"], v["in_work_years"], cola, step, promo, promo_inc, v["in_contrib"] / 100,
+        allowance, v["in_retirement_years"], mean_return=v["in_returns"] / 100, std_return=0.15,
+        n_simulations=1000, retiree_cola=1.02)
+    assert round(mc["depletion_prob"] * 100) == out_of_100
+
+
 # --- Risk verdict tiers ----------------------------------------------------------
 
 @pytest.mark.parametrize("prob,flat_b_wins,tier", [
