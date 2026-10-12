@@ -14,6 +14,7 @@ import view_comparison
 import view_market_swings
 
 st.set_page_config(
+    page_title="Pension Calculator",
     layout="wide",
     page_icon=str(Path(__file__).parent / "assets" / "icon.png"),
 )
@@ -72,6 +73,10 @@ if show_real:
 # session_state rather than importing from here (which would re-run the script).
 common.apply_pending_preset()
 inputs = common.render_sidebar()
+if inputs["problems"]:
+    # Stop only after the whole sidebar has rendered, so no input is forgotten.
+    st.error("Fix the input marked in red in the sidebar to see your results.")
+    st.stop()
 st.session_state["_inputs"] = inputs
 _nominal = common.compute_results(inputs)
 st.session_state["_results_nominal"] = _nominal

@@ -14,6 +14,7 @@ import ipaddress
 import json
 import logging
 import math
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -510,17 +511,24 @@ This calculator operates in annual periods. Within each year:
             key="in_retirement_age",
             help="Your age on the day you expect to retire.",
         ))
+        # Input problems are collected instead of stopping the script here:
+        # st.stop() mid-sidebar would skip the widgets below, and Streamlit then
+        # forgets their values. Each problem uses a safe stand-in value so the
+        # rest of the sidebar still renders; the entry script withholds results.
+        problems = []
         work_years = retirement_age - hire_age
         if work_years < 1:
             st.error(
                 f"You retire at {retirement_age} but start at {hire_age}. Make your retirement age "
                 f"later than the age you were hired to continue."
             )
-            st.stop()
-        st.caption(
-            f"That is {work_years} years of work: from {hire_year} (age {hire_age}) "
-            f"to {hire_year + work_years} (age {retirement_age})."
-        )
+            problems.append("ages")
+            work_years = 1
+        else:
+            st.caption(
+                f"That is {work_years} years of work: from {hire_year} (age {hire_age}) "
+                f"to {hire_year + work_years} (age {retirement_age})."
+            )
         cola_increase = st.number_input(
             "Cost of Living Adjustment (%)",
             value=3.0, min_value=0.0, max_value=5.5, step=0.1,
@@ -551,17 +559,19 @@ This calculator operates in annual periods. Within each year:
             key="in_promo_years",
             help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
         )
-        # Parse promotion years exactly once.
+        # Parse promotion years exactly once. Only plain ASCII digits count:
+        # str.isdigit() also accepts characters like "²" that int() rejects.
         _promo_tokens = [t.strip() for t in promotion_years_input.split(",") if t.strip()]
-        _promo_bad = [t for t in _promo_tokens if not t.isdigit()]
-        promotion_years = tuple(int(t) for t in _promo_tokens if t.isdigit())
-        _promo_oob = [y for y in promotion_years if y < 1 or y > int(work_years)]
+        _promo_bad = [t for t in _promo_tokens if not re.fullmatch(r"[0-9]{1,3}", t)]
+        _promo_good = tuple(int(t) for t in _promo_tokens if re.fullmatch(r"[0-9]{1,3}", t))
+        _promo_oob = [y for y in _promo_good if y < 1 or y > int(work_years)]
+        promotion_years = tuple(y for y in _promo_good if 1 <= y <= int(work_years))
         if _promo_bad:
             st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only, then results will update.")
-            st.stop()
-        if _promo_oob:
+            problems.append("promotions")
+        elif _promo_oob and "ages" not in problems:
             st.error(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career. Fix or remove them to continue.")
-            st.stop()
+            problems.append("promotions")
         promotion_increase = st.number_input(
             "Promotion Increase (%)",
             value=8.0, min_value=0.0, max_value=100.0, step=1.,
@@ -574,19 +584,22 @@ This calculator operates in annual periods. Within each year:
             # raise up to it (COLA, steps, promotions) to recover the starting wage.
             _year_now = years_so_far + 1
             if _year_now > int(work_years):
-                st.error(
-                    f"Hired in {hire_year}, you would have finished your {int(work_years)}-year career "
-                    f"already. Pick a later retirement age, or enter your starting wage instead."
+                if "ages" not in problems:
+                    st.error(
+                        f"Hired in {hire_year}, you would have finished your {int(work_years)}-year career "
+                        f"already. Pick a later retirement age, or enter your starting wage instead."
+                    )
+                problems.append("wage")
+                starting_wage = current_wage
+            else:
+                _growth = simulation.salary_schedule(
+                    1.0, _year_now, cola_increase, step_increase, promotion_years,
+                    promotion_increase, int(step_count), first_step_midyear)[-1]
+                starting_wage = current_wage / _growth
+                st.caption(
+                    f"That works out to a starting wage of about ${starting_wage:,.0f} in {hire_year}, "
+                    f"using the raises you entered above."
                 )
-                st.stop()
-            _growth = simulation.salary_schedule(
-                1.0, _year_now, cola_increase, step_increase, promotion_years,
-                promotion_increase, int(step_count), first_step_midyear)[-1]
-            starting_wage = current_wage / _growth
-            st.caption(
-                f"That works out to a starting wage of about ${starting_wage:,.0f} in {hire_year}, "
-                f"using the raises you entered above."
-            )
 
         st.subheader("Pension")
         pension_contribution_rate = st.number_input(
@@ -761,6 +774,7 @@ This calculator operates in annual periods. Within each year:
         "retiree_cola": 1 + retiree_cola_pct / 100,
         "deferral_years": 0 if plan is None else plan["deferral_years"],
         "plan_status": "manual" if plan is None else plan["status"],
+        "problems": problems,
     }
 
 
@@ -937,12 +951,16 @@ def _parse_param(raw, spec):
     if kind is str:
         return raw[:100]
     try:
-        value = kind(float(raw)) if kind is int else kind(raw)
-    except ValueError:
+        number = float(raw)
+    except (ValueError, OverflowError):
         return None
-    if not math.isfinite(value) or value < lo or value > hi:
+    if not math.isfinite(number) or number < lo or number > hi:
         return None
-    return value
+    if kind is int:
+        if number != int(number):
+            return None
+        return int(number)
+    return number
 
 
 def apply_query_params():
@@ -970,9 +988,12 @@ def legacy_hire_age(work_years_raw, retirement_age):
     if work_years_raw is None:
         return None
     try:
-        hire_age = int(retirement_age) - int(float(work_years_raw))
-    except ValueError:
+        years = float(work_years_raw)
+    except (ValueError, OverflowError):
         return None
+    if not math.isfinite(years) or years != int(years):
+        return None
+    hire_age = int(retirement_age) - int(years)
     lo, hi = _SHARE_SPEC["in_hire_age"][1:]
     return hire_age if lo <= hire_age <= hi else None
 
