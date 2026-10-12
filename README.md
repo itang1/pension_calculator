@@ -20,7 +20,8 @@ The app has two pages that share the same sidebar inputs and link to each other:
 - **Break-even rate**: the minimum annual investment return at which Option B survives your full retirement, compared directly to your assumed rate
 - **Year-over-year breakdown tables** for both working and retirement phases, showing contributions, withdrawals, market returns, and running balances
 - **Pension allowance estimator**: enter your career details and the app estimates your first-year allowance using a formula of my choice
-- **Configurable assumptions**: starting salary, COLA, step increases, promotion years, pension contribution rate, index return rate, retirement age, and retirement length
+- **Configurable assumptions**: starting salary, COLA, step increases (size and number of steps), promotion years, pension contribution rate, retirement factor, early-retirement reduction, vesting period, index return rate, retirement age, and retirement length
+- **Today's-dollars conversion**: a manually entered allowance from a plan estimator can be given in today's dollars and is grown by COLA to your first retirement year, so it is compared in the same future dollars as your salary
 - **Case studies** showing scenario where each option wins, with full settings to reproduce in the calculator with one click
 - **Feedback form** to submit questions and comments
 

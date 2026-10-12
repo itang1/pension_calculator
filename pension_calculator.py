@@ -35,25 +35,14 @@ common.render_html(
     </style>"""
 )
 
-# Keep page-local widget state alive across page switches. Streamlit drops the
-# state of any widget that is not rendered during a rerun, so widgets that live
-# in a page body (not the always-rendered sidebar) need this re-assignment pin.
-for _k in ("mc_std",):
+# Keep conditionally rendered widget state alive. Streamlit drops the state of
+# any widget that is not rendered during a rerun, so widgets that live in a
+# page body (not the always-rendered sidebar), or only show in one allowance
+# mode, need this re-assignment pin.
+for _k in ("mc_std", "in_factor", "in_early_red", "in_vest",
+           "allowance_manual", "in_allowance_basis"):
     if _k in st.session_state:
         st.session_state[_k] = st.session_state[_k]
-
-if "session_tracked" not in st.session_state:
-    st.session_state.session_tracked = True
-    components.html("""
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7SKCXXZV9W"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-7SKCXXZV9W');
-        </script>
-    """, height=0)
-    common.log_visit()
 
 st.title("Is Your Pension Worth It?")
 
@@ -85,3 +74,19 @@ st.session_state["_pages"] = {"comparison": _comparison_page, "market": _market_
 
 pg = st.navigation([_comparison_page, _market_page])
 pg.run()
+
+# Analytics run after the page has rendered, so the visit logging (a
+# geolocation lookup plus a Sheets write) never delays the first paint.
+common.count_pageview(pg)
+if "session_tracked" not in st.session_state:
+    st.session_state.session_tracked = True
+    components.html("""
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7SKCXXZV9W"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-7SKCXXZV9W');
+        </script>
+    """, height=0)
+    common.log_visit()

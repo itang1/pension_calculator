@@ -2,14 +2,19 @@
 
 These run with no Streamlit context and no Google credentials; that is the
 whole point of extracting simulation.py from the app (see AUDIT M-11). The two
-scenarios mirror the in-app Case Study A and Case Study B copy.
+fixtures are fixed engine regressions; the in-app case studies themselves are
+checked against their copy in tests/test_case_studies.py.
 """
+
+import math
+
+import numpy as np
 
 import pytest
 
 import simulation as s
 
-# --- Scenario fixtures (mirror the app's Case Study A and B) --------------------
+# --- Scenario fixtures ----------------------------------------------------------
 
 CASE_A = dict(  # Personal fund wins
     starting_wage=120000, work_years=30, cola_increase=1.03, step_increase=1.055,
@@ -156,3 +161,73 @@ def test_monte_carlo_zero_volatility_distribution_matches_deterministic():
     assert mc["median_path"][-1] == pytest.approx(det, rel=1e-6)
     assert mc["final_balances"][0] == pytest.approx(det, rel=1e-6)
     assert (mc["depletion_years"] == 0).all()
+
+
+# --- Step schedule ----------------------------------------------------------------
+
+def test_step_count_and_midyear_flag():
+    # Two step raises, no mid-year averaging: raises land in years 2 and 3 only.
+    sched = s.salary_schedule(100000, 5, 1.0, 1.10, (), 1.0, step_count=2,
+                              first_step_midyear=False)
+    assert sched == pytest.approx([100000, 110000, 121000, 121000, 121000])
+    # No step raises at all means no year-1 averaging either.
+    flat = s.salary_schedule(100000, 3, 1.0, 1.10, (), 1.0, step_count=0)
+    assert flat == pytest.approx([100000, 100000, 100000])
+
+
+# --- Allowance estimator -----------------------------------------------------------
+
+def test_estimate_allowance_formula_and_vesting():
+    assert s.estimate_allowance(30, 100000, 2.0) == pytest.approx(60000)
+    assert s.estimate_allowance(30, 100000, 2.0, early_reduction_pct=10) == pytest.approx(54000)
+    assert s.estimate_allowance(4, 100000, 2.0, vesting_years=5) == 0.0
+    assert s.estimate_allowance(5, 100000, 2.0, vesting_years=5) == pytest.approx(10000)
+
+
+def test_todays_dollars_grow_by_cola_to_retirement():
+    assert s.to_retirement_dollars(70000, 30, 1.03) == pytest.approx(70000 * 1.03 ** 30)
+    assert s.to_retirement_dollars(70000, 30, 1.0) == pytest.approx(70000)
+
+
+# --- Shortfall after depletion ------------------------------------------------------
+
+def test_negative_balance_earns_no_returns():
+    r = _run(CASE_B, 1.05)
+    ret = r["yearly_data"][r["yearly_data"]["Year"].str.startswith("R")]
+    negative_start = ret[ret["Start Balance"] < 0]
+    assert len(negative_start) > 0
+    assert (negative_start["Market Returns"] == 0).all()
+    # Once negative, each year only adds that year's unpaid withdrawal.
+    expected = negative_start["Start Balance"] - negative_start["Pension Redeemed"]
+    assert negative_start["Balance"].to_numpy() == pytest.approx(expected.to_numpy())
+
+
+# --- Break-even cap --------------------------------------------------------------
+
+def test_breakeven_is_infinite_when_no_return_can_save_the_fund():
+    # One working year of deposits, then a huge withdrawal right away.
+    hopeless = dict(CASE_B, work_years=1, retirement_years=1, starting_allowance=10_000_000)
+    args = tuple(hopeless[k] for k in (
+        "starting_wage", "work_years", "cola_increase", "step_increase", "promotion_years",
+        "promotion_increase", "pension_contribution_rate", "starting_allowance", "retirement_years"))
+    assert math.isinf(s.compute_breakeven_rate(*args))
+
+
+# --- Monte Carlo return model ----------------------------------------------------
+
+def test_lognormal_returns_match_requested_median_and_spread():
+    mean, std = 0.07, 0.15
+    sigma = s.lognormal_sigma(mean, std)
+    draws = np.exp(np.random.default_rng(1).normal(math.log(1 + mean), sigma, 2_000_000)) - 1
+    assert np.median(draws) == pytest.approx(mean, abs=1e-3)
+    assert draws.std() == pytest.approx(std, abs=1e-3)
+    assert draws.min() > -1.0
+
+
+def test_monte_carlo_typical_working_path_tracks_flat_rate():
+    # With contributions only, the median path should sit close to the flat
+    # line (the input is read as the same compound rate on both pages), not
+    # far below it as an arithmetic-mean model would put it.
+    flat = _run(CASE_A, 1.07)["personal_fund_values"][CASE_A["work_years"]]
+    mc = s.run_monte_carlo(**CASE_A, mean_return=0.07, std_return=0.15, n_simulations=4000)
+    assert mc["median_path"][CASE_A["work_years"]] == pytest.approx(flat, rel=0.08)

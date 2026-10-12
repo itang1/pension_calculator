@@ -222,12 +222,63 @@ def log_visit():
         pass
 
 
+_GOATCOUNTER_URL = "https://itang1.goatcounter.com/count"
+
+
+def count_pageview(page):
+    """Count a page view in GoatCounter, once per page switch.
+
+    Streamlit reruns the whole script on every widget change, so the view is
+    only counted when the visitor lands on a different page. GoatCounter's
+    count.js skips iframes and Streamlit pages have no editable <head>, so
+    this uses GoatCounter's no-JavaScript image pixel. Paths are prefixed
+    with the host, matching the other apps that share the dashboard.
+    """
+    path = "/" + (page.url_path or "")
+    if st.session_state.get("_gc_last_path") == path:
+        return
+    st.session_state["_gc_last_path"] = path
+    try:
+        host = urllib.parse.urlsplit(st.context.url or "").netloc or st.context.headers.get("Host", "")
+    except Exception:
+        return
+    hostname = host.split(":")[0]
+    if not host or hostname in ("localhost", "127.0.0.1") or hostname.endswith(".local"):
+        return
+    # Every value is URL-encoded with no safe characters, so header text can
+    # never break out of the src attribute.
+    query = urllib.parse.urlencode({
+        "p": host + path,
+        "t": page.title,
+        "rnd": f"{time.time_ns()}",
+    }, quote_via=urllib.parse.quote, safe="")
+    render_html(
+        f'<img src="{_GOATCOUNTER_URL}?{query}" alt="" width="1" height="1" '
+        f'style="position:absolute;opacity:0;pointer-events:none">'
+    )
+
+
 # The math lives in simulation.py with no Streamlit dependency,
 # so it is unit-testable; caching is applied here at the app boundary.
 run_simulation = st.cache_data(simulation.run_simulation)
 compute_breakeven_rate = st.cache_data(simulation.compute_breakeven_rate)
 run_monte_carlo = st.cache_data(simulation.run_monte_carlo)
 compute_fas = simulation.compute_fas
+
+
+def fmt_rate(pct):
+    """Format a return rate (%) for copy; the break-even can be ``math.inf``."""
+    if math.isinf(pct):
+        return f"over {simulation.BREAKEVEN_CAP_PCT:.0f}%"
+    return f"{pct:.1f}%"
+
+
+def fmt_share(prob):
+    """Format a share of futures (0-1) as a percent that never rounds a real risk to 0%."""
+    pct = prob * 100
+    if 0 < pct < 1:
+        return f"{pct:.1f}%"
+    return f"{pct:.0f}%"
 
 
 def render_html(html: str):
@@ -239,7 +290,9 @@ def render_html(html: str):
 
 
 # One-click scenarios for the case studies. Keys/types must match the sidebar
-# widgets exactly (int widgets need ints, float widgets floats).
+# widgets exactly (int widgets need ints, float widgets floats). Every preset
+# uses the allowance estimator so the pension figure is in the same future
+# dollars as the salary path; tests/test_case_studies.py checks the copy.
 PRESETS = {
     "alice": {
         "label": "Alice: personal fund wins",
@@ -247,8 +300,10 @@ PRESETS = {
             "in_wage": 120000, "in_work_years": 30, "in_retirement_age": 55,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 20",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
-            "in_allowance_mode": "Enter manually", "allowance_manual": 70458,
-            "in_retirement_years": 30, "in_returns": 7.0,
+            "in_step_count": 4, "in_step_midyear": True,
+            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
+            "in_early_red": 0.0, "in_vest": 5,
+            "in_retirement_years": 30, "in_returns": 10.0,
         },
     },
     "bob": {
@@ -257,7 +312,9 @@ PRESETS = {
             "in_wage": 65000, "in_work_years": 20, "in_retirement_age": 55,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
-            "in_allowance_mode": "Enter manually", "allowance_manual": 27000,
+            "in_step_count": 4, "in_step_midyear": True,
+            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
+            "in_early_red": 0.0, "in_vest": 5,
             "in_retirement_years": 40, "in_returns": 5.0,
         },
     },
@@ -267,8 +324,10 @@ PRESETS = {
             "in_wage": 80000, "in_work_years": 35, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "15",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
-            "in_allowance_mode": "Enter manually", "allowance_manual": 55000,
-            "in_retirement_years": 25, "in_returns": 6.0,
+            "in_step_count": 4, "in_step_midyear": True,
+            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
+            "in_early_red": 0.0, "in_vest": 5,
+            "in_retirement_years": 25, "in_returns": 9.0,
         },
     },
     "dave": {
@@ -277,7 +336,9 @@ PRESETS = {
             "in_wage": 95000, "in_work_years": 15, "in_retirement_age": 50,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
-            "in_allowance_mode": "Enter manually", "allowance_manual": 42000,
+            "in_step_count": 4, "in_step_midyear": True,
+            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
+            "in_early_red": 0.0, "in_vest": 5,
             "in_retirement_years": 35, "in_returns": 4.0,
         },
     },
@@ -287,8 +348,10 @@ PRESETS = {
             "in_wage": 150000, "in_work_years": 25, "in_retirement_age": 55,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 18",
             "in_promo_pct": 10.0, "in_contrib": 10.0,
-            "in_allowance_mode": "Enter manually", "allowance_manual": 85000,
-            "in_retirement_years": 25, "in_returns": 8.0,
+            "in_step_count": 4, "in_step_midyear": True,
+            "in_allowance_mode": "Estimate for me", "in_factor": 1.5,
+            "in_early_red": 0.0, "in_vest": 5,
+            "in_retirement_years": 25, "in_returns": 10.0,
         },
     },
 }
@@ -333,7 +396,7 @@ This calculator operates in annual periods. Within each year:
 - **Withdrawals**: Made at the end of the year.
 - **Market returns**: Earned on the balance at the *start* of the year, before that year's deposit or withdrawal.
 - **COLA**: Applied to salary at the end of each working year, taking effect the following year. In retirement, applied to the pension allowance at the end of each year, taking effect the following year.
-- **Step increases**: The Step 1 → Step 2 raise occurs 6 months after hire. Since the calculator uses annual periods, Year 1 contributions are averaged over 6 months at Step 1 and 6 months at Step 2. The Steps 2 → 3, 3 → 4, and 4 → 5 raises each take effect at the start of Years 3, 4, and 5 respectively.
+- **Step increases**: Applied at the end of each of your first few working years (set by *Number of Step Raises*), taking effect the following year. If your first step raise comes mid-year, Year 1 is averaged over 6 months at the starting step and 6 months at the next step.
 - **Promotions**: Applied at the end of the year you specify, taking effect the following year.
 """)
 
@@ -360,14 +423,26 @@ This calculator operates in annual periods. Within each year:
             "Cost of Living Adjustment (%)",
             value=3.0, min_value=0.0, max_value=5.5, step=0.1,
             key="in_cola",
-            help="Annual salary adjustment announced each October, typically between 2-3.5%. Set to 0 for plans with no COLA. In retirement, your pension check grows by this same percentage each year."
+            help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. In retirement, your pension check grows by this same percentage each year."
         ) / 100 + 1
         step_increase = st.number_input(
             "Step Increase (%)",
-            value=5.5, min_value=0., step=0.1,
+            value=5.5, min_value=0., max_value=50.0, step=0.1,
             key="in_step",
-            help="Annual raise from step progression. Applies in each of your first 4 years."
+            help="Raise from each step on your pay scale."
         ) / 100 + 1
+        step_count = st.number_input(
+            "Number of Step Raises",
+            value=4, min_value=0, max_value=20, step=1,
+            key="in_step_count",
+            help="How many step raises you get before reaching the top of your pay scale. One raise is applied at the end of each of your first this-many years.",
+        )
+        first_step_midyear = st.checkbox(
+            "First step raise comes mid-year",
+            value=True,
+            key="in_step_midyear",
+            help="Check this if your first step raise takes effect partway through Year 1 (for example, after a 6-month probation). Year 1 is then averaged half at your starting step and half at the next step.",
+        )
         promotion_years_input = st.text_input(
             "Promotion Years",
             value="10, 20",
@@ -387,7 +462,7 @@ This calculator operates in annual periods. Within each year:
             st.stop()
         promotion_increase = st.number_input(
             "Promotion Increase (%)",
-            value=8.0, step=1.,
+            value=8.0, min_value=0.0, max_value=100.0, step=1.,
             key="in_promo_pct",
             help="Expected salary bump each time you are promoted."
         ) / 100 + 1
@@ -395,7 +470,7 @@ This calculator operates in annual periods. Within each year:
         st.subheader("Pension")
         pension_contribution_rate = st.number_input(
             "Pension Contribution Rate (%)",
-            value=10.0, step=1.,
+            value=10.0, min_value=0.0, max_value=100.0, step=1.,
             key="in_contrib",
             help="Percentage of your salary automatically deducted and contributed to the pension system each year."
         ) / 100
@@ -412,46 +487,36 @@ This calculator operates in annual periods. Within each year:
         manual_override = (_allowance_mode == "Enter manually")
 
         if not manual_override:
-            # Auto-determine retirement factor from age and years of service
-            _age = int(retirement_age)
-            _yrs = int(work_years)
-            if _age >= 63 and _yrs >= 30:
-                _factor = 0.021
-                _is_reduced = False
-            elif _age >= 60 and _yrs >= 30:
-                _factor = 0.020
-                _is_reduced = False
-            elif _age >= 55 and _yrs >= 30:
-                _factor = 0.020
-                _is_reduced = False
-            elif _yrs >= 30:
-                _factor = 0.020
-                _is_reduced = True
-            elif _age >= 63 and _yrs >= 5:
-                _factor = 0.020
-                _is_reduced = False
-            else:
-                _factor = 0.015
-                _is_reduced = False
-
-            if _is_reduced:
-                _early_red = st.number_input(
-                    "Early Retirement Reduction (%)",
-                    value=0.0, min_value=0.0, max_value=50.0, step=0.5,
-                    key="in_early_red",
-                    help="Your age and years of service qualify for retirement with an early reduction. Enter the exact percentage from your plan's retirement estimator.",
-                )
-            else:
-                _early_red = 0.0
+            _factor_pct = st.number_input(
+                "Retirement Factor (% per year of service)",
+                value=2.0, min_value=0.0, max_value=5.0, step=0.1,
+                key="in_factor",
+                help="The share of your final average salary you earn for each year of service. Many plans use 1.5% to 2.5%, and the factor often depends on your age and years of service when you retire. Check your plan's handbook.",
+            )
+            _early_red = st.number_input(
+                "Early Retirement Reduction (%)",
+                value=0.0, min_value=0.0, max_value=50.0, step=0.5,
+                key="in_early_red",
+                help="If you retire before your plan's full-benefit age, many plans permanently reduce the allowance. Enter the exact percentage from your plan's retirement estimator, or 0 if none.",
+            )
+            _vest_years = st.number_input(
+                "Years Required to Vest",
+                value=5, min_value=0, max_value=20, step=1,
+                key="in_vest",
+                help="The minimum years of service before you earn a lifetime allowance.",
+            )
 
             _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
-                               promotion_years, promotion_increase)
-            _reduction = 1.0 - _early_red / 100.0
-            _computed_allowance = work_years * _fas * _factor * _reduction
+                               promotion_years, promotion_increase,
+                               int(step_count), first_step_midyear)
+            _computed_allowance = simulation.estimate_allowance(
+                int(work_years), _fas, _factor_pct, _early_red, int(_vest_years))
 
+            # The value is pushed through session_state (not ``value=``) so a
+            # keyed, disabled widget always shows the freshly computed figure.
+            st.session_state["allowance_formula"] = round(_computed_allowance)
             st.number_input(
                 "First-year annual pension allowance ($)",
-                value=round(_computed_allowance),
                 min_value=0,
                 step=500,
                 disabled=True,
@@ -462,6 +527,17 @@ This calculator operates in annual periods. Within each year:
                     "Derived from your career inputs above. Switch to 'Enter manually' to override."
                 ),
             )
+            if int(work_years) < int(_vest_years):
+                st.warning(
+                    f"With {int(work_years)} years of service you would not vest, so there is no "
+                    f"lifetime allowance. Most plans refund your own contributions instead, which "
+                    f"this calculator does not model."
+                )
+            else:
+                st.caption(
+                    f"That is about ${_computed_allowance / cola_increase ** int(work_years):,.0f} "
+                    f"in today's dollars, after {int(work_years)} years of COLA."
+                )
             starting_allowance = _computed_allowance
         else:
             manual_allowance = st.number_input(
@@ -472,7 +548,26 @@ This calculator operates in annual periods. Within each year:
                 key="allowance_manual",
                 help="Your annual pension payment in the first year of retirement. Find this from your plan's retirement estimator. COLA will compound on top of this each subsequent year.",
             )
-            starting_allowance = manual_allowance
+            _basis = st.radio(
+                "This amount is in",
+                ["Today's dollars", "Dollars at retirement"],
+                key="in_allowance_basis",
+                help=(
+                    "Plan estimators usually show your benefit in today's dollars. The calculator "
+                    "grows your salary in future dollars, so a today's-dollars figure is first "
+                    "grown by COLA to your retirement year. Mixing the two would make the pension "
+                    "look several times smaller than it is."
+                ),
+            )
+            if _basis == "Today's dollars":
+                starting_allowance = simulation.to_retirement_dollars(
+                    manual_allowance, int(work_years), cola_increase)
+                st.caption(
+                    f"That is about ${starting_allowance:,.0f} in your first year of retirement, "
+                    f"after {int(work_years)} years of COLA."
+                )
+            else:
+                starting_allowance = manual_allowance
 
         st.subheader("Retirement")
         retirement_years = st.number_input(
@@ -481,16 +576,18 @@ This calculator operates in annual periods. Within each year:
             key="in_retirement_years",
             help="How many years you expect to spend in retirement before you die."
         )
+        st.caption(f"Retirement runs from age {int(retirement_age)} to {int(retirement_age) + int(retirement_years)}.")
         index_returns_rate = (
             st.number_input(
                 "Average Index Returns Rate (%)",
-                value=10.0,
+                value=7.0,
                 min_value=0.0,
                 max_value=25.0,
                 step=0.5,
                 key="in_returns",
                 help=(
-                    "Expected annual return on Option B's investment account (not inflation-adjusted). "
+                    "Expected annual return on Option B's investment account (not inflation-adjusted), "
+                    "as a compound rate: the growth you would get if every year returned the same. "
                     "⚠ This number matters more than any other input: a 1% change can flip the winner."
                 ),
             )
@@ -506,6 +603,8 @@ This calculator operates in annual periods. Within each year:
         "step_increase": step_increase,
         "promotion_years": promotion_years,
         "promotion_increase": promotion_increase,
+        "step_count": int(step_count),
+        "first_step_midyear": bool(first_step_midyear),
         "pension_contribution_rate": pension_contribution_rate,
         "starting_allowance": starting_allowance,
         "retirement_years": int(retirement_years),
@@ -520,6 +619,7 @@ def compute_results(inputs):
         inputs["step_increase"], inputs["promotion_years"], inputs["promotion_increase"],
         inputs["pension_contribution_rate"], inputs["starting_allowance"],
         inputs["retirement_years"], inputs["index_returns_rate"],
+        inputs["step_count"], inputs["first_step_midyear"],
     )
 
     personal_fund_values = result["personal_fund_values"]
@@ -536,6 +636,7 @@ def compute_results(inputs):
         inputs["step_increase"], inputs["promotion_years"], inputs["promotion_increase"],
         inputs["pension_contribution_rate"], inputs["starting_allowance"],
         inputs["retirement_years"],
+        inputs["step_count"], inputs["first_step_midyear"],
     )
 
     years_covered = inputs["retirement_years"] if depletion_year is None else depletion_year - 1
@@ -563,6 +664,8 @@ def get_monte_carlo(inputs, std_pct, n_simulations=1000):
         mean_return=inputs["index_returns_rate"] - 1,
         std_return=std_pct / 100.0,
         n_simulations=n_simulations,
+        step_count=inputs["step_count"],
+        first_step_midyear=inputs["first_step_midyear"],
     )
 
 
@@ -856,7 +959,8 @@ def render_feedback_form(page_name):
                     round(res["pension_redeemed_total"], 2),
                     round(res["personal_fund_values"][inputs["work_years"]], 2),
                     round(res["personal_balance"], 2),
-                    round(res["breakeven_rate"], 2),
+                    # JSON (and so the Sheets API) has no infinity.
+                    "over cap" if math.isinf(res["breakeven_rate"]) else round(res["breakeven_rate"], 2),
                     res["years_covered"],
                     "Option A" if res["personal_balance"] <= 0 else "Option B",
                     ip, country, region, city, zip_code, lat, lon,
