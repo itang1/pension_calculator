@@ -54,6 +54,7 @@ CLAIMS = [
     ("carol", True, 2.0, 198_800, 83_800, 6.4e6, 2.9e6, 5.2e6, None),
     ("dave", False, 2.0, 51_900, 35_800, 1.7e6, 276_000, None, 6),
     ("frank", True, 1.5, 166_500, 89_800, 5.3e6, 2.4e6, 6.5e6, None),
+    ("grace", False, 2.0, 40_100, 29_100, 1.3e6, 251_000, None, 8),
 ]
 
 
@@ -72,12 +73,17 @@ def test_case_study_copy_matches_engine(preset, b_wins, factor, allow, today, re
     assert r["depletion"] == dep
 
 
+def test_grace_breakeven_claim():
+    # Copy: "would need a steady 12.5% a year just to break even."
+    assert round(_replay("grace")["breakeven"], 1) == 12.5
+
+
 def test_alice_breakeven_claim():
     # Copy: "at a flat 9.2% or less, the pension comes out ahead."
     assert 9.2 < _replay("alice")["breakeven"] < 9.3
 
 
-@pytest.mark.parametrize("preset,out_of_100", [("alice", 38), ("carol", 34), ("frank", 31)])
+@pytest.mark.parametrize("preset,out_of_100", [("alice", 38), ("carol", 34), ("frank", 31), ("grace", 97)])
 def test_case_study_market_swing_claims(preset, out_of_100):
     # Copy: "runs out in about N out of 100 possible futures" at the page's
     # default 15% swings.
@@ -165,3 +171,9 @@ def test_wage_today_inverts_to_starting_wage():
     growth = s.salary_schedule(1.0, year_now, *args)[-1]
     start = 150000 / growth
     assert s.salary_schedule(start, year_now, *args)[-1] == pytest.approx(150000)
+
+
+def test_out_of_100_never_hides_a_real_risk():
+    assert common.out_of_100(0.003) == "fewer than 1"
+    assert common.out_of_100(0.0) == "0"
+    assert common.out_of_100(0.384) == "38"

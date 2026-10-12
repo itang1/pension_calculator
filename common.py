@@ -309,6 +309,26 @@ def inputs_summary_html(inputs, res):
     )
 
 
+def out_of_100(prob):
+    """A share of futures as a plain count out of 100 that never hides a real risk."""
+    if 0 < prob < 0.005:
+        return "fewer than 1"
+    return f"{round(prob * 100)}"
+
+
+# Quick picks for the return input, from cautious to optimistic. Set through a
+# button callback, which runs before the widget is created on the next rerun.
+RETURN_PICKS = [
+    (5.0, "Cautious", "lots of bonds, or a rough few decades"),
+    (7.0, "Middle", "a typical mix of stocks and bonds"),
+    (9.0, "Optimistic", "mostly stocks and good markets"),
+]
+
+
+def _set_returns(value):
+    st.session_state["in_returns"] = value
+
+
 def render_html(html: str):
     """
     Every ``unsafe_allow_html`` render routes through here. Only ever
@@ -368,6 +388,18 @@ PRESETS = {
             "in_step_count": 4, "in_step_midyear": True,
             "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 25, "in_returns": 4.0,
+        },
+    },
+    "grace": {
+        "label": "Grace: pension wins",
+        "values": {
+            "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
+            "in_wage": 90000, "in_hire_age": 50, "in_retirement_age": 63,
+            "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
+            "in_promo_pct": 8.0, "in_contrib": 10.0,
+            "in_step_count": 4, "in_step_midyear": True,
+            "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
+            "in_retirement_years": 25, "in_returns": 7.0,
         },
     },
     "frank": {
@@ -612,7 +644,7 @@ This calculator operates in annual periods. Within each year:
                     f"With {int(work_years)} years of service you would not vest, so there is no "
                     f"lifetime allowance. Instead your contributions are refunded with "
                     f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% interest (about ${_refund:,.0f}). "
-                    f"In that case Option B only wins if it earns more than "
+                    f"In that case your account only wins if it earns more than "
                     f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% a year."
                 )
             else:
@@ -680,6 +712,14 @@ This calculator operates in annual periods. Within each year:
                 f"slowly erodes it. Also used to show amounts in {CURRENT_YEAR} dollars."
             ),
         )
+        st.markdown("**Not sure what return to expect? Pick one:**")
+        for col, (value, name, why) in zip(st.columns(len(RETURN_PICKS)), RETURN_PICKS):
+            col.button(f"{value:g}%", key=f"pick_{value:g}", on_click=_set_returns, help=f"{name}: {why}",
+                       args=(value,), width="stretch")
+        st.caption(
+            " · ".join(f"**{value:g}%** {name.lower()}: {why}" for value, name, why in RETURN_PICKS)
+            + ". U.S. stocks alone have averaged about 10% a year over the past century, with big swings."
+        )
         index_returns_rate = (
             st.number_input(
                 "Average Index Returns Rate (%)",
@@ -689,7 +729,7 @@ This calculator operates in annual periods. Within each year:
                 step=0.5,
                 key="in_returns",
                 help=(
-                    "Expected annual return on Option B's investment account (not inflation-adjusted), "
+                    "Expected annual return on your own investment account (not inflation-adjusted), "
                     "as a compound rate: the growth you would get if every year returned the same. "
                     "⚠ This number matters more than any other input: a 1% change can flip the winner."
                 ),
@@ -928,9 +968,9 @@ def sync_query_params():
 
 
 def build_rate_curve_chart(inputs, res):
-    """Money left at death for Option B across flat return rates.
+    """Money left at death for your account across flat return rates.
 
-    One line: above $0 Option B wins, below it the pension wins. The user's
+    One line: above $0 your account wins, below it the pension wins. The user's
     assumed rate and the break-even rate are marked so the single break-even
     number becomes something you can see.
     """
@@ -955,7 +995,7 @@ def build_rate_curve_chart(inputs, res):
     fig = go.Figure(go.Scatter(
         x=rates, y=finals, mode="lines",
         line=dict(color="#0D9488", width=2),
-        hovertemplate="Flat return %{x:.1f}%<br>Option B at death: $%{y:,.0f}<extra></extra>",
+        hovertemplate="Flat return %{x:.1f}%<br>Your account at death: $%{y:,.0f}<extra></extra>",
     ))
     fig.add_hline(y=0, line_width=1.5, line_color=muted)
     # Zoom on the crossing: size the y-axis from the shortfall side and the
@@ -964,9 +1004,9 @@ def build_rate_curve_chart(inputs, res):
     at_current = finals[min(range(len(rates)), key=lambda i: abs(rates[i] - current))]
     span = max(abs(min(finals + [0.0])), abs(at_current), 1.0)
     lo, hi = -1.3 * span, 1.6 * span
-    fig.add_annotation(x=rates[1], y=hi * 0.85, text="Above $0: Option B wins (money left over)",
+    fig.add_annotation(x=rates[1], y=hi * 0.85, text="Above $0: your account wins (money left over)",
                        showarrow=False, xanchor="left", font=dict(size=12, color=muted))
-    fig.add_annotation(x=rates[-2], y=lo * 0.85, text="Below $0: the pension wins (Option B runs out)",
+    fig.add_annotation(x=rates[-2], y=lo * 0.85, text="Below $0: the pension wins (your account runs out)",
                        showarrow=False, xanchor="right", font=dict(size=12, color=muted))
 
     fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color=ink,
@@ -983,7 +1023,7 @@ def build_rate_curve_chart(inputs, res):
                            bgcolor="rgba(255,255,255,0.85)")
 
     fig.update_layout(
-        title=dict(text=f"<b>Option B's money left at death, by flat return rate{dollars_note(res)}</b>",
+        title=dict(text=f"<b>Your account's money left at death, by flat return rate{dollars_note(res)}</b>",
                    x=0.5, xanchor="center", font=dict(size=15, color=ink)),
         xaxis=dict(title="Flat annual return (%)", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
         yaxis=dict(title="Money left at death ($)", tickformat=",", gridcolor="#eef0f2",
@@ -1099,7 +1139,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         x=ages,
         y=personal_fund_values,
         mode="lines+markers",
-        name=f"Option B: personal fund balance (fixed {index_return_pct:.1f}% return from sidebar)",
+        name=f"Your own account's balance (fixed {index_return_pct:.1f}% return from sidebar)",
         line=dict(color="#0D9488", width=3),
         customdata=_personal_customdata,
         hovertemplate=(
@@ -1114,7 +1154,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
 
     _y_pad = data_range * 0.12
     if title is None:
-        title = f"Option B Personal Fund Balance at a flat {index_return_pct:.1f}% annual return"
+        title = f"Your Own Account's Balance at a flat {index_return_pct:.1f}% annual return"
     title += dollars_note(res)
     fig.update_layout(
         title=dict(
@@ -1123,7 +1163,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             font=dict(size=16, color="#1e293b"),
         ),
         xaxis_title="Your age",
-        yaxis_title="Option B's balance ($)<br><sup>below $0 = income it couldn't pay</sup>",
+        yaxis_title="Your account's balance ($)<br><sup>below $0 = income it couldn't pay</sup>",
         xaxis=dict(
             tickmode="array",
             tickvals=[ages[i] for i in range(0, len(ages), x_tick_step)],

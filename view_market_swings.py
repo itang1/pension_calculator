@@ -1,9 +1,9 @@
-"""Page 2: what happens to Option B when returns swing year to year.
+"""Page 2: what happens to your account when returns swing year to year.
 
 The comparison page assumes the market returns one flat rate every single
 year. This page re-runs the same scenario 1,000 times with realistic
 year-to-year swings (a Monte Carlo simulation; that term appears in the
-methodology expander, not in the main copy) and reports how often Option B
+methodology expander, not in the main copy) and reports how often your account
 runs out of money, when it happens, and what the typical outcome looks like.
 """
 
@@ -15,6 +15,7 @@ from common import (
     build_fund_chart,
     deflate_mc,
     inputs_summary_html,
+    out_of_100,
     dollars_note,
     get_monte_carlo,
     render_feedback_form,
@@ -43,8 +44,8 @@ def risk_tier(depletion_prob, flat_b_wins):
 def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
     """The page's answer: a traffic-light verdict on the ruin risk.
 
-    The comparison page answers "on average, does Option B end with money?"
-    The depletion probability answers "how often does Option B run out once
+    The comparison page answers "on average, does your account end with money?"
+    The depletion probability answers "how often does your account run out once
     returns vary?" Those are different questions, and a favorable flat-rate
     result can coexist with an unacceptably high chance of ruin. This banner
     turns the two numbers into a single risk-tiered recommendation, with a
@@ -58,16 +59,16 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
 
     if tier == "none":
         bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "Option B holds up, even in bad markets."
+        verdict = "Your account holds up, even in bad markets."
         body = (
-            "In all 1,000 possible futures, Option B never ran out of money. "
+            "In all 1,000 possible futures, your account never ran out of money. "
             "The answer from page 1 holds up."
         )
     elif tier == "small":
         bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "Option B is a reasonable choice, with a small risk."
+        verdict = "Your account is a reasonable choice, with a small risk."
         body = (
-            f"Option B ran out of money in <strong>{n} out of 100</strong> possible futures. "
+            f"Your account ran out of money in <strong>{n} out of 100</strong> possible futures. "
             f"Usually it works out. If you choose it, keep some savings aside in case you land "
             f"in one of the unlucky ones."
         )
@@ -75,16 +76,16 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
         bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
         verdict = "A real trade-off: neither option is clearly better."
         body = (
-            f"Option B usually ends with more money, but it ran out in <strong>{n} out of 100</strong> "
+            f"Your account usually ends with more money, but it ran out in <strong>{n} out of 100</strong> "
             f"possible futures. The pension can never run out. If running out of money in old age "
-            f"would be a disaster for you, the pension's guarantee may be worth more than Option B's "
+            f"would be a disaster for you, the pension's guarantee may be worth more than your account's "
             f"extra money."
         )
     elif tier == "lean_a":
         bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
-        verdict = "Lean toward the pension, even though page 1 picked Option B."
+        verdict = "Lean toward the pension, even though page 1 picked your own account."
         body = (
-            f"Page 1 assumed a smooth {r} every year. With real ups and downs, Option B ran out "
+            f"Page 1 assumed a smooth {r} every year. With real ups and downs, your account ran out "
             f"of money in <strong>{n} out of 100</strong> possible futures. That is close to a coin "
             f"flip, which is too risky for most people's retirement money."
         )
@@ -92,24 +93,24 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
         bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
         verdict = "The pension is the safer choice."
         body = (
-            f"Page 1 said Option B wins with a smooth {r} every year. But with real ups and downs, "
-            f"Option B ran out of money in <strong>{n} out of 100</strong> possible futures. When "
+            f"Page 1 said your account wins with a smooth {r} every year. But with real ups and downs, "
+            f"your account ran out of money in <strong>{n} out of 100</strong> possible futures. When "
             f"most futures end with an empty account, the pension's paycheck for life is the safer bet."
         )
     elif tier == "a_close":
         bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
-        verdict = "The pension wins, though Option B sometimes gets lucky."
+        verdict = "The pension wins, though your account sometimes gets lucky."
         body = (
-            f"Even with a smooth {r} every year, Option B runs out. With real ups and downs it ran "
+            f"Even with a smooth {r} every year, your account runs out. With real ups and downs it ran "
             f"out in <strong>{n} out of 100</strong> possible futures, and the rest only made it "
-            f"because they happened to get good years. Picking Option B here is a bet on luck; "
+            f"because they happened to get good years. Choosing your own account here is a bet on luck; "
             f"the pension is the safer choice."
         )
     else:  # a_confirmed
         bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
         verdict = "The pension is the safer choice, and bad markets make it clearer."
         body = (
-            f"Even with a smooth {r} every year, Option B runs out. With real ups and downs it ran "
+            f"Even with a smooth {r} every year, your account runs out. With real ups and downs it ran "
             f"out in <strong>{n} out of 100</strong> possible futures. The pension's paycheck for "
             f"life is the more reliable choice."
         )
@@ -120,13 +121,6 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
 {body}
 </div>
 """)
-
-
-def out_of_100(prob):
-    """A share of futures as a plain count out of 100 that never hides a real risk."""
-    if 0 < prob < 0.005:
-        return "fewer than 1"
-    return f"{round(prob * 100)}"
 
 
 def render():
@@ -146,7 +140,7 @@ def render():
     st.markdown(f"""
 Page 1 pretended the stock market grows by exactly {index_return_pct:.1f}% every single year. Real markets don't work that way. Some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
 
-**So this page asks: with real ups and downs, how often does Option B run out of money?**
+**So this page asks: with real ups and downs, how often does your account run out of money?**
 
 To find out, we made up **1,000 possible futures** for the stock market. Each one is a different random mix of good and bad years, like rolling dice for every year of your {work_years} working years and {retirement_years} retired years. Then we ran your plan through every one of them.
 """)
@@ -184,7 +178,7 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
             label="Futures where the money ran out",
             value=f"{_n_out:,} out of {len(final_balances):,}",
             delta=None,
-            help="Out of the 1,000 possible futures, how many left Option B's account empty before the end of your retirement. The pension can never run out; it pays until you die.",
+            help="Out of the 1,000 possible futures, how many left your own account empty before the end of your retirement. The pension can never run out; it pays until you die.",
         )
     with m2:
         st.metric(
@@ -227,7 +221,7 @@ Page 1 tells you who wins in a smooth, average market. This page tells you the r
     fig = build_fund_chart(
         inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"],
         title=(
-            f"Option B's account: a steady {index_return_pct:.1f}% a year "
+            f"Your own account: a steady {index_return_pct:.1f}% a year "
             f"vs. 1,000 possible futures"
         ),
     )
@@ -235,8 +229,8 @@ Page 1 tells you who wins in a smooth, average market. This page tells you the r
 
     with st.expander("How to read this chart"):
         st.markdown("""
-- **Bold teal line** = page 1's answer: Option B's account if the market grew by the same amount every year.
-- **Shaded bands** = where Option B's account lands across the 1,000 possible futures. Blue = the middle half of futures (the most likely range). Red = the unluckiest futures. Green = the luckiest ones, which can go off the top of the chart.
+- **Bold teal line** = page 1's answer: your own account if the market grew by the same amount every year.
+- **Shaded bands** = where your own account lands across the 1,000 possible futures. Blue = the middle half of futures (the most likely range). Red = the unluckiest futures. Green = the luckiest ones, which can go off the top of the chart.
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the \\$0 mark. Once a simulated future hits \\$0, it has run out of money permanently.
 """)
