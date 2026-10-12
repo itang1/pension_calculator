@@ -5,7 +5,8 @@ the sidebar inputs, cached simulation wrappers, the fund chart builder, and
 the feedback form. Page-specific copy and layout live in the view modules.
 
 Per-user data is passed between the entry script and the views via
-``st.session_state`` (keys ``_inputs`` and ``_results``), never via module
+``st.session_state`` (keys ``_inputs``, ``_results`` for display, and
+``_results_nominal`` in future dollars), never via module
 globals, which are process-wide and would leak between sessions.
 """
 
@@ -19,6 +20,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import gspread
+import numpy as np
 import pandas as pd
 import streamlit as st
 from plotly import graph_objects as go
@@ -301,21 +303,19 @@ PRESETS = {
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 20",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
-            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
-            "in_early_red": 0.0, "in_vest": 5,
+            "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 30, "in_returns": 10.0,
         },
     },
     "bob": {
         "label": "Bob: pension wins",
         "values": {
-            "in_wage": 65000, "in_work_years": 20, "in_retirement_age": 55,
+            "in_wage": 65000, "in_work_years": 20, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
-            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
-            "in_early_red": 0.0, "in_vest": 5,
-            "in_retirement_years": 40, "in_returns": 5.0,
+            "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
+            "in_retirement_years": 35, "in_returns": 5.0,
         },
     },
     "carol": {
@@ -325,32 +325,29 @@ PRESETS = {
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "15",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
-            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
-            "in_early_red": 0.0, "in_vest": 5,
+            "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 25, "in_returns": 9.0,
         },
     },
     "dave": {
         "label": "Dave: pension wins",
         "values": {
-            "in_wage": 95000, "in_work_years": 15, "in_retirement_age": 50,
+            "in_wage": 95000, "in_work_years": 15, "in_retirement_age": 63,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
-            "in_allowance_mode": "Estimate for me", "in_factor": 2.0,
-            "in_early_red": 0.0, "in_vest": 5,
-            "in_retirement_years": 35, "in_returns": 4.0,
+            "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
+            "in_retirement_years": 25, "in_returns": 4.0,
         },
     },
     "frank": {
         "label": "Frank: personal fund wins",
         "values": {
-            "in_wage": 150000, "in_work_years": 25, "in_retirement_age": 55,
+            "in_wage": 150000, "in_work_years": 25, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 18",
             "in_promo_pct": 10.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
-            "in_allowance_mode": "Estimate for me", "in_factor": 1.5,
-            "in_early_red": 0.0, "in_vest": 5,
+            "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 25, "in_returns": 10.0,
         },
     },
@@ -395,7 +392,7 @@ This calculator operates in annual periods. Within each year:
 - **Contributions & deposits**: Made at the end of the year.
 - **Withdrawals**: Made at the end of the year.
 - **Market returns**: Earned on the balance at the *start* of the year, before that year's deposit or withdrawal.
-- **COLA**: Applied to salary at the end of each working year, taking effect the following year. In retirement, applied to the pension allowance at the end of each year, taking effect the following year.
+- **COLA**: Applied to salary at the end of each working year, taking effect the following year. In retirement, the pension's own COLA (inflation, up to 2% a year) is applied at the end of each year, taking effect the following year.
 - **Step increases**: Applied at the end of each of your first few working years (set by *Number of Step Raises*), taking effect the following year. If your first step raise comes mid-year, Year 1 is averaged over 6 months at the starting step and 6 months at the next step.
 - **Promotions**: Applied at the end of the year you specify, taking effect the following year.
 """)
@@ -417,13 +414,21 @@ This calculator operates in annual periods. Within each year:
             "Age at Retirement",
             value=55, min_value=18, max_value=75, step=1,
             key="in_retirement_age",
-            help="Your age on the day you expect to retire."
+            help="Your age on the day you expect to retire. Your age when hired is this minus Years to Work."
         )
+        hire_age = int(retirement_age) - int(work_years)
+        if hire_age < 16:
+            st.error(
+                f"Retiring at {int(retirement_age)} after {int(work_years)} years means starting work at "
+                f"age {hire_age}. Raise your retirement age or lower your years of work to continue."
+            )
+            st.stop()
+        st.caption(f"You are hired at age {hire_age} and retire at {int(retirement_age)}.")
         cola_increase = st.number_input(
             "Cost of Living Adjustment (%)",
             value=3.0, min_value=0.0, max_value=5.5, step=0.1,
             key="in_cola",
-            help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. In retirement, your pension check grows by this same percentage each year."
+            help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. This is for your salary while working; the pension's own COLA in retirement follows inflation (see Expected Inflation below)."
         ) / 100 + 1
         step_increase = st.number_input(
             "Step Increase (%)",
@@ -486,35 +491,21 @@ This calculator operates in annual periods. Within each year:
         )
         manual_override = (_allowance_mode == "Enter manually")
 
-        if not manual_override:
-            _factor_pct = st.number_input(
-                "Retirement Factor (% per year of service)",
-                value=2.0, min_value=0.0, max_value=5.0, step=0.1,
-                key="in_factor",
-                help="The share of your final average salary you earn for each year of service. Many plans use 1.5% to 2.5%, and the factor often depends on your age and years of service when you retire. Check your plan's handbook.",
-            )
-            _early_red = st.number_input(
-                "Early Retirement Reduction (%)",
-                value=0.0, min_value=0.0, max_value=50.0, step=0.5,
-                key="in_early_red",
-                help="If you retire before your plan's full-benefit age, many plans permanently reduce the allowance. Enter the exact percentage from your plan's retirement estimator, or 0 if none.",
-            )
-            _vest_years = st.number_input(
-                "Years Required to Vest",
-                value=5, min_value=0, max_value=20, step=1,
-                key="in_vest",
-                help="The minimum years of service before you earn a lifetime allowance.",
-            )
+        # Inflation drives the retiree COLA and the today's-dollars views, so it
+        # is read before the allowance captions that use it (widget in Retirement).
+        inflation = 1 + st.session_state.get("in_inflation", 2.5) / 100
 
+        plan = None
+        if not manual_override:
             _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
                                promotion_years, promotion_increase,
                                int(step_count), first_step_midyear)
-            _computed_allowance = simulation.estimate_allowance(
-                int(work_years), _fas, _factor_pct, _early_red, int(_vest_years))
+            plan = simulation.plan_benefit(int(work_years), int(retirement_age), _fas)
+            starting_allowance = plan["allowance"]
 
             # The value is pushed through session_state (not ``value=``) so a
             # keyed, disabled widget always shows the freshly computed figure.
-            st.session_state["allowance_formula"] = round(_computed_allowance)
+            st.session_state["allowance_formula"] = round(starting_allowance)
             st.number_input(
                 "First-year annual pension allowance ($)",
                 min_value=0,
@@ -522,23 +513,39 @@ This calculator operates in annual periods. Within each year:
                 disabled=True,
                 key="allowance_formula",
                 help=(
-                    "Years of Service × Final Average Salary (highest 36 consecutive months) "
-                    "× Retirement Factor × Early Retirement Reduction Factor. "
-                    "Derived from your career inputs above. Switch to 'Enter manually' to override."
+                    "Years of Service × Final Average Salary (highest 3 consecutive years) "
+                    "× Retirement Factor × Early Retirement Reduction Factor, capped at 80% of "
+                    "Final Average Salary. The factor and any reduction follow the plan's rules "
+                    "for your age and years of service. Switch to 'Enter manually' to override."
                 ),
             )
-            if int(work_years) < int(_vest_years):
+            if plan["status"] == "unvested":
+                _refund = simulation.refund_with_interest(
+                    [s * pension_contribution_rate for s in simulation.salary_schedule(
+                        starting_wage, int(work_years), cola_increase, step_increase,
+                        promotion_years, promotion_increase, int(step_count), first_step_midyear)])
                 st.warning(
                     f"With {int(work_years)} years of service you would not vest, so there is no "
-                    f"lifetime allowance. Most plans refund your own contributions instead, which "
-                    f"this calculator does not model."
+                    f"lifetime allowance. Instead your contributions are refunded with "
+                    f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% interest (about ${_refund:,.0f}). "
+                    f"In that case Option B only wins if it earns more than "
+                    f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% a year."
                 )
             else:
-                st.caption(
-                    f"That is about ${_computed_allowance / cola_increase ** int(work_years):,.0f} "
-                    f"in today's dollars, after {int(work_years)} years of COLA."
-                )
-            starting_allowance = _computed_allowance
+                _rule = f"{plan['factor_pct']:g}% per year of service"
+                if plan["reduction"] < 1:
+                    _rule += f", reduced to {plan['reduction'] * 100:.1f}% for retiring before 55"
+                if plan["capped"]:
+                    _rule += ", capped at 80% of your final average salary"
+                _today = starting_allowance / inflation ** (int(work_years) + plan["deferral_years"])
+                st.caption(f"{_rule}. That is about ${_today:,.0f} a year in today's dollars.")
+                if plan["status"] == "deferred":
+                    st.warning(
+                        f"Without 30 years of service you can't start a pension before age "
+                        f"{simulation.PLAN_FULL_AGE}. Leaving at {int(retirement_age)} gives a deferred pension "
+                        f"from age {simulation.PLAN_FULL_AGE} with no COLA, so neither option pays anything for "
+                        f"your first {plan['deferral_years']} years of retirement."
+                    )
         else:
             manual_allowance = st.number_input(
                 "First-year annual pension allowance ($)",
@@ -555,16 +562,16 @@ This calculator operates in annual periods. Within each year:
                 help=(
                     "Plan estimators usually show your benefit in today's dollars. The calculator "
                     "grows your salary in future dollars, so a today's-dollars figure is first "
-                    "grown by COLA to your retirement year. Mixing the two would make the pension "
-                    "look several times smaller than it is."
+                    "grown by inflation to your retirement year. Mixing the two would make the "
+                    "pension look several times smaller than it is."
                 ),
             )
             if _basis == "Today's dollars":
                 starting_allowance = simulation.to_retirement_dollars(
-                    manual_allowance, int(work_years), cola_increase)
+                    manual_allowance, int(work_years), inflation)
                 st.caption(
                     f"That is about ${starting_allowance:,.0f} in your first year of retirement, "
-                    f"after {int(work_years)} years of COLA."
+                    f"after {int(work_years)} years of inflation."
                 )
             else:
                 starting_allowance = manual_allowance
@@ -577,6 +584,16 @@ This calculator operates in annual periods. Within each year:
             help="How many years you expect to spend in retirement before you die."
         )
         st.caption(f"Retirement runs from age {int(retirement_age)} to {int(retirement_age) + int(retirement_years)}.")
+        inflation_pct = st.number_input(
+            "Expected Inflation (%)",
+            value=2.5, min_value=0.0, max_value=10.0, step=0.1,
+            key="in_inflation",
+            help=(
+                "Average yearly rise in prices (CPI). The pension's COLA in retirement follows "
+                f"inflation up to {simulation.PLAN_RETIREE_COLA_CAP_PCT:g}% a year, so higher inflation "
+                "slowly erodes it. Also used to show amounts in today's dollars."
+            ),
+        )
         index_returns_rate = (
             st.number_input(
                 "Average Index Returns Rate (%)",
@@ -595,6 +612,10 @@ This calculator operates in annual periods. Within each year:
             + 1
         )
 
+    retiree_cola_pct = min(inflation_pct, simulation.PLAN_RETIREE_COLA_CAP_PCT)
+    if plan is not None and not plan["cola_applies"]:
+        retiree_cola_pct = 0.0
+
     return {
         "starting_wage": starting_wage,
         "work_years": int(work_years),
@@ -609,18 +630,36 @@ This calculator operates in annual periods. Within each year:
         "starting_allowance": starting_allowance,
         "retirement_years": int(retirement_years),
         "index_returns_rate": index_returns_rate,
+        "inflation": 1 + inflation_pct / 100,
+        "retiree_cola": 1 + retiree_cola_pct / 100,
+        "deferral_years": 0 if plan is None else plan["deferral_years"],
+        "plan_status": "manual" if plan is None else plan["status"],
+    }
+
+
+def _engine_args(inputs):
+    """Positional arguments shared by every simulation entry point."""
+    return (
+        inputs["starting_wage"], inputs["work_years"], inputs["cola_increase"],
+        inputs["step_increase"], inputs["promotion_years"], inputs["promotion_increase"],
+        inputs["pension_contribution_rate"], inputs["starting_allowance"],
+        inputs["retirement_years"],
+    )
+
+
+def _engine_kwargs(inputs):
+    return {
+        "step_count": inputs["step_count"],
+        "first_step_midyear": inputs["first_step_midyear"],
+        "retiree_cola": inputs["retiree_cola"],
+        "deferral_years": inputs["deferral_years"],
     }
 
 
 def compute_results(inputs):
     """Run the flat-rate simulation and derive everything both pages display."""
-    result = run_simulation(
-        inputs["starting_wage"], inputs["work_years"], inputs["cola_increase"],
-        inputs["step_increase"], inputs["promotion_years"], inputs["promotion_increase"],
-        inputs["pension_contribution_rate"], inputs["starting_allowance"],
-        inputs["retirement_years"], inputs["index_returns_rate"],
-        inputs["step_count"], inputs["first_step_midyear"],
-    )
+    result = run_simulation(*_engine_args(inputs), inputs["index_returns_rate"],
+                            **_engine_kwargs(inputs))
 
     personal_fund_values = result["personal_fund_values"]
 
@@ -631,13 +670,7 @@ def compute_results(inputs):
         None,
     )
 
-    breakeven_rate = compute_breakeven_rate(
-        inputs["starting_wage"], inputs["work_years"], inputs["cola_increase"],
-        inputs["step_increase"], inputs["promotion_years"], inputs["promotion_increase"],
-        inputs["pension_contribution_rate"], inputs["starting_allowance"],
-        inputs["retirement_years"],
-        inputs["step_count"], inputs["first_step_midyear"],
-    )
+    breakeven_rate = compute_breakeven_rate(*_engine_args(inputs), **_engine_kwargs(inputs))
 
     years_covered = inputs["retirement_years"] if depletion_year is None else depletion_year - 1
 
@@ -649,6 +682,7 @@ def compute_results(inputs):
         # Display-only percentages
         "index_return_pct": (inputs["index_returns_rate"] - 1) * 100,
         "cola_pct": (inputs["cola_increase"] - 1) * 100,
+        "retiree_cola_pct": (inputs["retiree_cola"] - 1) * 100,
         "step_pct": (inputs["step_increase"] - 1) * 100,
         "promotion_pct": (inputs["promotion_increase"] - 1) * 100,
     }
@@ -657,16 +691,192 @@ def compute_results(inputs):
 def get_monte_carlo(inputs, std_pct, n_simulations=1000):
     """Cached Monte Carlo run for the current inputs at the given volatility (%)."""
     return run_monte_carlo(
-        inputs["starting_wage"], inputs["work_years"], inputs["cola_increase"],
-        inputs["step_increase"], inputs["promotion_years"], inputs["promotion_increase"],
-        inputs["pension_contribution_rate"], inputs["starting_allowance"],
-        inputs["retirement_years"],
+        *_engine_args(inputs),
         mean_return=inputs["index_returns_rate"] - 1,
         std_return=std_pct / 100.0,
         n_simulations=n_simulations,
-        step_count=inputs["step_count"],
-        first_step_midyear=inputs["first_step_midyear"],
+        **_engine_kwargs(inputs),
     )
+
+
+def ages_for(inputs):
+    """Age at the end of each simulated year: hire age for W0, then one per year."""
+    hire_age = inputs["retirement_age"] - inputs["work_years"]
+    return [hire_age + i for i in range(inputs["work_years"] + inputs["retirement_years"] + 1)]
+
+
+def _deflators(inputs, n_points):
+    """Divide by these to turn end-of-year amounts into today's dollars."""
+    return np.array([inputs["inflation"] ** i for i in range(n_points)])
+
+
+def deflate_results(res, inputs):
+    """A copy of the flat-rate results with every dollar amount in today's dollars.
+
+    Each end-of-year amount is divided by inflation compounded to that year.
+    Running totals are re-summed from the deflated yearly amounts, so they stay
+    true sums. Rates (return, break-even) are unchanged. The year-by-year
+    tables keep future dollars so each row still adds up.
+    """
+    df = res["yearly_data"].copy()
+    d = _deflators(inputs, len(df) + 1)[1:]
+    for col in ("Salary", "Start Balance", "Pension Contribution", "Pension Redeemed",
+                "Market Returns", "Balance"):
+        df[col] = df[col].to_numpy() / d
+    df["Pension Contribution Total"] = df["Pension Contribution"].cumsum()
+    df["Pension Redeemed Total"] = df["Pension Redeemed"].cumsum()
+    working = df["Year"].str.startswith("W")
+    df.loc[~working, "Pension Contribution Total"] = 0.0
+    out = dict(res)
+    out["yearly_data"] = df
+    out["personal_fund_values"] = [0] + df["Balance"].tolist()
+    out["pension_fund_values"] = [0] + df["Pension Redeemed Total"].tolist()
+    out["pension_contribution_total"] = float(df["Pension Contribution"].sum())
+    out["pension_redeemed_total"] = float(df["Pension Redeemed"].sum())
+    out["personal_balance"] = float(df["Balance"].iloc[-1])
+    out["real_dollars"] = True
+    return out
+
+
+def deflate_mc(mc, inputs):
+    """Monte Carlo outputs in today's dollars (same deflators as the flat path)."""
+    d = _deflators(inputs, mc["percentiles"].shape[1])
+    out = dict(mc)
+    out["percentiles"] = mc["percentiles"] / d
+    out["median_path"] = mc["median_path"] / d
+    out["final_balances"] = mc["final_balances"] / d[-1]
+    return out
+
+
+def dollars_note(res):
+    """Suffix for chart titles saying which dollars are shown."""
+    return " (today's dollars)" if res.get("real_dollars") else ""
+
+
+# --- Shareable links ----------------------------------------------------------------
+# Every sidebar input (plus the display toggle and the swing slider) is mirrored
+# into the page URL, so a copied link reopens the same scenario. Values are
+# parsed and range-checked here before they touch widget state.
+_SHARE_SPEC = {
+    "in_wage": (int, 0, 10_000_000),
+    "in_work_years": (int, 1, 60),
+    "in_retirement_age": (int, 18, 75),
+    "in_cola": (float, 0.0, 5.5),
+    "in_step": (float, 0.0, 50.0),
+    "in_step_count": (int, 0, 20),
+    "in_step_midyear": (bool, None, None),
+    "in_promo_years": (str, None, None),
+    "in_promo_pct": (float, 0.0, 100.0),
+    "in_contrib": (float, 0.0, 100.0),
+    "in_allowance_mode": (["Estimate for me", "Enter manually"], None, None),
+    "allowance_manual": (int, 0, 10_000_000),
+    "in_allowance_basis": (["Today's dollars", "Dollars at retirement"], None, None),
+    "in_retirement_years": (int, 1, 60),
+    "in_inflation": (float, 0.0, 10.0),
+    "in_returns": (float, 0.0, 25.0),
+    "in_real": (bool, None, None),
+    "mc_std": (float, 0.0, 30.0),
+}
+
+
+def _param_name(key):
+    return key.removeprefix("in_")
+
+
+def _parse_param(raw, spec):
+    kind, lo, hi = spec
+    if isinstance(kind, list):
+        return raw if raw in kind else None
+    if kind is bool:
+        return {"true": True, "false": False}.get(raw.lower())
+    if kind is str:
+        return raw[:100]
+    try:
+        value = kind(float(raw)) if kind is int else kind(raw)
+    except ValueError:
+        return None
+    if not math.isfinite(value) or value < lo or value > hi:
+        return None
+    return value
+
+
+def apply_query_params():
+    """Load inputs from the URL once per session, before any widget renders."""
+    if st.session_state.get("_qp_applied"):
+        return
+    st.session_state["_qp_applied"] = True
+    for key, spec in _SHARE_SPEC.items():
+        raw = st.query_params.get(_param_name(key))
+        if raw is None:
+            continue
+        value = _parse_param(raw, spec)
+        if value is not None:
+            st.session_state[key] = value
+
+
+def sync_query_params():
+    """Mirror the current inputs into the URL so the address bar is shareable."""
+    params = {_param_name(k): str(st.session_state[k])
+              for k in _SHARE_SPEC if k in st.session_state}
+    if dict(st.query_params) != params:
+        st.query_params.from_dict(params)
+
+
+def build_rate_curve_chart(inputs, res):
+    """Money left at death for Option B across flat return rates.
+
+    One line: above $0 Option B wins, below it the pension wins. The user's
+    assumed rate and the break-even rate are marked so the single break-even
+    number becomes something you can see.
+    """
+    rates = [r / 2 for r in range(0, 31)]  # 0% to 15% in half-point steps
+    real = res.get("real_dollars", False)
+    finals = []
+    for r in rates:
+        sim = run_simulation(*_engine_args(inputs), 1 + r / 100, **_engine_kwargs(inputs))
+        final = sim["personal_balance"]
+        if real:
+            final /= inputs["inflation"] ** (inputs["work_years"] + inputs["retirement_years"])
+        finals.append(final)
+    ink, muted = "#1e293b", "#64748B"
+
+    fig = go.Figure(go.Scatter(
+        x=rates, y=finals, mode="lines",
+        line=dict(color="#0D9488", width=2),
+        hovertemplate="Flat return %{x:.1f}%<br>Option B at death: $%{y:,.0f}<extra></extra>",
+    ))
+    fig.add_hline(y=0, line_width=1.5, line_color=muted)
+    yr = max(abs(min(finals)), abs(max(finals)))
+    fig.add_annotation(x=rates[1], y=yr * 0.9, text="Option B wins here (money left over)",
+                       showarrow=False, xanchor="left", font=dict(size=12, color=muted))
+    fig.add_annotation(x=rates[-2], y=-yr * 0.9, text="The pension wins here (Option B runs out)",
+                       showarrow=False, xanchor="right", font=dict(size=12, color=muted))
+
+    current = res["index_return_pct"]
+    fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color=ink,
+                  annotation_text=f"Your assumption: {current:.1f}%",
+                  annotation_position="top", annotation_font_color=ink)
+    be = res["breakeven_rate"]
+    if 0 < be <= rates[-1]:
+        fig.add_trace(go.Scatter(
+            x=[be], y=[0], mode="markers",
+            marker=dict(size=10, color="#0D9488", line=dict(width=2, color="white")),
+            hovertemplate=f"Break-even: {be:.1f}%<extra></extra>",
+        ))
+        fig.add_annotation(x=be, y=0, text=f"Break-even {be:.1f}%", showarrow=True,
+                           arrowhead=0, ax=40, ay=40, font=dict(size=12, color=ink),
+                           bgcolor="rgba(255,255,255,0.85)")
+
+    fig.update_layout(
+        title=dict(text=f"<b>Option B's money left at death, by flat return rate{dollars_note(res)}</b>",
+                   x=0.5, xanchor="center", font=dict(size=15, color=ink)),
+        xaxis=dict(title="Flat annual return (%)", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
+        yaxis=dict(title="Money left at death ($)", tickformat=",", gridcolor="#eef0f2",
+                   range=[-yr * 1.1, yr * 1.1]),
+        plot_bgcolor="white", showlegend=False, hovermode="x",
+        margin=dict(l=40, r=20, t=60, b=50),
+    )
+    return fig
 
 
 def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
@@ -684,6 +894,9 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     yearly_data = res["yearly_data"]
     work_years = inputs["work_years"]
     index_return_pct = res["index_return_pct"]
+    # The x-axis is age. Ages are unique and increasing (hire age at W0, then
+    # one per year), so they double as the plot positions.
+    ages = ages_for(inputs)
 
     # Adaptive x-axis
     total_years = len(years)
@@ -717,8 +930,8 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
 
     fig = go.Figure()
 
-    _xf = list(years)
-    _xr = list(years)[::-1]
+    _xf = list(ages)
+    _xr = list(ages)[::-1]
 
     if mc_pcts is not None:
         fig.add_trace(go.Scatter(
@@ -747,19 +960,19 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     _deposits = [0.0] + yearly_data["Pension Contribution"].tolist()
     _withdrawals = [0.0] + yearly_data["Pension Redeemed"].tolist()
     _returns = [0.0] + yearly_data["Market Returns"].tolist()
-    _personal_customdata = list(zip(_deposits, _withdrawals, _returns))
+    _personal_customdata = list(zip(_deposits, _withdrawals, _returns, years))
 
     fig.add_trace(go.Scatter(
-        x=years,
+        x=ages,
         y=pension_fund_values,
         mode="lines+markers",
         name="Annual payout amount (same for both options)",
         line=dict(color="#A855F7", width=2),
         marker=dict(color="#A855F7", size=5, symbol="circle"),
-        customdata=_withdrawals,
+        customdata=list(zip(_withdrawals, years)),
         hovertemplate=(
-            "<b>Year %{x}</b><br>"
-            "This year paid out: $%{customdata:,.0f}<br>"
+            "<b>Age %{x}</b> (year %{customdata[1]})<br>"
+            "This year paid out: $%{customdata[0]:,.0f}<br>"
             "Running total paid out: $%{y:,.0f}"
             "<extra></extra>"
         ),
@@ -767,14 +980,14 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     ))
 
     fig.add_trace(go.Scatter(
-        x=years,
+        x=ages,
         y=personal_fund_values,
         mode="lines+markers",
         name=f"Option B: personal fund balance (fixed {index_return_pct:.1f}% return from sidebar)",
         line=dict(color="#0D9488", width=3),
         customdata=_personal_customdata,
         hovertemplate=(
-            "<b>Year %{x}</b><br>"
+            "<b>Age %{x}</b> (year %{customdata[3]})<br>"
             "Deposit this year: $%{customdata[0]:,.0f}<br>"
             "Withdrawal this year: $%{customdata[1]:,.0f}<br>"
             "Market returns this year: $%{customdata[2]:,.0f}<br>"
@@ -786,18 +999,18 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     _y_pad = data_range * 0.12
     if title is None:
         title = f"Option B Personal Fund Balance at a flat {index_return_pct:.1f}% annual return"
+    title += dollars_note(res)
     fig.update_layout(
         title=dict(
             text=f"<b>{title}</b>",
             x=0.5, xanchor="center",
             font=dict(size=16, color="#1e293b"),
         ),
-        xaxis_title="Year (W = Working, R = Retirement)",
+        xaxis_title="Your age",
         yaxis_title="Dollar Amount ($)",
         xaxis=dict(
-            tickangle=45,
             tickmode="array",
-            tickvals=[years[i] for i in range(0, len(years), x_tick_step)],
+            tickvals=[ages[i] for i in range(0, len(ages), x_tick_step)],
             tickfont=dict(size=10),
             showgrid=True,
             gridcolor="lightgray",
@@ -816,7 +1029,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     )
 
     fig.add_vrect(
-        x0=-0.5, x1=work_years + 0.5,
+        x0=ages[0] - 0.5, x1=ages[work_years] + 0.5,
         fillcolor="rgba(0,0,0,0)", layer="below", line_width=0,
         annotation_text="<b>Working Years</b>", annotation_position="top left",
         annotation=dict(
@@ -825,7 +1038,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         ),
     )
     fig.add_vrect(
-        x0=work_years + 0.5, x1=len(years) - 0.5,
+        x0=ages[work_years] + 0.5, x1=ages[-1] + 0.5,
         fillcolor="rgba(0,0,0,0)", layer="below", line_width=0,
         annotation_text="<b>Retirement Years</b>", annotation_position="top left",
         annotation=dict(
@@ -833,7 +1046,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             bgcolor="rgba(255,255,255,0.75)", borderpad=5,
         ),
     )
-    fig.add_vline(x=work_years, line_width=2, line_dash="dash", line_color="#DC2626")
+    fig.add_vline(x=ages[work_years], line_width=2, line_dash="dash", line_color="#DC2626")
     _fund_depletes = min(personal_fund_values) < 0
     fig.add_hline(y=0, line_width=2, line_color="#666666",
                   annotation_text="$0 = personal fund depleted" if _fund_depletes else "$0",
@@ -843,8 +1056,8 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         if _fund_depletes:
             _dep_idx = next(i for i, v in enumerate(personal_fund_values) if v < 0)
             fig.add_annotation(
-                x=years[_dep_idx], y=0,
-                text=f"<b>✗ Runs out here: {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
+                x=ages[_dep_idx], y=0,
+                text=f"<b>✗ Runs out by age {ages[_dep_idx]}: {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
                 showarrow=True, arrowhead=2, arrowcolor="#DC2626",
                 ax=-40, ay=-60,
                 font=dict(size=13, color="#DC2626"),
@@ -852,7 +1065,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             )
         else:
             fig.add_annotation(
-                x=years[-1], y=personal_fund_values[-1],
+                x=ages[-1], y=personal_fund_values[-1],
                 text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over, yours to keep</b>",
                 showarrow=True, arrowhead=2, arrowcolor="#0D9488",
                 ax=-90, ay=-40,
@@ -868,13 +1081,13 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     table = df[df["Year"].str.startswith(phase_prefix)].copy()
     table = table.rename(columns=rename_map)
 
-    money_cols = [c for c in table.columns if c != "Year"]
+    money_cols = [c for c in table.columns if c not in ("Year", "Age")]
 
     # These sets don't depend on `col`; compute once, not per column.
     renamed_running = {rename_map.get(k, k) for k in (
         "Pension Contribution Total", "Pension Redeemed Total")}
     renamed_balance = {rename_map.get(k, k) for k in ("Balance",)}
-    total_row = {"Year": "Total"}
+    total_row = {"Year": "Total", **({"Age": None} if "Age" in table.columns else {})}
     for col in money_cols:
         if col in renamed_running or col in renamed_balance:
             total_row[col] = table[col].iloc[-1] if len(table) else 0.0
@@ -893,6 +1106,8 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
         return ["font-weight: 700;" if row["Year"] == "Total" else "" for _ in row]
 
     styler = table.style.format("${:,.0f}", subset=money_cols, na_rep="-")
+    if "Age" in table.columns:
+        styler = styler.format("{:.0f}", subset=["Age"], na_rep="")
     styler = styler.apply(_bold_total, axis=1)
     if balance_col is not None:
         styler = styler.map(_highlight_negative, subset=[balance_col])
@@ -907,7 +1122,8 @@ def render_feedback_form(page_name):
     volatility and depletion numbers the user was actually looking at.
     """
     inputs = st.session_state["_inputs"]
-    res = st.session_state["_results"]
+    # Feedback rows are logged in future dollars regardless of the display toggle.
+    res = st.session_state["_results_nominal"]
 
     st.divider()
     st.header("Share Your Feedback")

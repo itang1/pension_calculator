@@ -19,9 +19,10 @@ The app has two pages that share the same sidebar inputs and link to each other:
 - **Summary metrics**: total pension contributed, total pension received, fund value at retirement, final fund balance, break-even investment return rate, and years the personal fund covers
 - **Break-even rate**: the minimum annual investment return at which Option B survives your full retirement, compared directly to your assumed rate
 - **Year-over-year breakdown tables** for both working and retirement phases, showing contributions, withdrawals, market returns, and running balances
-- **Pension allowance estimator**: enter your career details and the app estimates your first-year allowance using a formula of my choice
-- **Configurable assumptions**: starting salary, COLA, step increases (size and number of steps), promotion years, pension contribution rate, retirement factor, early-retirement reduction, vesting period, index return rate, retirement age, and retirement length
+- **Pension allowance estimator**: built-in plan rules pick the benefit factor from your age and years of service, apply the early-retirement reduction table, the 80% cap, vesting, and deferred pensions, and grow the pension in retirement by inflation up to a 2% COLA cap
+- **Configurable assumptions**: starting salary, salary COLA, step increases (size and number of steps), promotion years, pension contribution rate, expected inflation, index return rate, retirement age, and retirement length
 - **Today's-dollars conversion**: a manually entered allowance from a plan estimator can be given in today's dollars and is grown by COLA to your first retirement year, so it is compared in the same future dollars as your salary
+- **Ages on every chart**, a **today's-dollars toggle**, a **return-rate chart** showing how the answer changes with the return, and **shareable links** (the page URL carries your inputs)
 - **Case studies** showing scenario where each option wins, with full settings to reproduce in the calculator with one click
 - **Feedback form** to submit questions and comments
 

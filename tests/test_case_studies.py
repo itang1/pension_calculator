@@ -20,43 +20,48 @@ def _replay(preset_id):
     cola = 1 + v["in_cola"] / 100
     step = 1 + v["in_step"] / 100
     promo_inc = 1 + v["in_promo_pct"] / 100
-    fas = s.compute_fas(v["in_wage"], v["in_work_years"], cola, step, promo, promo_inc,
+    wy, age = v["in_work_years"], v["in_retirement_age"]
+    fas = s.compute_fas(v["in_wage"], wy, cola, step, promo, promo_inc,
                         v["in_step_count"], v["in_step_midyear"])
-    allowance = s.estimate_allowance(v["in_work_years"], fas, v["in_factor"],
-                                     v["in_early_red"], v["in_vest"])
-    args = (v["in_wage"], v["in_work_years"], cola, step, promo, promo_inc,
+    plan = s.plan_benefit(wy, age, fas)
+    assert plan["status"] == "immediate"  # every case study retires at an eligible age
+    allowance = plan["allowance"]
+    inflation = 1 + v["in_inflation"] / 100
+    kw = dict(step_count=v["in_step_count"], first_step_midyear=v["in_step_midyear"],
+              retiree_cola=1 + min(v["in_inflation"], s.PLAN_RETIREE_COLA_CAP_PCT) / 100)
+    args = (v["in_wage"], wy, cola, step, promo, promo_inc,
             v["in_contrib"] / 100, allowance, v["in_retirement_years"])
-    res = s.run_simulation(*args, 1 + v["in_returns"] / 100,
-                           v["in_step_count"], v["in_step_midyear"])
+    res = s.run_simulation(*args, 1 + v["in_returns"] / 100, **kw)
     pv = res["personal_fund_values"]
-    wy = v["in_work_years"]
     depletion = next((k for k in range(1, v["in_retirement_years"] + 1) if pv[wy + k] <= 0), None)
     return {
+        "factor": plan["factor_pct"],
         "allowance": allowance,
-        "allowance_today": allowance / cola ** wy,
+        "allowance_today": allowance / inflation ** wy,
         "received": res["pension_redeemed_total"],
         "at_retirement": pv[wy],
         "final": res["personal_balance"],
         "depletion": depletion,
-        "breakeven": s.compute_breakeven_rate(*args, v["in_step_count"], v["in_step_midyear"]),
+        "breakeven": s.compute_breakeven_rate(*args, **kw),
     }
 
 
-# (preset, personal fund wins?, allowance, today's dollars, total received,
-#  fund at retirement, final balance or None, depletion year or None)
+# (preset, personal fund wins?, plan factor, allowance, today's dollars,
+#  total received, fund at retirement, final balance or None, depletion year or None)
 CLAIMS = [
-    ("alice", True, 238_100, 98_100, 11.3e6, 3.2e6, 5.4e6, None),
-    ("bob", False, 54_850, 30_400, 4.1e6, 332_000, None, 7),
-    ("carol", True, 198_800, 70_600, 7.2e6, 2.9e6, 3.4e6, None),
-    ("dave", False, 51_900, 33_300, 3.1e6, 276_000, None, 6),
-    ("frank", True, 166_500, 79_500, 6.1e6, 2.4e6, 4.8e6, None),
+    ("alice", True, 2.0, 238_100, 113_500, 9.7e6, 3.2e6, 10.0e6, None),
+    ("bob", False, 1.5, 41_100, 25_100, 2.1e6, 332_000, None, 10),
+    ("carol", True, 2.0, 198_800, 83_800, 6.4e6, 2.9e6, 5.2e6, None),
+    ("dave", False, 2.0, 51_900, 35_800, 1.7e6, 276_000, None, 6),
+    ("frank", True, 1.5, 166_500, 89_800, 5.3e6, 2.4e6, 6.5e6, None),
 ]
 
 
-@pytest.mark.parametrize("preset,b_wins,allow,today,received,at_ret,final,dep", CLAIMS)
-def test_case_study_copy_matches_engine(preset, b_wins, allow, today, received, at_ret, final, dep):
+@pytest.mark.parametrize("preset,b_wins,factor,allow,today,received,at_ret,final,dep", CLAIMS)
+def test_case_study_copy_matches_engine(preset, b_wins, factor, allow, today, received, at_ret, final, dep):
     r = _replay(preset)
     assert (r["final"] > 0) == b_wins
+    assert r["factor"] == factor
     assert r["allowance"] == pytest.approx(allow, rel=0.005)
     assert r["allowance_today"] == pytest.approx(today, rel=0.005)
     assert r["received"] == pytest.approx(received, rel=0.03)
@@ -68,8 +73,8 @@ def test_case_study_copy_matches_engine(preset, b_wins, allow, today, received, 
 
 
 def test_alice_breakeven_claim():
-    # Copy: "at a flat 9.6% or less, the pension comes out ahead."
-    assert _replay("alice")["breakeven"] == pytest.approx(9.6, abs=0.05)
+    # Copy: "at a flat 9.2% or less, the pension comes out ahead."
+    assert 9.2 < _replay("alice")["breakeven"] < 9.3
 
 
 # --- Risk verdict tiers ----------------------------------------------------------
@@ -93,3 +98,30 @@ def test_share_formatting_never_rounds_real_risk_to_zero():
     assert common.fmt_share(0.003) == "0.3%"
     assert common.fmt_share(0.0) == "0%"
     assert common.fmt_share(0.36) == "36%"
+
+
+# --- Shareable links ---------------------------------------------------------------
+
+def test_query_param_parsing_rejects_bad_values():
+    spec = common._SHARE_SPEC
+    assert common._parse_param("30", spec["in_work_years"]) == 30
+    assert common._parse_param("7.5", spec["in_returns"]) == 7.5
+    assert common._parse_param("99", spec["in_returns"]) is None      # above widget max
+    assert common._parse_param("abc", spec["in_wage"]) is None
+    assert common._parse_param("nan", spec["in_returns"]) is None
+    assert common._parse_param("True", spec["in_real"]) is True
+    assert common._parse_param("Enter manually", spec["in_allowance_mode"]) == "Enter manually"
+    assert common._parse_param("Hack", spec["in_allowance_mode"]) is None
+
+
+# --- Today's dollars ---------------------------------------------------------------
+
+def test_deflated_results_are_consistent():
+    inputs = {"inflation": 1.025, "work_years": 30, "retirement_years": 30, "retirement_age": 55}
+    res = s.run_simulation(120000, 30, 1.03, 1.055, (10, 20), 1.08, 0.10, 238100, 30, 1.10,
+                           retiree_cola=1.02)
+    real = common.deflate_results(res, inputs)
+    assert real["personal_balance"] == pytest.approx(res["personal_balance"] / 1.025 ** 60)
+    assert real["pension_fund_values"][-1] == pytest.approx(real["pension_redeemed_total"])
+    assert real["pension_redeemed_total"] < res["pension_redeemed_total"]
+    assert common.ages_for(inputs)[0] == 25 and common.ages_for(inputs)[30] == 55

@@ -11,6 +11,10 @@ Rate conventions (kept for backward compatibility with the app):
 - ``index_returns_rate`` is a compound (geometric) annual rate: the flat path
   grows by exactly this much every year, and the Monte Carlo median year does
   too, so both pages read the same input the same way.
+- ``retiree_cola`` (a multiplier) grows the pension in retirement and is
+  separate from the salary ``cola_increase``. ``None`` means "same as salary".
+- ``deferral_years`` is how many retirement years pass before the pension
+  starts (a deferred pension). Option B withdraws nothing in those years.
 """
 
 import math
@@ -46,10 +50,29 @@ def salary_schedule(starting_wage, work_years, cola_increase, step_increase,
     return salaries
 
 
+def payout_schedule(starting_allowance, retirement_years, retiree_cola,
+                    deferral_years=0):
+    """Pension paid in each retirement year, which Option B also withdraws.
+
+    Nothing is paid during the first ``deferral_years``; after that the
+    allowance starts at ``starting_allowance`` and grows by ``retiree_cola``.
+    """
+    payouts = []
+    payment = starting_allowance
+    for k in range(retirement_years):
+        if k < deferral_years:
+            payouts.append(0.0)
+        else:
+            payouts.append(payment)
+            payment *= retiree_cola
+    return payouts
+
+
 def run_simulation(starting_wage, work_years, cola_increase, step_increase,
                    promotion_years, promotion_increase, pension_contribution_rate,
                    starting_allowance, retirement_years, index_returns_rate,
-                   step_count=4, first_step_midyear=True):
+                   step_count=4, first_step_midyear=True, retiree_cola=None,
+                   deferral_years=0):
     """Flat-rate simulation of both options, year by year.
 
     Once Option B's balance goes negative it stops earning (or owing) market
@@ -59,7 +82,9 @@ def run_simulation(starting_wage, work_years, cola_increase, step_increase,
     pension_contribution_total = 0
     pension_redeemed_total = 0
     personal_balance = 0
-    pension_redeemed = starting_allowance
+    payouts = payout_schedule(
+        starting_allowance, retirement_years,
+        cola_increase if retiree_cola is None else retiree_cola, deferral_years)
 
     salaries = salary_schedule(starting_wage, work_years, cola_increase,
                                step_increase, promotion_years, promotion_increase,
@@ -92,6 +117,7 @@ def run_simulation(starting_wage, work_years, cola_increase, step_increase,
 
     # Retirement phase
     for ret_year in range(1, retirement_years + 1):
+        pension_redeemed = payouts[ret_year - 1]
         pension_redeemed_total += pension_redeemed
 
         start_balance = personal_balance
@@ -109,8 +135,6 @@ def run_simulation(starting_wage, work_years, cola_increase, step_increase,
             "Market Returns": market_returns,
             "Balance": personal_balance,
         })
-
-        pension_redeemed *= cola_increase
 
     yearly_data = pd.DataFrame(rows)
 
@@ -156,9 +180,81 @@ def estimate_allowance(work_years, fas, factor_pct, early_reduction_pct=0.0,
     return work_years * fas * (factor_pct / 100.0) * (1.0 - early_reduction_pct / 100.0)
 
 
-def to_retirement_dollars(amount_today, work_years, cola_increase):
-    """Grow a today's-dollars amount by COLA to the first year of retirement."""
-    return amount_today * cola_increase ** work_years
+# --- Built-in plan rules ---------------------------------------------------------
+# The plan's rules for members hired on or after January 1, 2014, taken from
+# the plan's member handbook (rev. November 2022) and its July 1, 2026
+# actuarial valuation (summary of plan provisions).
+
+PLAN_CONTRIBUTION_PCT = 10.0       # member contribution, % of pay
+PLAN_BENEFIT_CAP = 0.80            # allowance capped at 80% of final average salary
+PLAN_RETIREE_COLA_CAP_PCT = 2.0    # retiree COLA follows CPI, up to 2% a year
+PLAN_REFUND_INTEREST_PCT = 6.5     # interest credited on refunded contributions
+PLAN_VESTING_YEARS = 5
+PLAN_FULL_AGE = 60                 # earliest age for a pension without 30 years
+PLAN_SERVICE_FOR_ANY_AGE = 30
+
+
+def early_reduction_factor(age):
+    """The plan's early-retirement reduction factor at a whole-year age.
+
+    1.0 from age 60; 1.5 points less per year from 55 to 59 (0.925 at 55);
+    3 points less per year below 55 (0.895 at 54, 0.715 at 48).
+    """
+    if age >= 60:
+        return 1.0
+    if age >= 55:
+        return 0.925 + 0.015 * (age - 55)
+    return max(0.0, 0.925 - 0.03 * (55 - age))
+
+
+def plan_benefit(work_years, retirement_age, fas):
+    """First-year allowance under the built-in plan rules.
+
+    Returns a dict with the ``allowance`` (first year it is paid), the
+    ``factor_pct`` and ``reduction`` applied, whether the 80% ``capped`` limit
+    bit, ``deferral_years`` before payments start, whether the retiree
+    ``cola_applies``, and a ``status`` of "immediate", "deferred", or
+    "unvested" (no pension; contributions are refunded with interest).
+    """
+    result = {"factor_pct": 0.0, "reduction": 1.0, "capped": False,
+              "deferral_years": 0, "cola_applies": True, "status": "immediate"}
+    if work_years >= PLAN_SERVICE_FOR_ANY_AGE:
+        result["factor_pct"] = 2.1 if retirement_age >= 63 else 2.0
+        # Unreduced from age 55 with 30 years of service.
+        if retirement_age < 55:
+            result["reduction"] = early_reduction_factor(retirement_age)
+    elif work_years >= PLAN_VESTING_YEARS and retirement_age >= 63:
+        result["factor_pct"] = 2.0
+    elif work_years >= PLAN_VESTING_YEARS and retirement_age >= PLAN_FULL_AGE:
+        result["factor_pct"] = 1.5
+    elif work_years >= PLAN_VESTING_YEARS:
+        # Too young to retire: a deferred pension starts at 60 at 1.5%, with
+        # no retiree COLA and no spouse continuance.
+        result.update(factor_pct=1.5, status="deferred", cola_applies=False,
+                      deferral_years=PLAN_FULL_AGE - retirement_age)
+    else:
+        result.update(status="unvested", cola_applies=False)
+        result["allowance"] = 0.0
+        return result
+
+    raw = work_years * fas * result["factor_pct"] / 100.0 * result["reduction"]
+    cap = PLAN_BENEFIT_CAP * fas
+    result["capped"] = raw > cap
+    result["allowance"] = min(raw, cap)
+    return result
+
+
+def refund_with_interest(contributions, interest_pct=PLAN_REFUND_INTEREST_PCT):
+    """Value of yearly contributions refunded with interest at separation."""
+    balance = 0.0
+    for c in contributions:
+        balance = balance * (1 + interest_pct / 100.0) + c
+    return balance
+
+
+def to_retirement_dollars(amount_today, work_years, inflation):
+    """Grow a today's-dollars amount by inflation (a multiplier) to the first year of retirement."""
+    return amount_today * inflation ** work_years
 
 
 # Break-even search window, in percent. A fund that survives at 0% has a
@@ -169,14 +265,15 @@ BREAKEVEN_CAP_PCT = 100.0
 def compute_breakeven_rate(starting_wage, work_years, cola_increase, step_increase,
                             promotion_years, promotion_increase, pension_contribution_rate,
                             starting_allowance, retirement_years, step_count=4,
-                            first_step_midyear=True):
+                            first_step_midyear=True, retiree_cola=None,
+                            deferral_years=0):
     """Lowest flat annual return (%) at which Option B lasts all of retirement."""
     def survives(rate):
         return run_simulation(
             starting_wage, work_years, cola_increase, step_increase,
             promotion_years, promotion_increase, pension_contribution_rate,
             starting_allowance, retirement_years, 1.0 + rate,
-            step_count, first_step_midyear,
+            step_count, first_step_midyear, retiree_cola, deferral_years,
         )["personal_balance"] > 0
 
     if survives(0.0):
@@ -210,7 +307,8 @@ def lognormal_sigma(mean_return, std_return):
 def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
                     promotion_years, promotion_increase, pension_contribution_rate,
                     starting_allowance, retirement_years, mean_return, std_return,
-                    n_simulations, seed=42, step_count=4, first_step_midyear=True):
+                    n_simulations, seed=42, step_count=4, first_step_midyear=True,
+                    retiree_cola=None, deferral_years=0):
     """Replay the flat-rate schedule through randomized market histories.
 
     ``mean_return`` is the same compound rate the flat page uses: yearly
@@ -238,14 +336,15 @@ def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
         contribution = salaries[wy - 1] * pension_contribution_rate
         history[wy] = history[wy - 1] * mults[:, wy - 1] + contribution
 
-    pension_redeemed = starting_allowance
+    payouts = payout_schedule(
+        starting_allowance, retirement_years,
+        cola_increase if retiree_cola is None else retiree_cola, deferral_years)
     for ry in range(1, retirement_years + 1):
         idx = work_years + ry
-        grown = history[idx - 1] * mults[:, idx - 1] - pension_redeemed
+        grown = history[idx - 1] * mults[:, idx - 1] - payouts[ry - 1]
         # Depletion is absorbing: once a path hits $0 it stays there, rather than
         # compounding a fictitious negative "debt" at the market rate.
         history[idx] = np.maximum(grown, 0.0)
-        pension_redeemed *= cola_increase
 
     pcts = np.percentile(history, [5, 25, 75, 95], axis=1)
     median_path = np.percentile(history, 50, axis=1)

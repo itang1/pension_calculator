@@ -8,7 +8,6 @@ content lives in view_comparison.py and view_market_swings.py.
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 import common
 import view_comparison
@@ -39,12 +38,30 @@ common.render_html(
 # any widget that is not rendered during a rerun, so widgets that live in a
 # page body (not the always-rendered sidebar), or only show in one allowance
 # mode, need this re-assignment pin.
-for _k in ("mc_std", "in_factor", "in_early_red", "in_vest",
-           "allowance_manual", "in_allowance_basis"):
+for _k in ("mc_std", "allowance_manual", "in_allowance_basis"):
     if _k in st.session_state:
         st.session_state[_k] = st.session_state[_k]
 
+# Inputs from a shared link load before any widget (including the toggle
+# below) is created, since widget state can only be seeded beforehand.
+common.apply_query_params()
+
 st.title("Is Your Pension Worth It?")
+
+# A one-line summary of the current inputs sits under the title, so phone
+# visitors (whose sidebar starts collapsed) can see what the results assume.
+# It is filled in after the sidebar renders, because it needs those inputs.
+_summary = st.container()
+show_real = st.toggle(
+    "Show amounts in today's dollars",
+    value=False,
+    key="in_real",
+    help=(
+        "Divides each future amount by inflation (set in the sidebar) so it reads in today's "
+        "money. Return rates stay as entered, and the year-by-year tables stay in future "
+        "dollars so each row adds up."
+    ),
+)
 
 # Sidebar inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from
@@ -52,7 +69,20 @@ st.title("Is Your Pension Worth It?")
 common.apply_pending_preset()
 inputs = common.render_sidebar()
 st.session_state["_inputs"] = inputs
-st.session_state["_results"] = common.compute_results(inputs)
+_nominal = common.compute_results(inputs)
+st.session_state["_results_nominal"] = _nominal
+st.session_state["_results"] = common.deflate_results(_nominal, inputs) if show_real else _nominal
+common.sync_query_params()
+
+with _summary:
+    st.caption(
+        f"**Your inputs:** \\${inputs['starting_wage']:,.0f} starting wage · "
+        f"{inputs['work_years']} years of work · retire at {inputs['retirement_age']} · "
+        f"{inputs['retirement_years']} years retired · "
+        f"{_nominal['index_return_pct']:.1f}% returns. "
+        "Change them in the sidebar (on a phone, tap the » arrow at the top left). "
+        "This page's link includes your inputs, so you can copy it to share or come back later."
+    )
 
 _comparison_page = st.Page(
     view_comparison.render,
@@ -80,13 +110,4 @@ pg.run()
 common.count_pageview(pg)
 if "session_tracked" not in st.session_state:
     st.session_state.session_tracked = True
-    components.html("""
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7SKCXXZV9W"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-7SKCXXZV9W');
-        </script>
-    """, height=0)
     common.log_visit()

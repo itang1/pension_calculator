@@ -175,6 +175,51 @@ def test_step_count_and_midyear_flag():
     assert flat == pytest.approx([100000, 100000, 100000])
 
 
+# --- Built-in plan rules ------------------------------------------------------------
+
+@pytest.mark.parametrize("years,age,factor,reduction,status", [
+    (30, 55, 2.0, 1.0, "immediate"),     # 55 with 30 years: unreduced
+    (30, 52, 2.0, 0.835, "immediate"),   # under 55 with 30 years: reduced
+    (30, 63, 2.1, 1.0, "immediate"),
+    (20, 60, 1.5, 1.0, "immediate"),
+    (20, 63, 2.0, 1.0, "immediate"),
+    (20, 55, 1.5, 1.0, "deferred"),      # can't retire before 60 without 30 years
+    (4, 65, 0.0, 1.0, "unvested"),
+])
+def test_plan_benefit_rules(years, age, factor, reduction, status):
+    b = s.plan_benefit(years, age, 100000)
+    assert b["status"] == status
+    assert b["factor_pct"] == factor
+    assert b["reduction"] == pytest.approx(reduction)
+
+
+def test_plan_benefit_cap_and_deferral():
+    capped = s.plan_benefit(45, 66, 100000)  # 45 x 2.1% = 94.5%, capped at 80%
+    assert capped["capped"] and capped["allowance"] == pytest.approx(80000)
+    deferred = s.plan_benefit(20, 55, 100000)
+    assert deferred["deferral_years"] == 5 and not deferred["cola_applies"]
+    assert deferred["allowance"] == pytest.approx(30000)
+
+
+def test_early_reduction_table():
+    # Spot values from the plan's published table.
+    for age, factor in [(48, .7150), (54, .8950), (55, .9250), (56, .9400), (59, .9850), (60, 1.0)]:
+        assert s.early_reduction_factor(age) == pytest.approx(factor)
+
+
+def test_deferred_payouts_and_separate_retiree_cola():
+    pays = s.payout_schedule(1000, 5, 1.02, deferral_years=2)
+    assert pays == pytest.approx([0, 0, 1000, 1020, 1040.4])
+    r = s.run_simulation(**CASE_A, index_returns_rate=1.07, retiree_cola=1.02, deferral_years=3)
+    ret = r["yearly_data"][r["yearly_data"]["Year"].str.startswith("R")]
+    assert (ret["Pension Redeemed"].iloc[:3] == 0).all()
+    assert ret["Pension Redeemed"].iloc[4] == pytest.approx(CASE_A["starting_allowance"] * 1.02)
+
+
+def test_refund_with_interest():
+    assert s.refund_with_interest([100, 100], 10) == pytest.approx(210)
+
+
 # --- Allowance estimator -----------------------------------------------------------
 
 def test_estimate_allowance_formula_and_vesting():

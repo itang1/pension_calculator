@@ -11,7 +11,15 @@ import numpy as np
 import streamlit as st
 from plotly import graph_objects as go
 
-from common import build_fund_chart, fmt_share, get_monte_carlo, render_feedback_form, render_html
+from common import (
+    build_fund_chart,
+    deflate_mc,
+    dollars_note,
+    fmt_share,
+    get_monte_carlo,
+    render_feedback_form,
+    render_html,
+)
 
 
 def risk_tier(depletion_prob, flat_b_wins):
@@ -157,6 +165,8 @@ The results below come from **1,000 of those sequences** (each one a different p
     )
 
     mc = get_monte_carlo(inputs, _mc_std_pct)
+    if res.get("real_dollars"):
+        mc = deflate_mc(mc, inputs)
     depletion_prob = mc["depletion_prob"]
     final_balances = mc["final_balances"]
     median_final = float(np.percentile(final_balances, 50))
@@ -244,7 +254,7 @@ The results below come from **1,000 of those sequences** (each one a different p
         )
     hist.update_layout(
         title=dict(
-            text="<b>Ending balance at death, across all 1,000 futures</b>",
+            text=f"<b>Ending balance at death, across all 1,000 futures{dollars_note(res)}</b>",
             x=0.5, xanchor="center", font=dict(size=15, color="#1e293b"),
         ),
         xaxis_title="Money left at the end of retirement ($)",
@@ -284,18 +294,21 @@ The results below come from **1,000 of those sequences** (each one a different p
         st.markdown(f"""
 Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, here is *when* it happened. Running out in year {int(np.median(_dep_years))} of a {retirement_years}-year retirement is a very different problem than running out in the final year; this chart shows which one you'd be facing.
 """)
+        # Plotted by age (the age you reach by the end of the year the money
+        # ran out), matching the age axis on the fund chart above.
+        _ret_age = inputs["retirement_age"]
         timing = go.Figure(go.Histogram(
-            x=_dep_years, xbins=dict(size=1), marker_color="#DC2626",
-            hovertemplate="Ran out in retirement year %{x}<br>Number of futures: %{y}<extra></extra>",
+            x=_dep_years + _ret_age, xbins=dict(size=1), marker_color="#DC2626",
+            hovertemplate="Ran out by age %{x}<br>Number of futures: %{y}<extra></extra>",
         ))
         timing.update_layout(
             title=dict(
-                text="<b>Retirement year in which the fund hit $0</b>",
+                text="<b>Age by which the fund hit $0</b>",
                 x=0.5, xanchor="center", font=dict(size=15, color="#1e293b"),
             ),
-            xaxis_title=f"Retirement year (out of your {retirement_years})",
+            xaxis_title=f"Your age (retirement runs from {_ret_age} to {_ret_age + retirement_years})",
             yaxis_title="Number of futures",
-            xaxis=dict(range=[0.5, retirement_years + 0.5]),
+            xaxis=dict(range=[_ret_age + 0.5, _ret_age + retirement_years + 0.5]),
             plot_bgcolor="white",
             bargap=0.05,
             margin=dict(l=40, r=20, t=50, b=60),
