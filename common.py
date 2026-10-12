@@ -13,8 +13,10 @@ globals, which are process-wide and would leak between sessions.
 import ipaddress
 import json
 import logging
+import collections
 import math
 import re
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -184,6 +186,26 @@ def _client_metadata():
     )
 
 
+# Site-wide cap on Google Sheets writes. The per-session feedback cooldown
+# does not stop many new sessions at once, so this process-wide limiter (an
+# intentional module global, shared by every visitor) protects the sheet's
+# write quota. Visits are simply not logged while the cap is reached.
+_SHEET_WRITES_PER_MINUTE = 30
+_sheet_write_times = collections.deque()
+_sheet_write_lock = threading.Lock()
+
+
+def _sheet_write_allowed():
+    now = time.monotonic()
+    with _sheet_write_lock:
+        while _sheet_write_times and now - _sheet_write_times[0] > 60:
+            _sheet_write_times.popleft()
+        if len(_sheet_write_times) >= _SHEET_WRITES_PER_MINUTE:
+            return False
+        _sheet_write_times.append(now)
+        return True
+
+
 def _append_feedback(row: list):
     """Append a feedback row. Returns ``None`` on success, else ``True``.
 
@@ -191,6 +213,8 @@ def _append_feedback(row: list):
     contain the spreadsheet ID, service-account email, and API payloads, so we
     never surface the exception text to end users.
     """
+    if not _sheet_write_allowed():
+        return True
     try:
         _get_feedback_sheet().append_row(row, value_input_option="RAW")
         return None
@@ -220,6 +244,8 @@ def _get_visit_sheet():
 
 
 def log_visit():
+    if not _sheet_write_allowed():
+        return
     try:
         _get_visit_sheet().append_row(
             [datetime.now(timezone.utc).isoformat(timespec="seconds"), *_client_metadata()],
@@ -267,9 +293,9 @@ def count_pageview(page):
 
 # The math lives in simulation.py with no Streamlit dependency,
 # so it is unit-testable; caching is applied here at the app boundary.
-run_simulation = st.cache_data(simulation.run_simulation)
-compute_breakeven_rate = st.cache_data(simulation.compute_breakeven_rate)
-run_monte_carlo = st.cache_data(simulation.run_monte_carlo)
+run_simulation = st.cache_data(max_entries=512)(simulation.run_simulation)
+compute_breakeven_rate = st.cache_data(max_entries=256)(simulation.compute_breakeven_rate)
+run_monte_carlo = st.cache_data(max_entries=64)(simulation.run_monte_carlo)
 compute_fas = simulation.compute_fas
 
 
@@ -305,7 +331,7 @@ def inputs_summary_html(inputs, res):
         f"<strong>Right now the results assume:</strong> {wage} · hired at {hire_age} · "
         f"retire at {inputs['retirement_age']} · {inputs['retirement_years']} years retired · "
         f"{res['index_return_pct']:.1f}% returns.<br>"
-        "<span style='font-size:0.9em'>On a phone, tap the » arrow at the top left to open the "
+        "<span style='font-size:0.9em'>Until you change them, these are example numbers. On a phone, tap the » arrow at the top left to open the "
         "sidebar. To share these inputs or come back later, use <em>Share These Inputs</em> at the bottom of the sidebar.</span>"
     )
 
@@ -454,7 +480,7 @@ def render_sidebar():
     pinning.
     """
     with st.sidebar:
-        st.header("Input Assumptions")
+        st.header("Your Details")
 
         with st.expander("Timing Assumptions"):
             st.markdown("""
@@ -494,14 +520,14 @@ This calculator operates in annual periods. Within each year:
         if _wage_mode == "My wage today":
             current_wage = st.number_input(
                 "Your Annual Wage Today ($)",
-                value=120000, min_value=0, step=2500,
+                value=120000, min_value=0, max_value=10_000_000, step=2500,
                 key="in_current_wage",
                 help=f"What you are paid now, in {CURRENT_YEAR}.",
             )
         else:
             starting_wage = st.number_input(
                 "Starting Annual Wage ($)",
-                value=120000, min_value=0, step=2500,
+                value=120000, min_value=0, max_value=10_000_000, step=2500,
                 key="in_wage",
                 help=f"Your salary in your first year on the job, in {hire_year} dollars (what you were actually paid then).",
             )
@@ -536,7 +562,7 @@ This calculator operates in annual periods. Within each year:
                 f"to {hire_year + work_years} (age {retirement_age})."
             )
         cola_increase = st.number_input(
-            "Cost of Living Adjustment (%)",
+            "Yearly Cost-of-Living Raise (%)",
             value=3.0, min_value=0.0, max_value=5.5, step=0.1,
             key="in_cola",
             help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. This is for your salary while working; the pension's own COLA in retirement follows inflation (see Expected Inflation below)."
@@ -631,7 +657,7 @@ This calculator operates in annual periods. Within each year:
                 f"changes what goes into your own account, but not the pension formula."
             )
 
-        st.markdown("**Starting Pension Allowance**")
+        st.markdown("**Your Pension**")
 
         _allowance_mode = st.radio(
             "How to set allowance",
@@ -665,7 +691,7 @@ This calculator operates in annual periods. Within each year:
             # keyed, disabled widget always shows the freshly computed figure.
             st.session_state["allowance_formula"] = round(starting_allowance)
             st.number_input(
-                "First-year annual pension allowance ($)",
+                "Pension Income in the First Year ($)",
                 min_value=0,
                 step=500,
                 disabled=True,
@@ -679,7 +705,7 @@ This calculator operates in annual periods. Within each year:
             )
         else:
             manual_allowance = st.number_input(
-                "First-year annual pension allowance ($)",
+                "Pension Income in the First Year ($)",
                 value=70000,
                 min_value=0,
                 max_value=10_000_000,
@@ -749,7 +775,7 @@ This calculator operates in annual periods. Within each year:
 
         st.subheader("Retirement")
         retirement_years = st.number_input(
-            "Years in Retirement Before Death",
+            "Years in Retirement",
             value=30, min_value=1, max_value=60, step=1,
             key="in_retirement_years",
             help="How many years you expect to spend in retirement before you die."
@@ -775,7 +801,7 @@ This calculator operates in annual periods. Within each year:
         )
         index_returns_rate = (
             st.number_input(
-                "Average Index Returns Rate (%)",
+                "Yearly Investment Return (%)",
                 value=7.0,
                 min_value=0.0,
                 max_value=25.0,
@@ -985,7 +1011,7 @@ _SHARE_SPEC = {
     "in_current_wage": (int, 0, 10_000_000),
     "in_wage": (int, 0, 10_000_000),
     "in_hire_age": (int, 16, 74),
-    "in_retirement_age": (int, 18, 75),
+    "in_retirement_age": (int, 17, 75),
     "in_cola": (float, 0.0, 5.5),
     "in_step": (float, 0.0, 50.0),
     "in_step_count": (int, 0, 20),
@@ -1116,6 +1142,22 @@ def render_share_section(inputs):
             )
 
 
+def chart_title(text):
+    """Chart titles go in page text, which wraps, rather than inside the plot,
+    where long titles are cut off on phones."""
+    st.markdown(f"**{text}**")
+
+
+def rate_chart_title(res):
+    return f"Your account's money left at death, by flat return rate{dollars_note(res)}"
+
+
+def fund_chart_title(res, title=None):
+    if title is None:
+        title = f"Your account over time, at a steady {res['index_return_pct']:.1f}% a year"
+    return title + dollars_note(res)
+
+
 def build_rate_curve_chart(inputs, res):
     """Money left at death for your account across flat return rates.
 
@@ -1128,7 +1170,7 @@ def build_rate_curve_chart(inputs, res):
     current = res["index_return_pct"]
     be = res["breakeven_rate"]
     focus = max(current, be if math.isfinite(be) else current)
-    top = min(15.0, max(10.0, math.ceil(focus) + 3))
+    top = min(28.0, max(10.0, math.ceil(focus) + 3))
     rates = [r / 2 for r in range(0, int(top * 2) + 1)]
     real = res.get("real_dollars", False)
     finals = []
@@ -1169,13 +1211,11 @@ def build_rate_curve_chart(inputs, res):
                            bgcolor="rgba(255,255,255,0.85)")
 
     fig.update_layout(
-        title=dict(text=f"<b>Your account's money left at death, by flat return rate{dollars_note(res)}</b>",
-                   x=0.5, xanchor="center", font=dict(size=15, color=ink)),
         xaxis=dict(title="Flat annual return (%)", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
         yaxis=dict(title="Money left at death ($)", tickformat=",", gridcolor="#eef0f2",
                    range=[lo, hi]),
         plot_bgcolor="white", showlegend=False, hovermode="x",
-        margin=dict(l=40, r=20, t=60, b=50),
+        margin=dict(l=40, r=20, t=30, b=50),
     )
     return fig
 
@@ -1243,7 +1283,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             y=list(mc_pcts[0]) + list(mc_pcts[1])[::-1],
             fill="toself", fillcolor="rgba(220,38,38,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="Unluckiest futures", hoverinfo="skip",
+            name="Unlucky futures", hoverinfo="skip",
         ))
         fig.add_trace(go.Scatter(
             x=_xf + _xr,
@@ -1257,7 +1297,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             y=list(mc_pcts[2]) + list(mc_pcts[3])[::-1],
             fill="toself", fillcolor="rgba(22,163,74,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="Luckiest futures", hoverinfo="skip",
+            name="Lucky futures", hoverinfo="skip",
         ))
 
     # Hover arrays
@@ -1273,7 +1313,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         # total in the hover; plotting the running total dwarfed everything.
         y=_yearly_payouts,
         mode="lines+markers",
-        name="Annual payout amount (same for both options)",
+        name="Pension paid each year (same for both)",
         line=dict(color="#A855F7", width=2),
         marker=dict(color="#A855F7", size=5, symbol="circle"),
         customdata=list(zip(pension_fund_values, years, _cal)),
@@ -1290,7 +1330,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         x=ages,
         y=personal_fund_values,
         mode="lines+markers",
-        name=f"Your own account's balance (fixed {index_return_pct:.1f}% return from sidebar)",
+        name=f"Your account (steady {index_return_pct:.1f}%)",
         line=dict(color="#0D9488", width=3),
         customdata=_personal_customdata,
         hovertemplate=(
@@ -1304,15 +1344,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     ))
 
     _y_pad = data_range * 0.12
-    if title is None:
-        title = f"Your Own Account's Balance at a flat {index_return_pct:.1f}% annual return"
-    title += dollars_note(res)
     fig.update_layout(
-        title=dict(
-            text=f"<b>{title}</b>",
-            x=0.5, xanchor="center",
-            font=dict(size=16, color="#1e293b"),
-        ),
         xaxis_title="Your age",
         yaxis_title="Your account's balance ($)<br><sup>below $0 = income it couldn't pay</sup>",
         xaxis=dict(
@@ -1332,7 +1364,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         ),
         plot_bgcolor="white",
         legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
-        margin=dict(l=40, r=20, t=50, b=120),
+        margin=dict(l=40, r=20, t=30, b=120),
     )
 
     fig.add_vrect(
@@ -1364,7 +1396,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             _dep_idx = next(i for i, v in enumerate(personal_fund_values) if simulation.ran_short(v))
             fig.add_annotation(
                 x=ages[_dep_idx], y=0,
-                text=f"<b>✗ Runs out by age {ages[_dep_idx]}: {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
+                text=f"<b>✗ Runs out by age {ages[_dep_idx]}</b>",
                 showarrow=True, arrowhead=2, arrowcolor="#DC2626",
                 # Below and left of the point: the top of the chart holds the
                 # "Working Years" / "Retirement Years" labels.
@@ -1375,7 +1407,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         else:
             fig.add_annotation(
                 x=ages[-1], y=personal_fund_values[-1],
-                text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over, yours to keep</b>",
+                text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over</b>",
                 showarrow=True, arrowhead=2, arrowcolor="#0D9488",
                 ax=-90, ay=-40,
                 font=dict(size=13, color="#0D9488"),

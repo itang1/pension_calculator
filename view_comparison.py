@@ -17,6 +17,9 @@ from common import (
     ages_for,
     build_fund_chart,
     build_rate_curve_chart,
+    chart_title,
+    fund_chart_title,
+    rate_chart_title,
     fmt_rate,
     get_monte_carlo,
     inputs_summary_html,
@@ -62,7 +65,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
 <div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 Winner: Your own account</div>
 <strong>Assuming a flat {current_rate_pct:.1f}% return every single year, your own account comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, your account would still have <strong>${personal_balance:,.0f}</strong>{dollars} remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as the pension every single year. The pension leaves nothing at death (besides potential survivor benefits, if applicable).
-<br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for the pension to win.</em>{swings}
+<br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that in this calculation, a steady return below {breakeven_rate:.1f}% every year would make the pension win. When returns change from year to year, the order of good and bad years matters too.</em>{swings}
 </div>
 """)
     else:
@@ -71,7 +74,7 @@ After {int(retirement_years)} years of retirement, your account would still have
 <div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 Winner: The pension</div>
 <strong>Assuming a flat {current_rate_pct:.1f}% return every single year, the pension comes out ahead.</strong><br><br>
 Before your {int(retirement_years)}-year retirement was over, your account would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on your account cannot keep up with {int(retirement_years)} years of withdrawals, so the pension's guarantee that it pays until you die is the more reliable choice here.
-<br><br><em>Your account would need the market to average at least {fmt_rate(breakeven_rate)} every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>{swings}
+<br><br><em>Your account would need a steady return of at least {fmt_rate(breakeven_rate)} every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>{swings}
 </div>
 """)
     # st.page_link (not an HTML anchor inside the banner) so navigation stays
@@ -213,6 +216,7 @@ Instead of paying into the pension, imagine putting the same amount (for example
             ),
         )
 
+        chart_title(fund_chart_title(res))
         fig = build_fund_chart(inputs, res, _show_ref_line, verdict_annotation=True)
         st.plotly_chart(fig, width="stretch")
 
@@ -299,12 +303,13 @@ Instead of paying into the pension, imagine putting the same amount (for example
             "a point of return is worth: above \\$0 your account ends with money to spare, below it your account "
             "runs out and the pension wins."
         )
+        chart_title(rate_chart_title(res))
         st.plotly_chart(build_rate_curve_chart(inputs, res), width="stretch")
 
         st.markdown("""
     **What you leave behind at your death:**
     - With **your own account**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
-    - With **the pension**, payments stop when you die, unless you have an eligible spouse or domestic partner: the plan's standard allowance then keeps paying them 50% of it for life, at no extra cost. This calculator does not model survivor benefits, so for married members the pension is worth more than shown here.
+    - With **the pension**, payments stop when you die. Survivor benefits depend on your eligibility and the benefit option you choose, and are not included here; for members who qualify, they add value to the pension that this comparison leaves out.
     """)
 
         with st.expander("Limitations & Assumptions"):
@@ -347,7 +352,7 @@ Most public employees can't actually trade the pension for their own account: jo
 {_first_tip}
 - **You can save extra on top in a 457(b) plan.** Many public employers offer one, often called deferred compensation. You choose how much comes out of each paycheck, and it grows next to your pension. Some plans also offer a Roth version: you pay tax now and take the money out tax-free later.
 - **A Roth IRA is another option.** Most people with a paycheck can open one at a bank or brokerage (there are income limits). The money grows tax-free, and you can take out what you put in (not the growth) at any time.
-- **If you might leave before you can retire, know the rules first.** Leaving with under 5 years of service gets you only your contributions back. Leaving later, but before you can retire, gets you a pension that starts at 60 with no yearly COLA raises.
+- **If you might leave before you can retire, know the rules first.** Leaving with under 5 years of service gets you only your contributions back, plus interest. Leaving later, but before you can retire, gets you a pension that starts at 60 with no yearly COLA raises.
 - **Talk to your plan's retirement counselors.** They can give you an exact estimate of your pension, which you can enter in the sidebar under "Enter manually."
 
 *This is general information, not financial advice.*
@@ -408,14 +413,25 @@ Returns are calculated on the balance at the *start* of the year, before that ye
             )
 
     with st.expander("Retirement Years"):
-        st.markdown("""
-Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. Your own account is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), your own account has run out. The year it first goes red is the year that you will wish you had chosen the pension option, since the pension provides a lifetime guarantee.
+        if inputs["deferral_years"]:
+            _pension_start = (
+                f"Once you leave, contributions stop. The pension does not start until age "
+                f"{inputs['retirement_age'] + inputs['deferral_years']}, and then pays the same dollar "
+                f"amount every year (no COLA), so neither option pays anything before that."
+            )
+        else:
+            _pension_start = (
+                "Once you retire, contributions stop. The pension begins paying you a fixed annual "
+                "allowance that grows each year with COLA."
+            )
+        st.markdown(f"""
+{_pension_start} Your own account is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), your own account has run out. The year it first goes red is the year that you will wish you had chosen the pension option, since the pension provides a lifetime guarantee.
 """)
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**The Pension**")
             st.markdown(f"""
-The pension pays a set annual amount, growing by {res["retiree_cola_pct"]:.1f}% each year (COLA). **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
+The pension pays a set annual amount, {f'growing by {res["retiree_cola_pct"]:.1f}% each year (COLA)' if res["retiree_cola_pct"] else 'the same every year (no COLA)'}. **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
 """)
         with col2:
             st.markdown("**Your Own Account**")

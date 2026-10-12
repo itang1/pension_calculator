@@ -15,6 +15,8 @@ from plotly import graph_objects as go
 
 from common import (
     build_fund_chart,
+    chart_title,
+    fund_chart_title,
     deflate_mc,
     inputs_summary_html,
     out_of_100,
@@ -59,20 +61,27 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
     r = f"{current_rate_pct:.1f}%"
     tier = risk_tier(depletion_prob, flat_b_wins)
 
-    if tier == "none":
+    if tier == "none" and std_pct == 0:
         bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "Your account holds up, even in bad markets."
+        verdict = "With no ups and downs, every future matches page 1."
         body = (
-            "In all 1,000 possible futures, your account never ran out of money. "
-            "The answer from page 1 holds up."
+            "The bumpiness slider is at 0%, so every simulated year returns exactly the same amount "
+            "and your account never runs out. Move the slider right to see what real ups and downs do."
+        )
+    elif tier == "none":
+        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
+        verdict = "No failures in these 1,000 futures."
+        body = (
+            "In all 1,000 possible futures with the ups and downs you chose, your account never ran "
+            "out of money. That is a good sign, though not a guarantee: markets can be worse than "
+            "anything in these simulations."
         )
     elif tier == "small":
         bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "Your account is a reasonable choice, with a small risk."
+        verdict = "Your account usually lasts, with a small risk of running out."
         body = (
             f"Your account ran out of money in <strong>{n} out of 100</strong> possible futures. "
-            f"Usually it works out. If you choose it, keep some savings aside in case you land "
-            f"in one of the unlucky ones."
+            f"Most futures work out, but an unlucky one would leave you short late in life."
         )
     elif tier == "tradeoff":
         bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
@@ -85,11 +94,11 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
         )
     elif tier == "lean_a":
         bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
-        verdict = "Lean toward the pension, even though page 1 picked your own account."
+        verdict = "Your account runs out in a large share of futures, even though page 1 picked it."
         body = (
             f"Page 1 assumed a smooth {r} every year. With real ups and downs, your account ran out "
             f"of money in <strong>{n} out of 100</strong> possible futures. That is close to a coin "
-            f"flip, which is too risky for most people's retirement money."
+            f"flip, while the pension pays for life no matter what."
         )
     elif tier == "a_safer":
         bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
@@ -217,7 +226,7 @@ guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has 
     st.markdown("**Here is the whole idea in one example:**")
     render_html("""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-Suppose your $1,000 earns <strong>+50% one year</strong> (now $1,500) and <strong>−50% the next</strong> (now $750). Your "average" return was 0%, but you lost a quarter of your money. <strong>Down years hurt more than up years help.</strong> And if the down years happen early in your retirement, while you're also withdrawing money, the damage is permanent. That is why a fund that wins with a steady return can still run out of money in the real world, and why this page exists.
+Suppose you have &#36;1,000 and take out &#36;100 at the end of each year. If the market goes <strong>up 20% and then down 10%</strong>, you end with &#36;890. If the same two years come in the other order, <strong>down 10% and then up 20%</strong>, you end with &#36;860. <strong>Same returns, different order, &#36;30 less</strong>, because you sold more while prices were low. Over a long retirement, a few bad years early on can empty an account years sooner. That is why an account that wins with a steady return can still run out in the real world, and why this page exists.
 </div>
 """)
     st.space("small")
@@ -233,24 +242,20 @@ Page 1 tells you who wins in a smooth, average market. This page tells you the r
 
     if flat_final > 0 and median_final < flat_final:
         st.markdown(
-            f"Notice that the typical outcome (**\\${median_final:,.0f}**) is smaller than the flat-rate answer (**\\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% average return. That's the bad-years-early effect from the example above: withdrawals made after a drop lock in the loss. A flat rate usually paints a rosier picture of retirement than the bumpy reality it summarizes."
+            f"Notice that the typical outcome (**\\${median_final:,.0f}**) is smaller than the flat-rate answer (**\\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% average return. That's the order effect from the example above: withdrawals made after a drop lock in the loss. A flat rate usually paints a rosier picture of retirement than the bumpy reality it summarizes."
         )
 
-    st.header("All 1,000 possible futures on one chart")
+    st.header("The range of your account across 1,000 futures")
 
-    fig = build_fund_chart(
-        inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"],
-        title=(
-            f"Your own account: a steady {index_return_pct:.1f}% a year "
-            f"vs. 1,000 possible futures"
-        ),
-    )
+    chart_title(fund_chart_title(
+        res, f"Your account: a steady {index_return_pct:.1f}% a year vs. 1,000 possible futures"))
+    fig = build_fund_chart(inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"])
     st.plotly_chart(fig, width="stretch")
 
     with st.expander("How to read this chart"):
         st.markdown("""
 - **Bold teal line** = page 1's answer: your own account if the market grew by the same amount every year.
-- **Shaded bands** = where your own account lands across the 1,000 possible futures. Blue = the middle half of futures (the most likely range). Red = the unluckiest futures. Green = the luckiest ones, which can go off the top of the chart.
+- **Shaded bands** = at each age, the range your account's balance falls into across the 1,000 futures. Blue = the middle half (the most likely range). Red = the unlucky futures just below that, and green = the lucky ones just above it, which can go off the top of the chart. The very unluckiest and luckiest 5% are left off so the chart stays readable.
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the \\$0 mark. Once a simulated future hits \\$0, it has run out of money permanently.
 """)
@@ -289,10 +294,6 @@ Page 1 tells you who wins in a smooth, average market. This page tells you the r
             bgcolor="rgba(255,255,255,0.85)", borderpad=4,
         )
     hist.update_layout(
-        title=dict(
-            text=f"<b>Ending balance at death, across all 1,000 futures{dollars_note(res)}</b>",
-            x=0.5, xanchor="center", font=dict(size=15, color="#1e293b"),
-        ),
         xaxis_title="Money left at the end of retirement ($)",
         yaxis_title="Number of futures",
         xaxis=dict(tickformat=",", separatethousands=True),
@@ -316,6 +317,7 @@ Page 1 tells you who wins in a smooth, average market. This page tells you the r
             annotation_text="typical outcome", annotation_position="top",
             annotation_font_color="#1e293b", annotation_yshift=14,
         )
+    chart_title(f"Ending balance at death, across all 1,000 futures{dollars_note(res)}")
     st.plotly_chart(hist, width="stretch")
     st.caption(
         "The tallest bars show the most common outcomes. The red bar left of $0 counts "
@@ -338,18 +340,15 @@ Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, her
             hovertemplate="Ran out by age %{x}<br>Number of futures: %{y}<extra></extra>",
         ))
         timing.update_layout(
-            title=dict(
-                text="<b>Age by which the fund hit $0</b>",
-                x=0.5, xanchor="center", font=dict(size=15, color="#1e293b"),
-            ),
             xaxis_title=f"Your age (retirement runs from {_ret_age} to {_ret_age + retirement_years})",
             yaxis_title="Number of futures",
             xaxis=dict(range=[_ret_age + 0.5, _ret_age + retirement_years + 0.5]),
             plot_bgcolor="white",
             bargap=0.05,
-            margin=dict(l=40, r=20, t=50, b=60),
+            margin=dict(l=40, r=20, t=20, b=60),
             showlegend=False,
         )
+        chart_title("Age by which the account hit $0")
         st.plotly_chart(timing, width="stretch")
 
     with st.expander("How this was computed"):

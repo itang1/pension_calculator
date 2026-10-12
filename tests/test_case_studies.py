@@ -217,8 +217,15 @@ def test_reference_line_plots_each_years_payout():
                            retiree_cola=1.02)
     res = {**res, "index_return_pct": 7.0}
     fig = common.build_fund_chart(inputs, res, show_ref_line=True)
-    payout = next(tr for tr in fig.data if tr.name.startswith("Annual payout"))
+    payout = next(tr for tr in fig.data if tr.name.startswith("Pension paid each year"))
     last_payment = res["yearly_data"]["Pension Redeemed"].iloc[-1]
     assert payout.y[-1] == pytest.approx(last_payment)
     assert max(payout.y) < res["pension_redeemed_total"] / 5   # not the running total
     assert fig.layout.yaxis.range[1] >= max(payout.y)           # fully on the chart
+
+
+def test_sheet_writes_are_capped_site_wide(monkeypatch):
+    monkeypatch.setattr(common, "_sheet_write_times", common.collections.deque())
+    allowed = [common._sheet_write_allowed() for _ in range(common._SHEET_WRITES_PER_MINUTE + 5)]
+    assert allowed.count(True) == common._SHEET_WRITES_PER_MINUTE
+    assert allowed[-1] is False
