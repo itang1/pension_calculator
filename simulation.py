@@ -50,6 +50,17 @@ def salary_schedule(starting_wage, work_years, cola_increase, step_increase,
     return salaries
 
 
+# A balance this far below $0 means a payment could not be made in full.
+# Ending at exactly $0 after paying everything is fully funded, not a failure;
+# the half-cent margin absorbs floating-point noise.
+SHORTFALL_TOLERANCE = 0.005
+
+
+def ran_short(balance):
+    """True if a balance means some promised income went unpaid."""
+    return balance < -SHORTFALL_TOLERANCE
+
+
 def payout_schedule(starting_allowance, retirement_years, retiree_cola,
                     deferral_years=0):
     """Pension paid in each retirement year, which Option B also withdraws.
@@ -275,7 +286,7 @@ def compute_breakeven_rate(starting_wage, work_years, cola_increase, step_increa
             promotion_years, promotion_increase, pension_contribution_rate,
             starting_allowance, retirement_years, 1.0 + rate,
             step_count, first_step_midyear, retiree_cola, deferral_years,
-        )["personal_balance"] > 0
+        )["personal_balance"] >= -SHORTFALL_TOLERANCE
 
     if survives(0.0):
         return 0.0
@@ -340,9 +351,13 @@ def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
     payouts = payout_schedule(
         starting_allowance, retirement_years,
         cola_increase if retiree_cola is None else retiree_cola, deferral_years)
+    # First retirement year each path could not pay in full (0 = never).
+    depletion_years = np.zeros(n_simulations, dtype=int)
     for ry in range(1, retirement_years + 1):
         idx = work_years + ry
         grown = history[idx - 1] * mults[:, idx - 1] - payouts[ry - 1]
+        newly_short = (grown < -SHORTFALL_TOLERANCE) & (depletion_years == 0)
+        depletion_years[newly_short] = ry
         # Depletion is absorbing: once a path hits $0 it stays there, rather than
         # compounding a fictitious negative "debt" at the market rate.
         history[idx] = np.maximum(grown, 0.0)
@@ -350,16 +365,9 @@ def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
     pcts = np.percentile(history, [5, 25, 75, 95], axis=1)
     median_path = np.percentile(history, 50, axis=1)
 
-    # Per-path first retirement year with a $0 balance (0 = never ran out).
-    # Depletion is absorbing (see above), so "hit $0 at any point" and "ended
-    # at $0" are the same set of paths.
-    ret_hist = history[work_years + 1:]
-    ran_out = ret_hist <= 0
-    any_out = ran_out.any(axis=0)
-    depletion_years = np.where(any_out, ran_out.argmax(axis=0) + 1, 0)
-
-    # Share of simulated futures that ran out of money by the end of retirement.
-    depletion_prob = float(any_out.mean())
+    # Share of simulated futures that came up short before the end of retirement.
+    # A path that pays everything and ends at exactly $0 is fully funded.
+    depletion_prob = float((depletion_years > 0).mean())
 
     return {
         "percentiles": pcts,

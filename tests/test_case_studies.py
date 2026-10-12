@@ -187,3 +187,38 @@ def test_old_links_with_years_of_work_still_load():
     assert common.legacy_hire_age(None, 55) is None
     assert common.legacy_hire_age("abc", 55) is None
     assert common.legacy_hire_age("50", 55) is None   # hire age 5 is out of range
+
+
+def test_todays_dollar_shortfall_converts_each_missed_payment_in_its_own_year():
+    # Alice at 0% returns runs out. Her shortfall in this year's dollars must
+    # equal the sum of each unpaid payment converted in the year it was due.
+    inputs = {"inflation": 1.025, "work_years": 30, "retirement_years": 30, "retirement_age": 55,
+              "hire_year": common.CURRENT_YEAR}
+    res = s.run_simulation(120000, 30, 1.03, 1.055, (10, 20), 1.08, 0.10, 238100, 30, 1.0,
+                           retiree_cola=1.02)
+    df = res["yearly_data"]
+    expected = 0.0
+    for i in range(len(df)):
+        start, end = df["Start Balance"].iloc[i], df["Balance"].iloc[i]
+        if end < 0:
+            unpaid = -end if start >= 0 else start - end
+            expected -= unpaid / 1.025 ** (i + 1)
+    real = common.deflate_results(res, inputs)
+    assert real["personal_balance"] == pytest.approx(expected)
+    # The old shortcut (divide the whole nominal shortfall by the last year's
+    # inflation) understated it by about a quarter here.
+    assert abs(real["personal_balance"]) > abs(res["personal_balance"] / 1.025 ** 60) * 1.2
+
+
+def test_reference_line_plots_each_years_payout():
+    inputs = {"inflation": 1.025, "work_years": 30, "retirement_years": 30, "retirement_age": 55,
+              "hire_year": common.CURRENT_YEAR}
+    res = s.run_simulation(120000, 30, 1.03, 1.055, (10, 20), 1.08, 0.10, 238100, 30, 1.07,
+                           retiree_cola=1.02)
+    res = {**res, "index_return_pct": 7.0}
+    fig = common.build_fund_chart(inputs, res, show_ref_line=True)
+    payout = next(tr for tr in fig.data if tr.name.startswith("Annual payout"))
+    last_payment = res["yearly_data"]["Pension Redeemed"].iloc[-1]
+    assert payout.y[-1] == pytest.approx(last_payment)
+    assert max(payout.y) < res["pension_redeemed_total"] / 5   # not the running total
+    assert fig.layout.yaxis.range[1] >= max(payout.y)           # fully on the chart

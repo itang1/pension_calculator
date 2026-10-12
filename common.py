@@ -353,6 +353,7 @@ PRESETS = {
             "in_step_count": 4, "in_step_midyear": True,
             "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 30, "in_returns": 10.0,
+            "mc_std": 15.0,
         },
     },
     "bob": {
@@ -365,6 +366,7 @@ PRESETS = {
             "in_step_count": 4, "in_step_midyear": True,
             "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 35, "in_returns": 5.0,
+            "mc_std": 15.0,
         },
     },
     "carol": {
@@ -377,6 +379,7 @@ PRESETS = {
             "in_step_count": 4, "in_step_midyear": True,
             "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 25, "in_returns": 9.0,
+            "mc_std": 15.0,
         },
     },
     "dave": {
@@ -389,6 +392,7 @@ PRESETS = {
             "in_step_count": 4, "in_step_midyear": True,
             "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 25, "in_returns": 4.0,
+            "mc_std": 15.0,
         },
     },
     "grace": {
@@ -401,6 +405,7 @@ PRESETS = {
             "in_step_count": 4, "in_step_midyear": True,
             "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 25, "in_returns": 7.0,
+            "mc_std": 15.0,
         },
     },
     "frank": {
@@ -413,6 +418,7 @@ PRESETS = {
             "in_step_count": 4, "in_step_midyear": True,
             "in_allowance_mode": "Estimate for me", "in_inflation": 2.5,
             "in_retirement_years": 25, "in_returns": 10.0,
+            "mc_std": 15.0,
         },
     },
 }
@@ -842,7 +848,7 @@ def compute_results(inputs):
     # First retirement year where your own account is depleted
     depletion_year = next(
         (k for k in range(1, inputs["retirement_years"] + 1)
-         if personal_fund_values[inputs["work_years"] + k] <= 0),
+         if simulation.ran_short(personal_fund_values[inputs["work_years"] + k])),
         None,
     )
 
@@ -921,9 +927,20 @@ def deflate_results(res, inputs):
     """
     df = res["yearly_data"].copy()
     d = _deflators(inputs, len(df) + 1)[1:]
+    nominal_start = df["Start Balance"].to_numpy()
+    nominal_balance = df["Balance"].to_numpy()
     for col in ("Salary", "Start Balance", "Pension Contribution", "Pension Redeemed",
                 "Market Returns", "Balance"):
         df[col] = df[col].to_numpy() / d
+    # Below $0 the balance is a running total of unpaid income. Each year's
+    # unpaid payment is converted in its own year, so the shortfall is not
+    # shrunk as if every missed payment happened at the very end.
+    real_balance = df["Balance"].to_numpy().copy()
+    for i in range(len(df)):
+        if nominal_start[i] < 0:
+            unpaid = nominal_start[i] - nominal_balance[i]
+            real_balance[i] = real_balance[i - 1] - unpaid / d[i]
+    df["Balance"] = real_balance
     df["Pension Contribution Total"] = df["Pension Contribution"].cumsum()
     df["Pension Redeemed Total"] = df["Pension Redeemed"].cumsum()
     working = df["Year"].str.startswith("W")
@@ -1073,10 +1090,7 @@ def build_rate_curve_chart(inputs, res):
     finals = []
     for r in rates:
         sim = run_simulation(*_engine_args(inputs), 1 + r / 100, **_engine_kwargs(inputs))
-        final = sim["personal_balance"]
-        if real:
-            final /= inputs["inflation"] ** _years_after_now(
-                inputs, inputs["work_years"] + inputs["retirement_years"])
+        final = deflate_results(sim, inputs)["personal_balance"] if real else sim["personal_balance"]
         finals.append(final)
     ink, muted = "#1e293b", "#64748B"
 
@@ -1151,6 +1165,9 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     # rather than letting a 20x-lucky path squash the flat line into the
     # bottom of the chart.
     all_values = [v for v in personal_fund_values if v is not None]
+    _yearly_payouts = [0.0] + res["yearly_data"]["Pension Redeemed"].tolist()
+    if show_ref_line:
+        all_values = all_values + _yearly_payouts
     if mc_pcts is not None:
         all_values = all_values + list(mc_pcts[1]) + list(mc_pcts[2])
     data_min = min(all_values, default=0)
@@ -1208,16 +1225,18 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
 
     fig.add_trace(go.Scatter(
         x=ages,
-        y=pension_fund_values,
+        # Each year's payment (what the label promises), with the running
+        # total in the hover; plotting the running total dwarfed everything.
+        y=_yearly_payouts,
         mode="lines+markers",
         name="Annual payout amount (same for both options)",
         line=dict(color="#A855F7", width=2),
         marker=dict(color="#A855F7", size=5, symbol="circle"),
-        customdata=list(zip(_withdrawals, years, _cal)),
+        customdata=list(zip(pension_fund_values, years, _cal)),
         hovertemplate=(
             "<b>Age %{x}</b> · %{customdata[2]} (year %{customdata[1]})<br>"
-            "This year paid out: $%{customdata[0]:,.0f}<br>"
-            "Running total paid out: $%{y:,.0f}"
+            "This year paid out: $%{y:,.0f}<br>"
+            "Running total paid out: $%{customdata[0]:,.0f}"
             "<extra></extra>"
         ),
         visible=show_ref_line,
@@ -1291,14 +1310,14 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         ),
     )
     fig.add_vline(x=ages[work_years], line_width=2, line_dash="dash", line_color="#DC2626")
-    _fund_depletes = min(personal_fund_values) < 0
+    _fund_depletes = simulation.ran_short(min(personal_fund_values))
     fig.add_hline(y=0, line_width=2, line_color="#666666",
                   annotation_text="$0 = your account is empty" if _fund_depletes else "$0",
                   annotation_position="bottom right")
 
     if verdict_annotation:
         if _fund_depletes:
-            _dep_idx = next(i for i, v in enumerate(personal_fund_values) if v < 0)
+            _dep_idx = next(i for i, v in enumerate(personal_fund_values) if simulation.ran_short(v))
             fig.add_annotation(
                 x=ages[_dep_idx], y=0,
                 text=f"<b>✗ Runs out by age {ages[_dep_idx]}: {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
@@ -1424,7 +1443,7 @@ def render_feedback_form(page_name):
                     # JSON (and so the Sheets API) has no infinity.
                     "over cap" if math.isinf(res["breakeven_rate"]) else round(res["breakeven_rate"], 2),
                     res["years_covered"],
-                    "Option A" if res["personal_balance"] <= 0 else "Option B",
+                    "Option A" if simulation.ran_short(res["personal_balance"]) else "Option B",
                     ip, country, region, city, zip_code, lat, lon,
                     timezone, isp, is_vpn, is_mobile_net,
                     lang, referrer, platform_hdr, mobile_hdr,

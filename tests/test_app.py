@@ -111,3 +111,14 @@ def test_earlier_hires_are_told_the_rules_do_not_apply():
     at = _app()
     at.sidebar.number_input(key="in_hire_year").set_value(2010).run()
     assert any("hired before 2014" in w.value for w in at.sidebar.warning)
+
+
+def test_case_study_button_sets_the_swings_its_figures_assume():
+    at = _app()
+    at.session_state["mc_std"] = 0.0
+    at.run()
+    next(b for b in at.button if b.key == "load_alice").click().run()
+    at.run()
+    assert at.session_state["mc_std"] == 15.0
+    banner = next(m.value for m in at.markdown if "🏆" in m.value)
+    assert "38 out of 100" in banner

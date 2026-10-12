@@ -139,10 +139,10 @@ def test_monte_carlo_distribution_outputs_are_consistent():
     assert mc["depletion_years"].shape == (n,)
     assert mc["median_path"].shape == (total_years + 1,)
 
-    # Depletion is absorbing, so "has a depletion year" and "ended at $0" are
-    # the same set of paths, and both must match the reported probability.
+    # The depletion years and the reported probability describe the same paths.
     assert (mc["depletion_years"] > 0).mean() == pytest.approx(mc["depletion_prob"])
-    assert (mc["final_balances"] <= 0).mean() == pytest.approx(mc["depletion_prob"])
+    # Every path that came up short ends at $0 (depletion is absorbing).
+    assert (mc["final_balances"][mc["depletion_years"] > 0] == 0).all()
 
     # Depletion years fall inside the retirement window (0 = never ran out).
     assert mc["depletion_years"].min() >= 0
@@ -276,3 +276,15 @@ def test_monte_carlo_typical_working_path_tracks_flat_rate():
     flat = _run(CASE_A, 1.07)["personal_fund_values"][CASE_A["work_years"]]
     mc = s.run_monte_carlo(**CASE_A, mean_return=0.07, std_return=0.15, n_simulations=4000)
     assert mc["median_path"][CASE_A["work_years"]] == pytest.approx(flat, rel=0.08)
+
+
+def test_ending_at_exactly_zero_is_fully_funded():
+    # One working year deposits $10,000 at 0%; one retirement year pays out
+    # exactly $10,000. Every payment is made, so nothing ran short.
+    r = s.run_simulation(100000, 1, 1.0, 1.0, (), 1.0, 0.10, 10000, 1, 1.0, step_count=0)
+    assert r["personal_balance"] == pytest.approx(0.0)
+    assert not s.ran_short(r["personal_balance"])
+    assert s.compute_breakeven_rate(100000, 1, 1.0, 1.0, (), 1.0, 0.10, 10000, 1, step_count=0) == 0.0
+    mc = s.run_monte_carlo(100000, 1, 1.0, 1.0, (), 1.0, 0.10, 10000, 1, mean_return=0.0,
+                           std_return=0.0, n_simulations=10, step_count=0)
+    assert mc["depletion_prob"] == 0.0

@@ -36,7 +36,9 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
     ``runs_out`` is page 2's count ("N" out of 100 futures), shown here so a
     reader who never opens page 2 still sees the risk behind a smooth-market win.
     """
-    if personal_balance > 0:
+    short = simulation.ran_short(personal_balance)
+    tie = not short and personal_balance <= 0.5
+    if not short:
         swings = (f"<br><br><strong>One catch:</strong> real markets don't grow smoothly. With realistic "
                   f"ups and downs, your account runs out in <strong>{runs_out} out of 100</strong> possible futures.")
     else:
@@ -46,7 +48,15 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
         swings = ""
     rate_buffer = current_rate_pct - breakeven_rate
     dollars = f" (in {CURRENT_YEAR} dollars)" if real_dollars else ""
-    if personal_balance > 0:
+    if tie:
+        # Every payment is made and nothing is left: neither option is ahead.
+        render_html(f"""
+<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🤝 It's a tie</div>
+<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, your own account pays every year's income and ends with nothing left over, just like the pension.</strong>{swings}
+</div>
+""")
+    elif not short:
         render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 Winner: Your own account</div>
@@ -242,10 +252,10 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
         mc4, mc5, mc6 = st.columns(3)
         with mc4:
-            if personal_balance > 0:
+            if not simulation.ran_short(personal_balance):
                 st.metric(
                     label=f"Your Account at Death (Age {inputs['retirement_age'] + retirement_years})",
-                    value=f"${personal_balance:,.0f}",
+                    value=f"${max(personal_balance, 0):,.0f}",
                     delta="Did not run out ✓",
                     delta_arrow="off",
                     help="Your own account still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
@@ -440,7 +450,7 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
     st.header("Case Studies")
 
     st.markdown("""
-The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above).
+The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above). Each button also sets the market-swings slider on the second page to 15%, which the "out of 100 possible futures" figures below assume.
 """)
 
     with st.expander("Case Study A: Your Own Account Wins"):

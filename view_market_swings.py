@@ -187,7 +187,7 @@ guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has 
         return
 
     st.header("Your Result")
-    render_risk_verdict(depletion_prob, index_return_pct, _mc_std_pct, flat_b_wins=flat_final > 0)
+    render_risk_verdict(depletion_prob, index_return_pct, _mc_std_pct, flat_b_wins=not simulation.ran_short(flat_final))
 
     st.space("small")
 
@@ -257,8 +257,11 @@ Page 1 tells you who wins in a smooth, average market. This page tells you the r
 
     st.header("How the 1,000 futures ended")
 
-    ran_out_count = int((final_balances <= 0).sum())
-    survivors = final_balances[final_balances > 0]
+    # "Ran out" comes from the engine (a payment went unpaid), so a future
+    # that pays everything and ends at exactly $0 is not counted as a failure.
+    ran_out_mask = mc["depletion_years"] > 0
+    ran_out_count = int(ran_out_mask.sum())
+    survivors = final_balances[~ran_out_mask]
     _cap = float(np.percentile(final_balances, 95))
     hist = go.Figure()
     _w = 1.0
