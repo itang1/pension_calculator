@@ -15,7 +15,6 @@ from common import (
     build_fund_chart,
     deflate_mc,
     dollars_note,
-    fmt_share,
     get_monte_carlo,
     render_feedback_form,
     render_html,
@@ -52,80 +51,81 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
     The wording depends on which option won at the flat rate, so the banner
     never claims a flat-rate result the first page did not show.
     """
-    pct = fmt_share(depletion_prob)
-    one_in = round(1 / depletion_prob) if depletion_prob > 0 else 0
+    n = out_of_100(depletion_prob)
+    r = f"{current_rate_pct:.1f}%"
     tier = risk_tier(depletion_prob, flat_b_wins)
 
     if tier == "none":
         bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "Option B looks robust, not just favorable on average."
+        verdict = "Option B holds up, even in bad markets."
         body = (
-            f"Even after accounting for realistic year-to-year market swings, "
-            f"<strong>none</strong> of the 1,000 simulated futures ran out of money. "
-            f"The flat {current_rate_pct:.1f}% conclusion holds up under volatility."
+            "In all 1,000 possible futures, Option B never ran out of money. "
+            "The answer from page 1 holds up."
         )
     elif tier == "small":
         bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "Option B is the reasonable choice, with a small tail risk."
+        verdict = "Option B is a reasonable choice, with a small risk."
         body = (
-            f"Only <strong>{pct}</strong> (about 1 in {one_in}) of simulated futures "
-            f"ran out of money. Option B's flat-rate advantage mostly survives real market "
-            f"volatility; just keep a cash buffer for the unlucky minority of outcomes."
+            f"Option B ran out of money in <strong>{n} out of 100</strong> possible futures. "
+            f"Usually it works out. If you choose it, keep some savings aside in case you land "
+            f"in one of the unlucky ones."
         )
     elif tier == "tradeoff":
         bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
-        verdict = "Genuine trade-off: neither option is clearly correct."
+        verdict = "A real trade-off: neither option is clearly better."
         body = (
-            f"At a flat {current_rate_pct:.1f}% return Option B wins, but once volatility is "
-            f"considered <strong>{pct}</strong> of futures (about 1 in {one_in}) run out "
-            f"of money. You are weighing Option B's higher <em>expected</em> outcome against "
-            f"Option A's guarantee that you can never run out. If running out would be "
-            f"catastrophic for you, Option A's certainty can be worth the lower expected value."
+            f"Option B usually ends with more money, but it ran out in <strong>{n} out of 100</strong> "
+            f"possible futures. The pension can never run out. If running out of money in old age "
+            f"would be a disaster for you, the pension's guarantee may be worth more than Option B's "
+            f"extra money."
         )
     elif tier == "lean_a":
         bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
-        verdict = "Lean toward Option A, despite the flat-rate headline."
+        verdict = "Lean toward the pension, even though page 1 picked Option B."
         body = (
-            f"The flat-{current_rate_pct:.1f}% line says Option B &ldquo;wins,&rdquo; but a "
-            f"constant return is an optimistic assumption. Accounting for realistic ups and "
-            f"downs, <strong>{pct}</strong> of futures (roughly 1 in {one_in}) run out of "
-            f"money before the end of retirement. A near coin-flip risk of ruin is usually not "
-            f"worth the extra upside; Option A's lifetime guarantee is the safer call here."
+            f"Page 1 assumed a smooth {r} every year. With real ups and downs, Option B ran out "
+            f"of money in <strong>{n} out of 100</strong> possible futures. That is close to a coin "
+            f"flip, which is too risky for most people's retirement money."
         )
     elif tier == "a_safer":
         bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
-        verdict = "Option A is the safer choice."
+        verdict = "The pension is the safer choice."
         body = (
-            f"Even though a flat {current_rate_pct:.1f}% return would favor Option B, "
-            f"<strong>{pct}</strong> of realistic market futures run out of money. When "
-            f"most simulated outcomes end in ruin, the pension's guaranteed lifetime income is "
-            f"clearly the more reliable choice."
+            f"Page 1 said Option B wins with a smooth {r} every year. But with real ups and downs, "
+            f"Option B ran out of money in <strong>{n} out of 100</strong> possible futures. When "
+            f"most futures end with an empty account, the pension's paycheck for life is the safer bet."
         )
     elif tier == "a_close":
         bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
-        verdict = "Option A wins at a flat rate, but a lucky market could still rescue Option B."
+        verdict = "The pension wins, though Option B sometimes gets lucky."
         body = (
-            f"At a flat {current_rate_pct:.1f}% return Option B runs out of money. With realistic "
-            f"swings, <strong>{pct}</strong> of futures run out, and the rest end with money left "
-            f"over only because they drew a lucky run of returns. Choosing Option B here is a bet "
-            f"on above-average luck; Option A's lifetime guarantee is the safer choice."
+            f"Even with a smooth {r} every year, Option B runs out. With real ups and downs it ran "
+            f"out in <strong>{n} out of 100</strong> possible futures, and the rest only made it "
+            f"because they happened to get good years. Picking Option B here is a bet on luck; "
+            f"the pension is the safer choice."
         )
     else:  # a_confirmed
         bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
-        verdict = "Option A is the safer choice, and market swings confirm it."
+        verdict = "The pension is the safer choice, and bad markets make it clearer."
         body = (
-            f"At a flat {current_rate_pct:.1f}% return Option B already runs out of money, and "
-            f"with realistic swings <strong>{pct}</strong> of futures run out too. The pension's "
-            f"guaranteed lifetime income is clearly the more reliable choice."
+            f"Even with a smooth {r} every year, Option B runs out. With real ups and downs it ran "
+            f"out in <strong>{n} out of 100</strong> possible futures. The pension's paycheck for "
+            f"life is the more reliable choice."
         )
 
     render_html(f"""
 <div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>{symbol} Adding {std_pct:g}% volatility to the picture: {verdict}</strong><br><br>
+<strong>{symbol} {verdict}</strong><br><br>
 {body}
-<br><br><em>Why this can differ from the flat-rate result: the Base Comparison page assumes the market returns exactly {current_rate_pct:.1f}% every single year. This page keeps {current_rate_pct:.1f}% as the growth of a typical year, but adds realistic year-to-year swings. A few bad years early in retirement do lasting damage, because withdrawals made after a drop lock in the loss, so the typical retirement outcome is usually worse than the flat line and a share of futures run out. The flat-rate result tells you the average-case winner; this depletion percentage tells you the risk. For a retirement decision, the risk usually matters more.</em>
 </div>
 """)
+
+
+def out_of_100(prob):
+    """A share of futures as a plain count out of 100 that never hides a real risk."""
+    if 0 < prob < 0.005:
+        return "fewer than 1"
+    return f"{round(prob * 100)}"
 
 
 def render():
@@ -136,31 +136,23 @@ def render():
     retirement_years = inputs["retirement_years"]
 
     st.markdown(f"""
-The Base Comparison page assumes the market returns exactly {index_return_pct:.1f}% every year, forever. In reality, it looks more like [+18%, -4%, +25%, -2%, +11%...] with a different number every year, all over the place, even if it averages out to {index_return_pct:.1f}% over the long run.
+Page 1 pretended the stock market grows by exactly {index_return_pct:.1f}% every single year. Real markets don't work that way. Some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
 
-**Does that difference matter? Enormously. Here is the whole idea in one example:**
-""")
+**So this page asks: with real ups and downs, how often does Option B run out of money?**
 
-    render_html("""
-<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-Suppose your $1,000 earns <strong>+50% one year</strong> (now $1,500) and <strong>−50% the next</strong> (now $750). Your "average" return was 0%, but you lost a quarter of your money. <strong>Down years hurt more than up years help.</strong> And if the down years happen early in your retirement, while you're also withdrawing money, the damage is permanent. That is why a fund that wins with a steady return can still run out of money in the real world, and why this page exists.
-</div>
-""")
-
-    st.space()
-    st.markdown(f"""
-The results below come from **1,000 of those sequences** (each one a different possible market history spanning your {work_years} years of working plus {retirement_years} years of retirement), showing the full range of where your portfolio might end up depending on how the market behaves. The teal line stays as the flat-rate baseline to compare against.
+To find out, we made up **1,000 possible futures** for the stock market. Each one is a different random mix of good and bad years, like rolling dice for every year of your {work_years} working years and {retirement_years} retired years. Then we ran your plan through every one of them.
 """)
 
     _mc_std_pct = st.slider(
-        "Range of yearly market swings",
+        "How bumpy is the market?",
         min_value=0.0, max_value=30.0, value=15.0, step=0.5,
         key="mc_std",
         help=(
-            "This controls how wide the range of yearly returns can be. "
-            "At 15% (the historical norm for the US stock market), if your average "
-            "return is 10%, most individual years will fall somewhere in the range of -5% to +25%. "
-            "Drag lower to narrow the range (calmer markets). Drag higher to widen it (wilder swings)."
+            "How far a single year can swing away from the typical year. 15% matches the U.S. "
+            f"stock market's history: with a typical year of {index_return_pct:.0f}%, most years land "
+            f"somewhere between about {index_return_pct - 15:.0f}% and {index_return_pct + 15:.0f}%. "
+            "Slide left for a calmer market, right for a wilder one. At 0, every year is the same, "
+            "just like page 1."
         ),
     )
 
@@ -183,41 +175,59 @@ The results below come from **1,000 of those sequences** (each one a different p
             label="Futures where the money ran out",
             value=f"{_n_out:,} out of {len(final_balances):,}",
             delta=None,
-            help="Out of 1,000 simulated market futures, the share where the personal fund hit $0 before the end of your retirement. The pension can never do this; it pays until you die.",
+            help="Out of the 1,000 possible futures, how many left Option B's account empty before the end of your retirement. The pension can never run out; it pays until you die.",
         )
     with m2:
         st.metric(
             label="Typical (middle) ending balance",
             value=f"${median_final:,.0f}",
-            help="Line up all 1,000 futures from worst to best; this is the one exactly in the middle. Half the futures end with less than this, half with more.",
+            help="Line up all 1,000 futures from worst to best and pick the one in the middle. Half of the futures end with less than this, and half end with more.",
         )
     with m3:
         st.metric(
             label="The flat-rate result says",
             value=f"${max(flat_final, 0):,.0f}",
-            help="The ending balance from the Base Comparison page, where the market returns the same flat rate every single year. Compare it to the typical outcome on the left; a flat rate flatters the result.",
+            help="What page 1 says is left at the end, when the market grows by the same amount every year. Compare it with the typical result to the left; a smooth market makes things look better than they usually turn out.",
         )
+
+    st.subheader("Why ups and downs matter")
+    st.markdown("**Here is the whole idea in one example:**")
+    render_html("""
+<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+Suppose your $1,000 earns <strong>+50% one year</strong> (now $1,500) and <strong>−50% the next</strong> (now $750). Your "average" return was 0%, but you lost a quarter of your money. <strong>Down years hurt more than up years help.</strong> And if the down years happen early in your retirement, while you're also withdrawing money, the damage is permanent. That is why a fund that wins with a steady return can still run out of money in the real world, and why this page exists.
+</div>
+""")
+    st.space("small")
+
+    with st.expander("Why can this page disagree with page 1?"):
+        st.markdown(f"""
+Page 1 uses the same {index_return_pct:.1f}% every year. This page keeps {index_return_pct:.1f}% as a typical year but adds ups and downs.
+
+Bad years early in retirement do lasting damage. You still have to take out money to live on, so you end up selling investments while prices are low, and that money is gone before prices recover. That is why the typical result here is usually worse than page 1, and why some futures run out.
+
+Page 1 tells you who wins in a smooth, average market. This page tells you the risk. For retirement money, the risk usually matters more.
+""")
 
     if flat_final > 0 and median_final < flat_final:
         st.markdown(
             f"Notice that the typical outcome (**\\${median_final:,.0f}**) is smaller than the flat-rate answer (**\\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% average return. That's the bad-years-early effect from the example above: withdrawals made after a drop lock in the loss. A flat rate usually paints a rosier picture of retirement than the bumpy reality it summarizes."
         )
 
-    st.header("All 1,000 futures on one chart")
+    st.header("All 1,000 possible futures on one chart")
 
     fig = build_fund_chart(
         inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"],
         title=(
-            f"Option B Personal Fund Balance: flat {index_return_pct:.1f}%/yr line "
-            f"vs. 1,000 simulated market futures"
+            f"Option B's account: a steady {index_return_pct:.1f}% a year "
+            f"vs. 1,000 possible futures"
         ),
     )
     st.plotly_chart(fig, width="stretch")
 
     with st.expander("How to read this chart"):
         st.markdown("""
-- **Bold teal line** = the flat-rate baseline from the Base Comparison page: the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year.
-- **Colored bands** = the range of possible Option B balances once the market stops returning the same rate every year. Red = the worst 20% of outcomes, blue = the middle 50% (most likely), green = the best 20%. The best-case band can extend past the top of the chart; the y-axis is fitted to the likely region.
+- **Bold teal line** = page 1's answer: Option B's account if the market grew by the same amount every year.
+- **Shaded bands** = where Option B's account lands across the 1,000 possible futures. Blue = the middle half of futures (the most likely range). Red = the unluckiest futures. Green = the luckiest ones, which can go off the top of the chart.
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the \\$0 mark. Once a simulated future hits \\$0, it has run out of money permanently.
 """)

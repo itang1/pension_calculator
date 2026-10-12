@@ -11,6 +11,7 @@ import math
 import streamlit as st
 
 from common import (
+    CURRENT_YEAR,
     ages_for,
     build_fund_chart,
     build_rate_curve_chart,
@@ -26,7 +27,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
                          breakeven_rate, current_rate_pct, real_dollars=False):
     """The page's answer, before any chart or table."""
     rate_buffer = current_rate_pct - breakeven_rate
-    dollars = " (in today's dollars)" if real_dollars else ""
+    dollars = f" (in {CURRENT_YEAR} dollars)" if real_dollars else ""
     if personal_balance > 0:
         render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
@@ -71,15 +72,15 @@ def render():
     promotion_pct = res["promotion_pct"]
 
     st.markdown("""
-Many public employees (such as teachers, law enforcement officers, and civil servants) are required to contribute part of each paycheck to a pension plan (e.g. a flat 10%). In return, the pension pays a guaranteed annual benefit in retirement for life, regardless of market performance.
+Many public employees, like teachers, police officers, and city workers, must put part of every paycheck (for example, 10%) into a pension. In return, the pension pays them a set amount every year after they retire, for the rest of their life, no matter what the stock market does.
 
-In this calculator, we ask the question: **Instead of participating in the pension program, if an employee had the alternative option to invest that same money into their own personal retirement account, which option would produce better outcomes for them?**
+This calculator asks one question: **if you could put that same money into your own retirement account instead, which choice would leave you better off?**
 """)
 
     render_html(
         """
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<em>&larr; On the left sidebar, enter your own assumptions about salary, contribution rate, investment return, and retirement timeline to see how the two options compare.</em>
+<em>&larr; Use the sidebar on the left to enter your own salary, years of work, and retirement plans. Everything on this page updates as you go.</em>
 </div>
 """
     )
@@ -92,14 +93,14 @@ In this calculator, we ask the question: **Instead of participating in the pensi
         render_html("""
 <div style="background-color:#E0E7FF; border-left:5px solid #4F46E5; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option A: Traditional Pension</strong><br><br>
-Each year, a fixed percentage of your paycheck (e.g. 10%) is automatically deducted and funneled directly into your organization's pension system. The funds are then managed by professional fund managers who ensure its long-term stability and growth. In return, once you retire, the pension program will pay you a guaranteed annual payment for the rest of your life, regardless of broad market performance. (The specific amount will depend on your salary, years of service, and the pension formula used by your organization.)
+Each year, a set part of your paycheck (for example, 10%) goes straight into the pension fund, where professional managers invest it. Once you retire, the pension pays you a guaranteed amount every year for the rest of your life, even if the stock market crashes. How much you get depends on your salary, your years of work, and your plan's formula.
 </div>
 """)
     with col_b:
         render_html("""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option B: Personal Retirement Account</strong><br><br>
-Instead of contributing to the pension, imagine that you deposit that same amount (e.g. 10%) each year into your own personal investment account. You have total control over how to invest the funds, and the balance will grow with market returns depending on your investment choices. Imagine that in retirement, you choose to withdraw the same annual amount that the pension would have paid. Additionally, any remaining balance in your account at the end of your life is yours to keep or donate as well.
+Instead of paying into the pension, imagine putting the same amount (for example, 10%) into your own investment account each year. You choose how to invest it, and it grows or shrinks with the market. In retirement, you take out the same amount each year that the pension would have paid you. Anything left when you die is yours to pass on or give away.
 </div>
 """)
     st.space("small")
@@ -203,10 +204,10 @@ Both options pay you the **same income every year in retirement**. The compariso
             value=fmt_rate(res["breakeven_rate"]),
             delta=(
                 f"far above your {_current_rate_pct:.1f}% assumption" if math.isinf(_rate_buffer)
-                else f"{_rate_buffer:+.1f}pp vs. your {_current_rate_pct:.1f}% assumption"
+                else f"{_rate_buffer:+.1f} points vs. your {_current_rate_pct:.1f}% assumption"
             ),
             delta_color="inverse" if math.isinf(_rate_buffer) else "normal",
-            help="The minimum that the market needs to return in order for your personal fund to survive your full retirement period. Compare this to your Average Index Returns Rate input.",
+            help="The lowest steady yearly return that keeps your personal fund from running out before you die. If your expected return is above this, Option B wins; below it, the pension wins.",
         )
     with mc6:
         st.metric(
@@ -260,7 +261,7 @@ This calculator is an educational tool, not a comprehensive financial model. Kee
     table_data = st.session_state["_results_nominal"]["yearly_data"].copy()
     table_data.insert(1, "Age", ages_for(inputs)[1:])
     if res.get("real_dollars"):
-        st.caption("These tables stay in future dollars, even with today's dollars switched on above, so each row adds up exactly.")
+        st.caption(f"These tables stay in the dollars of each year, even with {CURRENT_YEAR} dollars switched on above, so each row adds up exactly.")
 
     st.markdown("""
 Each row is one year. The left table tracks **Option A (pension)**, while the right tracks **Option B (personal fund)**. They use the same dollar amounts each year so the comparison is apples-to-apples. The bold **Total** row at the bottom of each table ties back to the summary metrics above.

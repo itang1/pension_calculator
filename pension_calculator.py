@@ -38,7 +38,8 @@ common.render_html(
 # any widget that is not rendered during a rerun, so widgets that live in a
 # page body (not the always-rendered sidebar), or only show in one allowance
 # mode, need this re-assignment pin.
-for _k in ("mc_std", "allowance_manual", "in_allowance_basis"):
+for _k in ("mc_std", "allowance_manual", "in_allowance_basis",
+           "in_wage", "in_wage_mode", "in_current_wage"):
     if _k in st.session_state:
         st.session_state[_k] = st.session_state[_k]
 
@@ -53,15 +54,22 @@ st.title("Is Your Pension Worth It?")
 # It is filled in after the sidebar renders, because it needs those inputs.
 _summary = st.container()
 show_real = st.toggle(
-    "Show amounts in today's dollars",
+    f"Show amounts in {common.CURRENT_YEAR} dollars",
     value=False,
     key="in_real",
     help=(
-        "Divides each future amount by inflation (set in the sidebar) so it reads in today's "
-        "money. Return rates stay as entered, and the year-by-year tables stay in future "
-        "dollars so each row adds up."
+        f"Prices rise over time, so a dollar in 2060 will buy much less than a dollar in "
+        f"{common.CURRENT_YEAR}. Turn this on to see every amount as what it would buy in "
+        f"{common.CURRENT_YEAR}, using the inflation rate in the sidebar. Return rates stay as entered."
     ),
 )
+if show_real:
+    st.caption(
+        f"Every dollar amount below is shown as what it would buy in {common.CURRENT_YEAR}. "
+        "Future amounts look smaller because prices will have risen by then; if you were hired "
+        "years ago, past amounts look bigger for the same reason. The year-by-year tables stay in "
+        "the dollars of each year so every row still adds up."
+    )
 
 # Sidebar inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from
@@ -74,9 +82,16 @@ st.session_state["_results_nominal"] = _nominal
 st.session_state["_results"] = common.deflate_results(_nominal, inputs) if show_real else _nominal
 common.sync_query_params()
 
+# Echo the wage the visitor actually typed (today's wage, or the starting wage).
+if inputs["hire_year"] < common.CURRENT_YEAR and st.session_state.get("in_wage_mode") == "My wage today":
+    _wage_summary = (f"\\${st.session_state['in_current_wage']:,.0f} wage today "
+                     f"(hired in {inputs['hire_year']})")
+else:
+    _wage_summary = f"\\${inputs['starting_wage']:,.0f} starting wage in {inputs['hire_year']}"
+
 with _summary:
     st.caption(
-        f"**Your inputs:** \\${inputs['starting_wage']:,.0f} starting wage · "
+        f"**Your inputs:** {_wage_summary} · "
         f"{inputs['work_years']} years of work · retire at {inputs['retirement_age']} · "
         f"{inputs['retirement_years']} years retired · "
         f"{_nominal['index_return_pct']:.1f}% returns. "

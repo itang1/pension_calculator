@@ -17,7 +17,7 @@ import math
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import gspread
 import numpy as np
@@ -29,6 +29,10 @@ from user_agents import parse as _parse_ua
 import simulation
 
 _logger = logging.getLogger(__name__)
+
+# "Today" for dollar labels and the hire-year input. Everything that says
+# "today's dollars" means dollars of this calendar year.
+CURRENT_YEAR = date.today().year
 
 _SPREADSHEET_ID = "1-H0MxbLs4QhES0tbXT4EztNm-5y-GY_jOzwJnwprP1M"
 
@@ -299,6 +303,7 @@ PRESETS = {
     "alice": {
         "label": "Alice: personal fund wins",
         "values": {
+            "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 120000, "in_work_years": 30, "in_retirement_age": 55,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 20",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
@@ -310,6 +315,7 @@ PRESETS = {
     "bob": {
         "label": "Bob: pension wins",
         "values": {
+            "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 65000, "in_work_years": 20, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
@@ -321,6 +327,7 @@ PRESETS = {
     "carol": {
         "label": "Carol: personal fund wins",
         "values": {
+            "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 80000, "in_work_years": 35, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "15",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
@@ -332,6 +339,7 @@ PRESETS = {
     "dave": {
         "label": "Dave: pension wins",
         "values": {
+            "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 95000, "in_work_years": 15, "in_retirement_age": 63,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
@@ -343,6 +351,7 @@ PRESETS = {
     "frank": {
         "label": "Frank: personal fund wins",
         "values": {
+            "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 150000, "in_work_years": 25, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 18",
             "in_promo_pct": 10.0, "in_contrib": 10.0,
@@ -398,12 +407,43 @@ This calculator operates in annual periods. Within each year:
 """)
 
         st.subheader("Career")
-        starting_wage = st.number_input(
-            "Starting Annual Wage ($)",
-            value=50000, min_value=0, step=2500,
-            key="in_wage",
-            help="Your initial salary for the first year you were hired."
-        )
+        hire_year = int(st.number_input(
+            "Year You Were Hired",
+            value=CURRENT_YEAR, min_value=CURRENT_YEAR - 60, max_value=CURRENT_YEAR, step=1,
+            key="in_hire_year",
+            help=(
+                "The year your career (and your pension contributions) started. Leave it at this "
+                "year to plan a career from scratch. If you were hired years ago, enter that year: "
+                "the calculator still runs your whole career from day one."
+            ),
+        ))
+        years_so_far = CURRENT_YEAR - hire_year
+        _wage_mode = "My starting wage"
+        if years_so_far > 0:
+            _wage_mode = st.radio(
+                "Which wage do you know?",
+                ["My starting wage", "My wage today"],
+                horizontal=True,
+                key="in_wage_mode",
+                help=(
+                    "If you don't remember what you were paid when you started, enter what you make "
+                    "now. The calculator works backward through your raises to estimate your starting wage."
+                ),
+            )
+        if _wage_mode == "My wage today":
+            current_wage = st.number_input(
+                "Your Annual Wage Today ($)",
+                value=120000, min_value=0, step=2500,
+                key="in_current_wage",
+                help=f"What you are paid now, in {CURRENT_YEAR}.",
+            )
+        else:
+            starting_wage = st.number_input(
+                "Starting Annual Wage ($)",
+                value=120000, min_value=0, step=2500,
+                key="in_wage",
+                help=f"Your salary in your first year on the job, in {hire_year} dollars (what you were actually paid then).",
+            )
         work_years = st.number_input(
             "Years to Work",
             value=30, min_value=1, step=1,
@@ -423,7 +463,10 @@ This calculator operates in annual periods. Within each year:
                 f"age {hire_age}. Raise your retirement age or lower your years of work to continue."
             )
             st.stop()
-        st.caption(f"You are hired at age {hire_age} and retire at {int(retirement_age)}.")
+        st.caption(
+            f"You are hired at age {hire_age} (in {hire_year}) and retire at {int(retirement_age)} "
+            f"(in {hire_year + int(work_years)})."
+        )
         cola_increase = st.number_input(
             "Cost of Living Adjustment (%)",
             value=3.0, min_value=0.0, max_value=5.5, step=0.1,
@@ -471,6 +514,25 @@ This calculator operates in annual periods. Within each year:
             key="in_promo_pct",
             help="Expected salary bump each time you are promoted."
         ) / 100 + 1
+
+        if _wage_mode == "My wage today":
+            # This calendar year is career year (years_so_far + 1). Undo every
+            # raise up to it (COLA, steps, promotions) to recover the starting wage.
+            _year_now = years_so_far + 1
+            if _year_now > int(work_years):
+                st.error(
+                    f"Hired in {hire_year}, you would have finished your {int(work_years)}-year career "
+                    f"already. Raise Years to Work, or enter your starting wage instead."
+                )
+                st.stop()
+            _growth = simulation.salary_schedule(
+                1.0, _year_now, cola_increase, step_increase, promotion_years,
+                promotion_increase, int(step_count), first_step_midyear)[-1]
+            starting_wage = current_wage / _growth
+            st.caption(
+                f"That works out to a starting wage of about ${starting_wage:,.0f} in {hire_year}, "
+                f"using the raises you entered above."
+            )
 
         st.subheader("Pension")
         pension_contribution_rate = st.number_input(
@@ -537,8 +599,9 @@ This calculator operates in annual periods. Within each year:
                     _rule += f", reduced to {plan['reduction'] * 100:.1f}% for retiring before 55"
                 if plan["capped"]:
                     _rule += ", capped at 80% of your final average salary"
-                _today = starting_allowance / inflation ** (int(work_years) + plan["deferral_years"])
-                st.caption(f"{_rule}. That is about ${_today:,.0f} a year in today's dollars.")
+                _today = starting_allowance / inflation ** (
+                    int(work_years) + plan["deferral_years"] - years_so_far)
+                st.caption(f"{_rule}. That is about ${_today:,.0f} a year in {CURRENT_YEAR} dollars.")
                 if plan["status"] == "deferred":
                     st.warning(
                         f"Without 30 years of service you can't start a pension before age "
@@ -558,6 +621,7 @@ This calculator operates in annual periods. Within each year:
             _basis = st.radio(
                 "This amount is in",
                 ["Today's dollars", "Dollars at retirement"],
+                format_func=lambda o: f"{CURRENT_YEAR} dollars" if o == "Today's dollars" else o,
                 key="in_allowance_basis",
                 help=(
                     "Plan estimators usually show your benefit in today's dollars. The calculator "
@@ -568,10 +632,10 @@ This calculator operates in annual periods. Within each year:
             )
             if _basis == "Today's dollars":
                 starting_allowance = simulation.to_retirement_dollars(
-                    manual_allowance, int(work_years), inflation)
+                    manual_allowance, int(work_years) - years_so_far, inflation)
                 st.caption(
-                    f"That is about ${starting_allowance:,.0f} in your first year of retirement, "
-                    f"after {int(work_years)} years of inflation."
+                    f"That is about ${starting_allowance:,.0f} in {hire_year + int(work_years)}, "
+                    f"your first year of retirement."
                 )
             else:
                 starting_allowance = manual_allowance
@@ -591,7 +655,7 @@ This calculator operates in annual periods. Within each year:
             help=(
                 "Average yearly rise in prices (CPI). The pension's COLA in retirement follows "
                 f"inflation up to {simulation.PLAN_RETIREE_COLA_CAP_PCT:g}% a year, so higher inflation "
-                "slowly erodes it. Also used to show amounts in today's dollars."
+                f"slowly erodes it. Also used to show amounts in {CURRENT_YEAR} dollars."
             ),
         )
         index_returns_rate = (
@@ -620,6 +684,7 @@ This calculator operates in annual periods. Within each year:
         "starting_wage": starting_wage,
         "work_years": int(work_years),
         "retirement_age": int(retirement_age),
+        "hire_year": hire_year,
         "cola_increase": cola_increase,
         "step_increase": step_increase,
         "promotion_years": promotion_years,
@@ -699,19 +764,34 @@ def get_monte_carlo(inputs, std_pct, n_simulations=1000):
     )
 
 
+def calendar_years_for(inputs):
+    """Calendar year of each chart point (W0 and year 1 are both the hire year)."""
+    n = inputs["work_years"] + inputs["retirement_years"] + 1
+    return [inputs["hire_year"] + max(i - 1, 0) for i in range(n)]
+
+
 def ages_for(inputs):
     """Age at the end of each simulated year: hire age for W0, then one per year."""
     hire_age = inputs["retirement_age"] - inputs["work_years"]
     return [hire_age + i for i in range(inputs["work_years"] + inputs["retirement_years"] + 1)]
 
 
+def _years_after_now(inputs, i):
+    """Years from the start of this calendar year to the end of chart point ``i``."""
+    return i - (CURRENT_YEAR - inputs["hire_year"])
+
+
 def _deflators(inputs, n_points):
-    """Divide by these to turn end-of-year amounts into today's dollars."""
-    return np.array([inputs["inflation"] ** i for i in range(n_points)])
+    """Divide by these to turn end-of-year amounts into this year's dollars.
+
+    Points after today shrink by inflation; for a career that started years
+    ago, points before today grow instead (the exponent is negative).
+    """
+    return np.array([inputs["inflation"] ** _years_after_now(inputs, i) for i in range(n_points)])
 
 
 def deflate_results(res, inputs):
-    """A copy of the flat-rate results with every dollar amount in today's dollars.
+    """A copy of the flat-rate results with every dollar amount in this year's dollars.
 
     Each end-of-year amount is divided by inflation compounded to that year.
     Running totals are re-summed from the deflated yearly amounts, so they stay
@@ -739,7 +819,7 @@ def deflate_results(res, inputs):
 
 
 def deflate_mc(mc, inputs):
-    """Monte Carlo outputs in today's dollars (same deflators as the flat path)."""
+    """Monte Carlo outputs in this year's dollars (same deflators as the flat path)."""
     d = _deflators(inputs, mc["percentiles"].shape[1])
     out = dict(mc)
     out["percentiles"] = mc["percentiles"] / d
@@ -750,7 +830,7 @@ def deflate_mc(mc, inputs):
 
 def dollars_note(res):
     """Suffix for chart titles saying which dollars are shown."""
-    return " (today's dollars)" if res.get("real_dollars") else ""
+    return f" (in {CURRENT_YEAR} dollars)" if res.get("real_dollars") else ""
 
 
 # --- Shareable links ----------------------------------------------------------------
@@ -758,6 +838,9 @@ def dollars_note(res):
 # into the page URL, so a copied link reopens the same scenario. Values are
 # parsed and range-checked here before they touch widget state.
 _SHARE_SPEC = {
+    "in_hire_year": (int, CURRENT_YEAR - 60, CURRENT_YEAR),
+    "in_wage_mode": (["My starting wage", "My wage today"], None, None),
+    "in_current_wage": (int, 0, 10_000_000),
     "in_wage": (int, 0, 10_000_000),
     "in_work_years": (int, 1, 60),
     "in_retirement_age": (int, 18, 75),
@@ -836,7 +919,8 @@ def build_rate_curve_chart(inputs, res):
         sim = run_simulation(*_engine_args(inputs), 1 + r / 100, **_engine_kwargs(inputs))
         final = sim["personal_balance"]
         if real:
-            final /= inputs["inflation"] ** (inputs["work_years"] + inputs["retirement_years"])
+            final /= inputs["inflation"] ** _years_after_now(
+                inputs, inputs["work_years"] + inputs["retirement_years"])
         finals.append(final)
     ink, muted = "#1e293b", "#64748B"
 
@@ -939,28 +1023,29 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             y=list(mc_pcts[0]) + list(mc_pcts[1])[::-1],
             fill="toself", fillcolor="rgba(220,38,38,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="You get unlucky (worst 20% of outcomes)", hoverinfo="skip",
+            name="Unluckiest futures", hoverinfo="skip",
         ))
         fig.add_trace(go.Scatter(
             x=_xf + _xr,
             y=list(mc_pcts[1]) + list(mc_pcts[2])[::-1],
             fill="toself", fillcolor="rgba(59,130,246,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="Most likely (middle 50% of outcomes)", hoverinfo="skip",
+            name="Middle half of futures (most likely)", hoverinfo="skip",
         ))
         fig.add_trace(go.Scatter(
             x=_xf + _xr,
             y=list(mc_pcts[2]) + list(mc_pcts[3])[::-1],
             fill="toself", fillcolor="rgba(22,163,74,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="You get lucky (best 20% of outcomes)", hoverinfo="skip",
+            name="Luckiest futures", hoverinfo="skip",
         ))
 
     # Hover arrays
     _deposits = [0.0] + yearly_data["Pension Contribution"].tolist()
     _withdrawals = [0.0] + yearly_data["Pension Redeemed"].tolist()
     _returns = [0.0] + yearly_data["Market Returns"].tolist()
-    _personal_customdata = list(zip(_deposits, _withdrawals, _returns, years))
+    _cal = calendar_years_for(inputs)
+    _personal_customdata = list(zip(_deposits, _withdrawals, _returns, years, _cal))
 
     fig.add_trace(go.Scatter(
         x=ages,
@@ -969,9 +1054,9 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         name="Annual payout amount (same for both options)",
         line=dict(color="#A855F7", width=2),
         marker=dict(color="#A855F7", size=5, symbol="circle"),
-        customdata=list(zip(_withdrawals, years)),
+        customdata=list(zip(_withdrawals, years, _cal)),
         hovertemplate=(
-            "<b>Age %{x}</b> (year %{customdata[1]})<br>"
+            "<b>Age %{x}</b> · %{customdata[2]} (year %{customdata[1]})<br>"
             "This year paid out: $%{customdata[0]:,.0f}<br>"
             "Running total paid out: $%{y:,.0f}"
             "<extra></extra>"
@@ -987,7 +1072,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         line=dict(color="#0D9488", width=3),
         customdata=_personal_customdata,
         hovertemplate=(
-            "<b>Age %{x}</b> (year %{customdata[3]})<br>"
+            "<b>Age %{x}</b> · %{customdata[4]} (year %{customdata[3]})<br>"
             "Deposit this year: $%{customdata[0]:,.0f}<br>"
             "Withdrawal this year: $%{customdata[1]:,.0f}<br>"
             "Market returns this year: $%{customdata[2]:,.0f}<br>"

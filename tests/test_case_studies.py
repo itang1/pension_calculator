@@ -133,7 +133,8 @@ def test_query_param_parsing_rejects_bad_values():
 # --- Today's dollars ---------------------------------------------------------------
 
 def test_deflated_results_are_consistent():
-    inputs = {"inflation": 1.025, "work_years": 30, "retirement_years": 30, "retirement_age": 55}
+    inputs = {"inflation": 1.025, "work_years": 30, "retirement_years": 30, "retirement_age": 55,
+              "hire_year": common.CURRENT_YEAR}
     res = s.run_simulation(120000, 30, 1.03, 1.055, (10, 20), 1.08, 0.10, 238100, 30, 1.10,
                            retiree_cola=1.02)
     real = common.deflate_results(res, inputs)
@@ -141,3 +142,25 @@ def test_deflated_results_are_consistent():
     assert real["pension_fund_values"][-1] == pytest.approx(real["pension_redeemed_total"])
     assert real["pension_redeemed_total"] < res["pension_redeemed_total"]
     assert common.ages_for(inputs)[0] == 25 and common.ages_for(inputs)[30] == 55
+
+
+def test_deflation_is_anchored_to_this_calendar_year():
+    # Hired 10 years ago: chart point 10 is (roughly) now, so it is unchanged;
+    # earlier points grow and later points shrink.
+    inputs = {"inflation": 1.03, "work_years": 30, "retirement_years": 20, "retirement_age": 60,
+              "hire_year": common.CURRENT_YEAR - 10}
+    d = common._deflators(inputs, 51)
+    assert d[10] == pytest.approx(1.0)
+    assert d[0] == pytest.approx(1.03 ** -10)
+    assert d[50] == pytest.approx(1.03 ** 40)
+    assert common.calendar_years_for(inputs)[11] == common.CURRENT_YEAR
+
+
+def test_wage_today_inverts_to_starting_wage():
+    # The sidebar divides today's wage by the growth factor of this career
+    # year; replaying the schedule from that start must land back on it.
+    args = (1.03, 1.055, (10,), 1.08, 4, True)
+    year_now = 13
+    growth = s.salary_schedule(1.0, year_now, *args)[-1]
+    start = 150000 / growth
+    assert s.salary_schedule(start, year_now, *args)[-1] == pytest.approx(150000)
