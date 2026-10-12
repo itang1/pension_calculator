@@ -640,10 +640,10 @@ This calculator operates in annual periods. Within each year:
         )
         if hire_year < simulation.PLAN_FIRST_HIRE_YEAR:
             st.warning(
-                f"You were hired before {simulation.PLAN_FIRST_HIRE_YEAR}. Earlier members are under "
-                f"older rules (a different formula, contribution rate, and COLA), so the built-in "
-                f"estimate does not apply to you. Choose 'Enter manually' below and use the estimate "
-                f"from your plan's retirement office."
+                f"This calculator is designed for members hired in or after "
+                f"{simulation.PLAN_FIRST_HIRE_YEAR}. It does not model the pension rules for members "
+                f"hired earlier. Entering a manual pension amount does not change when payments start "
+                f"or how they increase, so the results may not match your pension."
             )
         pension_contribution_rate = st.number_input(
             "Pension Contribution Rate (%)",

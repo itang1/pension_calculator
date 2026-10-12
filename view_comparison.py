@@ -335,27 +335,26 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
     if inputs["plan_status"] == "unvested":
         _first_tip = (
-            f"- **Staying {simulation.PLAN_VESTING_YEARS} years changes everything.** With "
-            f"{simulation.PLAN_VESTING_YEARS} or more years of service you earn a lifetime pension "
-            f"instead of a refund."
+            f"- **In this estimate, fewer than {simulation.PLAN_VESTING_YEARS} years of service "
+            f"means a contribution refund instead of a lifetime pension.** The result shows the "
+            f"estimated refund under the assumptions entered."
         )
     else:
         _first_tip = (
-            f"- **Your pension is probably worth more than it looks.** Unless your own investments would "
-            f"earn a steady {fmt_rate(res['breakeven_rate'])} or more every year for decades, the pension "
-            f"beats doing it yourself, and it never runs out."
+            f"- **The break-even return is {fmt_rate(res['breakeven_rate'])} per year in this "
+            f"scenario.** That is the steady annual return the account would need, under this "
+            f"calculator's assumptions, to last through the retirement period shown. It is a "
+            f"comparison point, not a prediction of future returns."
         )
-    st.header("What Can You Actually Do?")
+    st.header("Understanding This Estimate")
     st.markdown(f"""
-Most public employees can't actually trade the pension for their own account: joining the pension usually comes with the job. So the real question isn't "pension or not?" It is "is my pension enough, and what should I add on top?" A few things worth knowing:
+This comparison uses the inputs above to show how a pension and a personal account might compare. It does not predict investment results or determine what is right for you. A few points that may help explain the estimate:
 
 {_first_tip}
-- **You can save extra on top in a 457(b) plan.** Many public employers offer one, often called deferred compensation. You choose how much comes out of each paycheck, and it grows next to your pension. Some plans also offer a Roth version: you pay tax now and take the money out tax-free later.
-- **A Roth IRA is another option.** Most people with a paycheck can open one at a bank or brokerage (there are income limits). The money grows tax-free, and you can take out what you put in (not the growth) at any time.
-- **If you might leave before you can retire, know the rules first.** Leaving with under 5 years of service gets you only your contributions back, plus interest. Leaving later, but before you can retire, gets you a pension that starts at 60 with no yearly COLA raises.
-- **Talk to your plan's retirement counselors.** They can give you an exact estimate of your pension, which you can enter in the sidebar under "Enter manually."
+- **This comparison assumes the same yearly payment from either option.** It does not include survivor or disability benefits, taxes on actual withdrawals, or other personal circumstances described above.
+- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a yearly amount; payment timing and annual increases still follow the built-in rules described in the sidebar.
 
-*This is general information, not financial advice.*
+*This calculator is for exploring a scenario. It is not a personal financial recommendation.*
 """)
 
     st.divider()

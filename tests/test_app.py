@@ -110,7 +110,10 @@ def test_manual_amount_keeps_the_plans_start_age_and_cola():
 def test_earlier_hires_are_told_the_rules_do_not_apply():
     at = _app()
     at.sidebar.number_input(key="in_hire_year").set_value(2010).run()
-    assert any("hired before 2014" in w.value for w in at.sidebar.warning)
+    warning = next(w.value for w in at.sidebar.warning if "calculator is designed" in w.value)
+    assert "hired in or after 2014" in warning
+    assert "does not model the pension rules" in warning
+    assert "Entering a manual pension amount does not change when payments start" in warning
 
 
 def test_case_study_button_sets_the_swings_its_figures_assume():
