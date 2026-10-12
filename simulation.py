@@ -185,6 +185,7 @@ def estimate_allowance(work_years, fas, factor_pct, early_reduction_pct=0.0,
 # the plan's member handbook (rev. November 2022) and its July 1, 2026
 # actuarial valuation (summary of plan provisions).
 
+PLAN_FIRST_HIRE_YEAR = 2014        # these rules cover members hired this year or later
 PLAN_CONTRIBUTION_PCT = 10.0       # member contribution, % of pay
 PLAN_BENEFIT_CAP = 0.80            # allowance capped at 80% of final average salary
 PLAN_RETIREE_COLA_CAP_PCT = 2.0    # retiree COLA follows CPI, up to 2% a year
@@ -365,5 +366,6 @@ def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
         "depletion_prob": depletion_prob,
         "median_path": median_path,
         "final_balances": history[-1],
+        "balances_at_leaving": history[work_years].copy(),
         "depletion_years": depletion_years,
     }

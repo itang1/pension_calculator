@@ -10,6 +10,8 @@ import math
 
 import streamlit as st
 
+import simulation
+
 from common import (
     CURRENT_YEAR,
     ages_for,
@@ -73,6 +75,40 @@ Before your {int(retirement_years)}-year retirement was over, your account would
     )
 
 
+def render_refund_result(inputs, res):
+    """Result for someone who leaves before vesting: a refund, not a pension.
+
+    Both the refund and your own account grow from the same deposits, so they
+    are compared on the day you leave. Your own account comes out ahead only
+    if it earns more than the plan's refund interest rate.
+    """
+    refund = res["refund"]
+    account = res["account_at_leaving"]
+    rate = simulation.PLAN_REFUND_INTEREST_PCT
+    dollars = f" (in {CURRENT_YEAR} dollars)" if res.get("real_dollars") else ""
+    if abs(account - refund) <= max(1.0, 1e-9 * refund):
+        winner, color, bar = "It's a tie", "#F1F5F9", "#64748B"
+    elif account > refund:
+        winner, color, bar = "Winner: Your own account", "#CCFBF1", "#0D9488"
+    else:
+        winner, color, bar = "Winner: The pension's refund", "#E0E7FF", "#4F46E5"
+    st.header("Your Result")
+    render_html(f"""
+<div style="background-color:{color}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 {winner}</div>
+<strong>You qualify for a refund of your contributions, not a lifetime pension.</strong><br><br>
+With {inputs["work_years"]} years of service you would not vest, so when you leave the plan pays back what you put in, plus {rate:g}% interest a year: about <strong>&#36;{refund:,.0f}</strong>{dollars}. Your own account, earning {res["index_return_pct"]:.1f}% a year on the same deposits, would hold about <strong>&#36;{account:,.0f}</strong>{dollars} when you leave.
+<br><br><em>Because both grow from the same deposits, your own account comes out ahead only if it earns more than {rate:g}% a year. Staying at least {simulation.PLAN_VESTING_YEARS} years would earn you a lifetime pension instead of a refund.</em>
+</div>
+""")
+    st.space("small")
+    c1, c2 = st.columns(2)
+    c1.metric(f"Refund When You Leave (Age {inputs['retirement_age']})", f"${refund:,.0f}",
+              help=f"Your contributions plus {rate:g}% interest a year, paid back when you leave.")
+    c2.metric(f"Your Account When You Leave (Age {inputs['retirement_age']})", f"${account:,.0f}",
+              help="The same deposits in your own account, growing at the return you entered.")
+
+
 def render():
     inputs = st.session_state["_inputs"]
     res = st.session_state["_results"]
@@ -124,164 +160,181 @@ Instead of paying into the pension, imagine putting the same amount (for example
 """)
     st.space("small")
 
-    # The verdict comes first, in its own section; the chart and metrics below explain it.
-    st.header("Your Result")
-    render_result_banner(
-        personal_balance, retirement_years, res["depletion_year"],
-        res["breakeven_rate"], index_return_pct, res.get("real_dollars", False),
-        runs_out=out_of_100(get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))["depletion_prob"]),
-    )
-
-    st.space("small")
-
-    st.header("The Pension vs. Your Own Account Over Time")
-
-    with st.expander("How to read this chart"):
-        st.markdown("""
-Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does your own account run out of money before you die?**
-
-- **Bold teal line (your own account)** = your account's balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, your account wins. If it hits zero, the pension wins.
-- **Purple line (optional)** = how much money is paid out each year. The pension pays this to you; the same amount comes out of your own account. Toggle it on/off with the checkbox above the chart.
-- **Horizontal axis** = your age, from the year you are hired to the end of retirement. Hover over a point to see that year's numbers.
-- **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
-- **Red dashed vertical line** = the year retirement begins.
-- **Horizontal gray line** = the $0 mark. If the teal line crosses below it, your account has run out of money.
-
-*Wondering what happens when the market doesn't return the same rate every year? That's the whole subject of the "What If the Market Has Bad Years?" page.*
-""")
-
-    _show_ref_line = st.checkbox(
-        "Show annual payout reference line",
-        value=False,
-        help=(
-            "Adds a purple line showing how much money changes hands each year. "
-            "In retirement, the pension sends you this amount as your pension check. "
-            "Your own account pays out this exact same amount. "
-            "It is the same number for both options every year. "
-            "This line just lets you see what that dollar amount looks like on the chart."
-        ),
-    )
-
-    fig = build_fund_chart(inputs, res, _show_ref_line, verdict_annotation=True)
-    st.plotly_chart(fig, width="stretch")
-
-    st.markdown(
-        "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from your own account. The metrics below mirror each other on both sides.*"
-    )
-
-    st.space("small")
-
-    _current_rate_pct = index_return_pct
-    _rate_buffer = _current_rate_pct - res["breakeven_rate"]
-    _years_covered = res["years_covered"]
-    _depletion_year = res["depletion_year"]
-    pension_contribution_total = res["pension_contribution_total"]
-    pension_redeemed_total = res["pension_redeemed_total"]
-
-    mc1, mc2, mc3 = st.columns(3)
-    with mc1:
-        st.metric(
-            label=f"Pension Contributed over {work_years} Years",
-            value=f"${pension_contribution_total:,.0f}",
-            help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. Your own account receives this same amount as deposits."
-        )
-    with mc2:
-        st.metric(
-            label=f"Pension Received over {retirement_years} Years",
-            value=f"${pension_redeemed_total:,.0f}",
-            delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
-            help="The total pension income paid out over all retirement years, including annual COLA increases. The same amount is withdrawn from your own account. The delta shows how much more you received than you put in."
-        )
-    with mc3:
-        st.metric(
-            label=f"Your Account at Retirement (Age {inputs['retirement_age']})",
-            value=f"${personal_fund_values[work_years]:,.0f}",
-            help="The balance of your own (hypothetical) investment account on the day you retire, after years of contributions and market growth."
+    if inputs["plan_status"] == "unvested":
+        # No pension to compare: show the refund against your own account instead
+        # of lifetime-income charts that do not apply.
+        render_refund_result(inputs, res)
+    else:
+        # The verdict comes first, in its own section; the chart and metrics below explain it.
+        st.header("Your Result")
+        render_result_banner(
+            personal_balance, retirement_years, res["depletion_year"],
+            res["breakeven_rate"], index_return_pct, res.get("real_dollars", False),
+            runs_out=out_of_100(get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))["depletion_prob"]),
         )
 
-    mc4, mc5, mc6 = st.columns(3)
-    with mc4:
-        if personal_balance > 0:
-            st.metric(
-                label=f"Your Account at Death (Age {inputs['retirement_age'] + retirement_years})",
-                value=f"${personal_balance:,.0f}",
-                delta="Did not run out ✓",
-                delta_arrow="off",
-                help="Your own account still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
-            )
-        else:
-            st.metric(
-                label=f"Your Account at Death (Age {inputs['retirement_age'] + retirement_years})",
-                value="$0",
-                delta="Ran out before death ✗",
-                delta_arrow="off",
-                delta_color="inverse",
-                help=(
-                    "Your own account ran dry before your retirement years were up. The pension would have continued paying regardless. "
-                    f"Over the remaining years, your account would have come up ${-personal_balance:,.0f} short of the same income."
-                ),
-            )
-    with mc5:
-        st.metric(
-            label="Break-even Return Rate",
-            value=fmt_rate(res["breakeven_rate"]),
-            delta=(
-                f"far above your {_current_rate_pct:.1f}% assumption" if math.isinf(_rate_buffer)
-                else f"{_rate_buffer:+.1f} points vs. your {_current_rate_pct:.1f}% assumption"
+        st.space("small")
+
+        st.header("The Pension vs. Your Own Account Over Time")
+
+        with st.expander("How to read this chart"):
+            st.markdown("""
+    Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does your own account run out of money before you die?**
+
+    - **Bold teal line (your own account)** = your account's balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, your account wins. If it hits zero, the pension wins.
+    - **Purple line (optional)** = how much money is paid out each year. The pension pays this to you; the same amount comes out of your own account. Toggle it on/off with the checkbox above the chart.
+    - **Horizontal axis** = your age, from the year you are hired to the end of retirement. Hover over a point to see that year's numbers.
+    - **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
+    - **Red dashed vertical line** = the year retirement begins.
+    - **Horizontal gray line** = the $0 mark. If the teal line crosses below it, your account has run out of money.
+
+    *Wondering what happens when the market doesn't return the same rate every year? That's the whole subject of the "What If the Market Has Bad Years?" page.*
+    """)
+
+        _show_ref_line = st.checkbox(
+            "Show annual payout reference line",
+            value=False,
+            help=(
+                "Adds a purple line showing how much money changes hands each year. "
+                "In retirement, the pension sends you this amount as your pension check. "
+                "Your own account pays out this exact same amount. "
+                "It is the same number for both options every year. "
+                "This line just lets you see what that dollar amount looks like on the chart."
             ),
-            delta_color="inverse" if math.isinf(_rate_buffer) else "normal",
-            help="The lowest steady yearly return that keeps your own account from running out before you die. If your expected return is above this, your account wins; below it, the pension wins.",
-        )
-    with mc6:
-        st.metric(
-            label="Years Your Account Covers",
-            value=f"{_years_covered} / {retirement_years} yrs",
-            delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
-            delta_arrow="off",
-            delta_color="normal" if _depletion_year is None else "inverse",
-            help="How many retirement years your own account can sustain the same annual withdrawal as the pension, out of your total retirement period.",
         )
 
-    st.subheader("How the answer changes with the return rate")
-    st.markdown(
-        "The break-even rate is where this line crosses \\$0. Slide along it to see how much "
-        "a point of return is worth: above \\$0 your account ends with money to spare, below it your account "
-        "runs out and the pension wins."
-    )
-    st.plotly_chart(build_rate_curve_chart(inputs, res), width="stretch")
+        fig = build_fund_chart(inputs, res, _show_ref_line, verdict_annotation=True)
+        st.plotly_chart(fig, width="stretch")
 
-    st.markdown("""
-**What you leave behind at your death:**
-- With **your own account**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
-- With **the pension**, payments stop when you die, unless you have an eligible spouse or domestic partner: the plan's standard allowance then keeps paying them 50% of it for life, at no extra cost. This calculator does not model survivor benefits, so for married members the pension is worth more than shown here.
-""")
+        st.markdown(
+            "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from your own account. The metrics below mirror each other on both sides.*"
+        )
 
-    with st.expander("Limitations & Assumptions"):
+        st.space("small")
+
+        _current_rate_pct = index_return_pct
+        _rate_buffer = _current_rate_pct - res["breakeven_rate"]
+        _years_covered = res["years_covered"]
+        _depletion_year = res["depletion_year"]
+        pension_contribution_total = res["pension_contribution_total"]
+        pension_redeemed_total = res["pension_redeemed_total"]
+
+        mc1, mc2, mc3 = st.columns(3)
+        with mc1:
+            st.metric(
+                label=f"Pension Contributed over {work_years} Years",
+                value=f"${pension_contribution_total:,.0f}",
+                help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. Your own account receives this same amount as deposits."
+            )
+        with mc2:
+            st.metric(
+                label=f"Pension Received over {retirement_years} Years",
+                value=f"${pension_redeemed_total:,.0f}",
+                delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
+                help="The total pension income paid out over all retirement years, including annual COLA increases. The same amount is withdrawn from your own account. The delta shows how much more you received than you put in."
+            )
+        with mc3:
+            st.metric(
+                label=f"Your Account at Retirement (Age {inputs['retirement_age']})",
+                value=f"${personal_fund_values[work_years]:,.0f}",
+                help="The balance of your own (hypothetical) investment account on the day you retire, after years of contributions and market growth."
+            )
+
+        mc4, mc5, mc6 = st.columns(3)
+        with mc4:
+            if personal_balance > 0:
+                st.metric(
+                    label=f"Your Account at Death (Age {inputs['retirement_age'] + retirement_years})",
+                    value=f"${personal_balance:,.0f}",
+                    delta="Did not run out ✓",
+                    delta_arrow="off",
+                    help="Your own account still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
+                )
+            else:
+                st.metric(
+                    label=f"Your Account at Death (Age {inputs['retirement_age'] + retirement_years})",
+                    value="$0",
+                    delta="Ran out before death ✗",
+                    delta_arrow="off",
+                    delta_color="inverse",
+                    help=(
+                        "Your own account ran dry before your retirement years were up. The pension would have continued paying regardless. "
+                        f"Over the remaining years, your account would have come up ${-personal_balance:,.0f} short of the same income."
+                    ),
+                )
+        with mc5:
+            st.metric(
+                label="Break-even Return Rate",
+                value=fmt_rate(res["breakeven_rate"]),
+                delta=(
+                    f"far above your {_current_rate_pct:.1f}% assumption" if math.isinf(_rate_buffer)
+                    else f"{_rate_buffer:+.1f} points vs. your {_current_rate_pct:.1f}% assumption"
+                ),
+                delta_color="inverse" if math.isinf(_rate_buffer) else "normal",
+                help="The lowest steady yearly return that keeps your own account from running out before you die. If your expected return is above this, your account wins; below it, the pension wins.",
+            )
+        with mc6:
+            st.metric(
+                label="Years Your Account Covers",
+                value=f"{_years_covered} / {retirement_years} yrs",
+                delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
+                delta_arrow="off",
+                delta_color="normal" if _depletion_year is None else "inverse",
+                help="How many retirement years your own account can sustain the same annual withdrawal as the pension, out of your total retirement period.",
+            )
+
+        st.subheader("How the answer changes with the return rate")
+        st.markdown(
+            "The break-even rate is where this line crosses \\$0. Slide along it to see how much "
+            "a point of return is worth: above \\$0 your account ends with money to spare, below it your account "
+            "runs out and the pension wins."
+        )
+        st.plotly_chart(build_rate_curve_chart(inputs, res), width="stretch")
+
         st.markdown("""
-This calculator is an educational tool, not a comprehensive financial model. Keep these caveats in mind when reading the results:
+    **What you leave behind at your death:**
+    - With **your own account**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
+    - With **the pension**, payments stop when you die, unless you have an eligible spouse or domestic partner: the plan's standard allowance then keeps paying them 50% of it for life, at no extra cost. This calculator does not model survivor benefits, so for married members the pension is worth more than shown here.
+    """)
 
-**The return rate is the single biggest factor.** A 1% difference in long-term returns shifts the outcome dramatically between the pension and your own account. The break-even rate in the results shows the minimum return your account needs to survive your full retirement.
+        with st.expander("Limitations & Assumptions"):
+            st.markdown("""
+    This calculator is an educational tool, not a comprehensive financial model. Keep these caveats in mind when reading the results:
 
-**Constant inputs.** The investment return, COLA, and step increase you enter are treated as fixed values applied every year. Real markets and salary schedules fluctuate, and a few bad return years early in retirement hurt far more than a steady average suggests. The *What If the Market Has Bad Years?* page simulates this for the return rate; COLA and step increases remain flat.
+    **The return rate is the single biggest factor.** A 1% difference in long-term returns shifts the outcome dramatically between the pension and your own account. The break-even rate in the results shows the minimum return your account needs to survive your full retirement.
 
-**Both options pay the same annual income.** This is not a comparison about how much you receive each year. The question is whether your account has money left over after covering all those payments through retirement. The same COLA rate is applied to both the pension payment and the withdrawal from your own account; in practice they can differ.
+    **Constant inputs.** The investment return, COLA, and step increase you enter are treated as fixed values applied every year. Real markets and salary schedules fluctuate, and a few bad return years early in retirement hurt far more than a steady average suggests. The *What If the Market Has Bad Years?* page simulates this for the return rate; COLA and step increases remain flat.
 
-**Equal tax treatment for both options.** The contribution rate is applied to the personal account on the same pre-tax basis as the pension. This is fine if you have room in a 457(b) plan (a tax-advantaged account available to government employees, similar to a 401k), which has its own contribution limit separate from your pension. But if you have no tax-advantaged space available, the personal account is actually disadvantaged in a way that is not factored in here.
+    **Both options pay the same annual income.** This is not a comparison about how much you receive each year. The question is whether your account has money left over after covering all those payments through retirement. The same COLA rate is applied to both the pension payment and the withdrawal from your own account; in practice they can differ.
 
-**Only your own contributions are compared.** Most pensions are also funded by your employer. This comparison assumes only your share of the money goes into your own account; the employer's share does not follow you, so it is not counted there.
+    **Equal tax treatment for both options.** The contribution rate is applied to the personal account on the same pre-tax basis as the pension. This is fine if you have room in a 457(b) plan (a tax-advantaged account available to government employees, similar to a 401k), which has its own contribution limit separate from your pension. But if you have no tax-advantaged space available, the personal account is actually disadvantaged in a way that is not factored in here.
 
-**Vesting and leaving early matter.** With fewer than 5 years of service there is no pension, only a refund of your contributions with interest. With 5 or more years but under 30, the pension can't start before age 60; leaving earlier gives a deferred pension from 60 with no COLA. The sidebar estimate applies both rules. Survivor and disability benefits are not modeled.
+    **Only your own contributions are compared.** Most pensions are also funded by your employer. This comparison assumes only your share of the money goes into your own account; the employer's share does not follow you, so it is not counted there.
 
-**Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the sidebar for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
+    **Vesting and leaving early matter.** With fewer than 5 years of service there is no pension, only a refund of your contributions with interest. With 5 or more years but under 30, the pension can't start before age 60; leaving earlier gives a deferred pension from 60 with no COLA. The sidebar estimate applies both rules. Survivor and disability benefits are not modeled.
 
-*Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
-""")
+    **Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the sidebar for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
 
+    *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
+    """)
+
+    if inputs["plan_status"] == "unvested":
+        _first_tip = (
+            f"- **Staying {simulation.PLAN_VESTING_YEARS} years changes everything.** With "
+            f"{simulation.PLAN_VESTING_YEARS} or more years of service you earn a lifetime pension "
+            f"instead of a refund."
+        )
+    else:
+        _first_tip = (
+            f"- **Your pension is probably worth more than it looks.** Unless your own investments would "
+            f"earn a steady {fmt_rate(res['breakeven_rate'])} or more every year for decades, the pension "
+            f"beats doing it yourself, and it never runs out."
+        )
     st.header("What Can You Actually Do?")
     st.markdown(f"""
 Most public employees can't actually trade the pension for their own account: joining the pension usually comes with the job. So the real question isn't "pension or not?" It is "is my pension enough, and what should I add on top?" A few things worth knowing:
 
-- **Your pension is probably worth more than it looks.** Unless your own investments would earn a steady {fmt_rate(res["breakeven_rate"])} or more every year for decades, the pension beats doing it yourself, and it never runs out.
+{_first_tip}
 - **You can save extra on top in a 457(b) plan.** Many public employers offer one, often called deferred compensation. You choose how much comes out of each paycheck, and it grows next to your pension. Some plans also offer a Roth version: you pay tax now and take the money out tax-free later.
 - **A Roth IRA is another option.** Most people with a paycheck can open one at a bank or brokerage (there are income limits). The money grows tax-free, and you can take out what you put in (not the growth) at any time.
 - **If you might leave before you can retire, know the rules first.** Leaving with under 5 years of service gets you only your contributions back. Leaving later, but before you can retire, gets you a pension that starts at 60 with no yearly COLA raises.
@@ -392,7 +445,7 @@ The examples below each show a scenario where one option wins. To see the full c
 
     with st.expander("Case Study A: Your Own Account Wins"):
         st.markdown("""
-**Settings:** Starting wage \\$120,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 20 (8% each) · Pension contribution rate 10% · Index returns 10% · Work years 30 · Retires at 55 · Retirement years 30 · Plan factor 2% (first-year allowance about \\$238,100, or \\$113,500 in today's dollars)
+**Settings:** Starting wage \\$120,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 20 (8% each) · Pension contribution rate 10% · Index returns 10% · Work years 30 · Retires at 55 · Retirement years 30 · Plan factor 2% (first-year allowance about \\$238,100, or \\$110,700 in today's dollars)
 """)
         if st.button("Try Alice's scenario in the calculator", key="load_alice", icon="▶️"):
             queue_preset("alice")
@@ -401,7 +454,7 @@ The examples below each show a scenario where one option wins. To see the full c
 
 Alice is a civil servant who starts at \\$120,000. Across a 30-year career, her salary climbs through step increases, COLA adjustments, and two promotions. Every year, 10% of it goes into the pension.
 
-**The pension:** By the time Alice retires, she has paid about **\\$770,000** into the pension. In return, she gets an allowance that starts around \\$238,100 a year (about \\$113,500 in today's dollars, since 30 years of raises and inflation come first) and rises 2% annually. Add up 30 years of those payments and she collects roughly **\\$9.7 million**.
+**The pension:** By the time Alice retires, she has paid about **\\$770,000** into the pension. In return, she gets an allowance that starts around \\$238,100 a year (about \\$110,700 in today's dollars, since 30 years of raises and inflation come first) and rises 2% annually. Add up 30 years of those payments and she collects roughly **\\$9.7 million**.
 
 **Her own account:** Now suppose she had put those same contributions into an account earning 10% a year instead. By retirement it would hold about **\\$3.2 million**. She then withdraws the same amount the pension would have paid each year. Since 10% growth outpaces what she takes out, the balance keeps climbing through retirement and finishes close to **\\$10 million**.
 
@@ -412,7 +465,7 @@ This is also the scenario people misread most often. They see "\\$9.7 million in
 
     with st.expander("Case Study B: Pension Wins"):
         st.markdown("""
-**Settings:** Starting wage \\$65,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retires at 60 · Retirement years 35 · Plan factor 1.5% (first-year allowance about \\$41,100, or \\$25,100 in today's dollars)
+**Settings:** Starting wage \\$65,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retires at 60 · Retirement years 35 · Plan factor 1.5% (first-year allowance about \\$41,100, or \\$24,500 in today's dollars)
 """)
         if st.button("Try Bob's scenario in the calculator", key="load_bob", icon="▶️"):
             queue_preset("bob")
@@ -432,7 +485,7 @@ The pension option tends to come out ahead when returns are low, retirement is l
 
     with st.expander("Case Study C: Your Own Account Wins"):
         st.markdown("""
-**Settings:** Starting wage \\$80,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotion at year 15 (8%) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retires at 60 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$198,800, or \\$83,800 in today's dollars)
+**Settings:** Starting wage \\$80,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotion at year 15 (8%) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retires at 60 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$198,800, or \\$81,700 in today's dollars)
 """)
         if st.button("Try Carol's scenario in the calculator", key="load_carol", icon="▶️"):
             queue_preset("carol")
@@ -450,7 +503,7 @@ Carol is a civil servant who starts at \\$80,000 and works a long 35-year career
 
     with st.expander("Case Study D: Pension Wins"):
         st.markdown("""
-**Settings:** Starting wage \\$95,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 4% · Work years 15 · Retires at 63 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$51,900, or \\$35,800 in today's dollars)
+**Settings:** Starting wage \\$95,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 4% · Work years 15 · Retires at 63 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$51,900, or \\$34,900 in today's dollars)
 """)
         if st.button("Try Dave's scenario in the calculator", key="load_dave", icon="▶️"):
             queue_preset("dave")
@@ -468,7 +521,7 @@ Dave is a civil servant who starts at \\$95,000 but works only 15 years before r
 
     with st.expander("Case Study E: Pension Wins (Hired Late)"):
         st.markdown("""
-**Settings:** Starting wage \\$90,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 7% · Hired at 50 · Retires at 63 (13 years of work) · Retirement years 25 · Plan factor 2% (first-year allowance about \\$40,100, or \\$29,100 in today's dollars)
+**Settings:** Starting wage \\$90,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 7% · Hired at 50 · Retires at 63 (13 years of work) · Retirement years 25 · Plan factor 2% (first-year allowance about \\$40,100, or \\$28,400 in today's dollars)
 """)
         if st.button("Try Grace's scenario in the calculator", key="load_grace", icon="▶️"):
             queue_preset("grace")
@@ -486,7 +539,7 @@ Grace changes careers and is hired at 50, starting at \\$90,000 with no promotio
 
     with st.expander("Case Study F: Your Own Account Wins"):
         st.markdown("""
-**Settings:** Starting wage \\$150,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 18 (10% each) · Pension contribution rate 10% · Index returns 10% · Work years 25 · Retires at 60 · Retirement years 25 · Plan factor 1.5% (first-year allowance about \\$166,500, or \\$89,800 in today's dollars)
+**Settings:** Starting wage \\$150,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 18 (10% each) · Pension contribution rate 10% · Index returns 10% · Work years 25 · Retires at 60 · Retirement years 25 · Plan factor 1.5% (first-year allowance about \\$166,500, or \\$87,600 in today's dollars)
 """)
         if st.button("Try Frank's scenario in the calculator", key="load_frank", icon="▶️"):
             queue_preset("frank")

@@ -9,6 +9,8 @@ runs out of money, when it happens, and what the typical outcome looks like.
 
 import numpy as np
 import streamlit as st
+
+import simulation
 from plotly import graph_objects as go
 
 from common import (
@@ -165,6 +167,24 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
     final_balances = mc["final_balances"]
     median_final = float(np.percentile(final_balances, 50))
     flat_final = res["personal_balance"]
+
+    if inputs["plan_status"] == "unvested":
+        # No pension, only a refund: the question becomes how often your own
+        # account beats the refund on the day you leave.
+        refund = res["refund"]
+        wins = int((mc["balances_at_leaving"] > refund).sum())
+        st.header("Your Result")
+        render_html(f"""
+<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>You would get a refund, not a lifetime pension.</strong><br><br>
+With real ups and downs, your own account ended up with more than the refund (about &#36;{refund:,.0f}) in
+<strong>{out_of_100(wins / len(mc["balances_at_leaving"]))} out of 100</strong> possible futures. The refund grows at a
+guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has to beat that to come out ahead.
+</div>
+""")
+        st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to Base Comparison: Flat Rate**", icon="⚖️")
+        render_feedback_form("market-swings")
+        return
 
     st.header("Your Result")
     render_risk_verdict(depletion_prob, index_return_pct, _mc_std_pct, flat_b_wins=flat_final > 0)

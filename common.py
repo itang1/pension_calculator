@@ -602,12 +602,28 @@ This calculator operates in annual periods. Within each year:
                 )
 
         st.subheader("Pension")
+        st.caption(
+            f"Pension estimates follow the plan's rules for members hired in "
+            f"{simulation.PLAN_FIRST_HIRE_YEAR} or later."
+        )
+        if hire_year < simulation.PLAN_FIRST_HIRE_YEAR:
+            st.warning(
+                f"You were hired before {simulation.PLAN_FIRST_HIRE_YEAR}. Earlier members are under "
+                f"older rules (a different formula, contribution rate, and COLA), so the built-in "
+                f"estimate does not apply to you. Choose 'Enter manually' below and use the estimate "
+                f"from your plan's retirement office."
+            )
         pension_contribution_rate = st.number_input(
             "Pension Contribution Rate (%)",
             value=10.0, min_value=0.0, max_value=100.0, step=1.,
             key="in_contrib",
             help="Percentage of your salary automatically deducted and contributed to the pension system each year."
         ) / 100
+        if abs(pension_contribution_rate * 100 - simulation.PLAN_CONTRIBUTION_PCT) > 1e-9:
+            st.caption(
+                f"Members of this plan contribute {simulation.PLAN_CONTRIBUTION_PCT:g}%. A different rate "
+                f"changes what goes into your own account, but not the pension formula."
+            )
 
         st.markdown("**Starting Pension Allowance**")
 
@@ -624,14 +640,21 @@ This calculator operates in annual periods. Within each year:
         # is read before the allowance captions that use it (widget in Retirement).
         inflation = 1 + st.session_state.get("in_inflation", 2.5) / 100
 
-        plan = None
-        if not manual_override:
-            _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
-                               promotion_years, promotion_increase,
-                               int(step_count), first_step_midyear)
-            plan = simulation.plan_benefit(int(work_years), int(retirement_age), _fas)
-            starting_allowance = plan["allowance"]
+        # The plan's eligibility rules apply in both modes. Entering the amount
+        # by hand replaces only the dollar figure, never when payments start or
+        # whether they get a COLA.
+        _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
+                           promotion_years, promotion_increase,
+                           int(step_count), first_step_midyear)
+        plan = simulation.plan_benefit(int(work_years), int(retirement_age), _fas)
+        # Payments are made at the end of each year, like every other cash flow
+        # here, so the first one lands at the end of the first year it is due.
+        # This is the one timing used for every today's-dollars conversion.
+        _first_pay_year = hire_year + int(work_years) + plan["deferral_years"]
+        _years_to_first_pay = int(work_years) + plan["deferral_years"] + 1 - years_so_far
 
+        if not manual_override:
+            starting_allowance = plan["allowance"]
             # The value is pushed through session_state (not ``value=``) so a
             # keyed, disabled widget always shows the freshly computed figure.
             st.session_state["allowance_formula"] = round(starting_allowance)
@@ -648,42 +671,18 @@ This calculator operates in annual periods. Within each year:
                     "for your age and years of service. Switch to 'Enter manually' to override."
                 ),
             )
-            if plan["status"] == "unvested":
-                _refund = simulation.refund_with_interest(
-                    [s * pension_contribution_rate for s in simulation.salary_schedule(
-                        starting_wage, int(work_years), cola_increase, step_increase,
-                        promotion_years, promotion_increase, int(step_count), first_step_midyear)])
-                st.warning(
-                    f"With {int(work_years)} years of service you would not vest, so there is no "
-                    f"lifetime allowance. Instead your contributions are refunded with "
-                    f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% interest (about ${_refund:,.0f}). "
-                    f"In that case your account only wins if it earns more than "
-                    f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% a year."
-                )
-            else:
-                _rule = f"{plan['factor_pct']:g}% per year of service"
-                if plan["reduction"] < 1:
-                    _rule += f", reduced to {plan['reduction'] * 100:.1f}% for retiring before 55"
-                if plan["capped"]:
-                    _rule += ", capped at 80% of your final average salary"
-                _today = starting_allowance / inflation ** (
-                    int(work_years) + plan["deferral_years"] - years_so_far)
-                st.caption(f"{_rule}. That is about ${_today:,.0f} a year in {CURRENT_YEAR} dollars.")
-                if plan["status"] == "deferred":
-                    st.warning(
-                        f"Without 30 years of service you can't start a pension before age "
-                        f"{simulation.PLAN_FULL_AGE}. Leaving at {int(retirement_age)} gives a deferred pension "
-                        f"from age {simulation.PLAN_FULL_AGE} with no COLA, so neither option pays anything for "
-                        f"your first {plan['deferral_years']} years of retirement."
-                    )
         else:
             manual_allowance = st.number_input(
                 "First-year annual pension allowance ($)",
                 value=70000,
                 min_value=0,
+                max_value=10_000_000,
                 step=2500,
                 key="allowance_manual",
-                help="Your annual pension payment in the first year of retirement. Find this from your plan's retirement estimator. COLA will compound on top of this each subsequent year.",
+                help=(
+                    "Your yearly pension payment in its first year. Find this from your plan's retirement "
+                    "estimator. When payments start and how they grow still follow the plan's rules."
+                ),
             )
             _basis = st.radio(
                 "This amount is in",
@@ -693,19 +692,54 @@ This calculator operates in annual periods. Within each year:
                 help=(
                     "Plan estimators usually show your benefit in today's dollars. The calculator "
                     "grows your salary in future dollars, so a today's-dollars figure is first "
-                    "grown by inflation to your retirement year. Mixing the two would make the "
-                    "pension look several times smaller than it is."
+                    "grown by inflation to the year of your first payment. Mixing the two would "
+                    "make the pension look several times smaller than it is."
                 ),
             )
             if _basis == "Today's dollars":
                 starting_allowance = simulation.to_retirement_dollars(
-                    manual_allowance, int(work_years) - years_so_far, inflation)
-                st.caption(
-                    f"That is about ${starting_allowance:,.0f} in {hire_year + int(work_years)}, "
-                    f"your first year of retirement."
-                )
+                    manual_allowance, _years_to_first_pay, inflation)
+                if plan["status"] != "unvested":
+                    st.caption(f"That is about ${starting_allowance:,.0f} in {_first_pay_year}, when your first payment is due.")
             else:
                 starting_allowance = manual_allowance
+
+        if plan["status"] == "unvested":
+            _refund = simulation.refund_with_interest(
+                [s * pension_contribution_rate for s in simulation.salary_schedule(
+                    starting_wage, int(work_years), cola_increase, step_increase,
+                    promotion_years, promotion_increase, int(step_count), first_step_midyear)])
+            st.warning(
+                f"With {int(work_years)} years of service you would not vest, so there is no "
+                f"lifetime pension{' (the amount above is not used)' if manual_override else ''}. "
+                f"Instead your contributions are refunded with "
+                f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% interest a year: about ${_refund:,.0f} when you leave."
+            )
+            starting_allowance = 0.0
+        else:
+            _start_age = int(retirement_age) + plan["deferral_years"]
+            _cola_pct = (min((inflation - 1) * 100, simulation.PLAN_RETIREE_COLA_CAP_PCT)
+                         if plan["cola_applies"] else 0.0)
+            if not manual_override:
+                _rule = f"{plan['factor_pct']:g}% per year of service"
+                if plan["reduction"] < 1:
+                    _rule += f", reduced to {plan['reduction'] * 100:.1f}% for retiring before 55"
+                if plan["capped"]:
+                    _rule += ", capped at 80% of your final average salary"
+                _today = starting_allowance / inflation ** _years_to_first_pay
+                st.caption(f"{_rule}. That is about ${_today:,.0f} a year in {CURRENT_YEAR} dollars.")
+            else:
+                st.caption(
+                    f"Under the plan's rules, payments start at age {_start_age} and "
+                    + (f"rise {_cola_pct:.1f}% a year." if _cola_pct else "stay the same each year (no COLA).")
+                )
+            if plan["status"] == "deferred":
+                st.warning(
+                    f"Without 30 years of service you can't start a pension before age "
+                    f"{simulation.PLAN_FULL_AGE}. Leaving at {int(retirement_age)} gives a deferred pension "
+                    f"from age {simulation.PLAN_FULL_AGE} with no COLA, so neither option pays anything for "
+                    f"your first {plan['deferral_years']} years of retirement."
+                )
 
         st.subheader("Retirement")
         retirement_years = st.number_input(
@@ -752,7 +786,7 @@ This calculator operates in annual periods. Within each year:
         )
 
     retiree_cola_pct = min(inflation_pct, simulation.PLAN_RETIREE_COLA_CAP_PCT)
-    if plan is not None and not plan["cola_applies"]:
+    if not plan["cola_applies"]:
         retiree_cola_pct = 0.0
 
     return {
@@ -772,8 +806,9 @@ This calculator operates in annual periods. Within each year:
         "index_returns_rate": index_returns_rate,
         "inflation": 1 + inflation_pct / 100,
         "retiree_cola": 1 + retiree_cola_pct / 100,
-        "deferral_years": 0 if plan is None else plan["deferral_years"],
-        "plan_status": "manual" if plan is None else plan["status"],
+        "deferral_years": plan["deferral_years"],
+        "plan_status": plan["status"],
+        "allowance_source": "manual" if manual_override else "estimate",
         "problems": problems,
     }
 
@@ -815,8 +850,18 @@ def compute_results(inputs):
 
     years_covered = inputs["retirement_years"] if depletion_year is None else depletion_year - 1
 
+    # Unvested members get their contributions back with interest instead of
+    # a pension. The refund and your own account grow from the same deposits,
+    # so the fair comparison is the two amounts on the day you leave.
+    refund = None
+    if inputs["plan_status"] == "unvested":
+        contributions = result["yearly_data"]["Pension Contribution"].iloc[:inputs["work_years"]]
+        refund = simulation.refund_with_interest(contributions.tolist())
+
     return {
         **result,
+        "refund": refund,
+        "account_at_leaving": personal_fund_values[inputs["work_years"]],
         "depletion_year": depletion_year,
         "breakeven_rate": breakeven_rate,
         "years_covered": years_covered,
@@ -890,6 +935,9 @@ def deflate_results(res, inputs):
     out["pension_contribution_total"] = float(df["Pension Contribution"].sum())
     out["pension_redeemed_total"] = float(df["Pension Redeemed"].sum())
     out["personal_balance"] = float(df["Balance"].iloc[-1])
+    out["account_at_leaving"] = out["personal_fund_values"][inputs["work_years"]]
+    if res.get("refund") is not None:
+        out["refund"] = res["refund"] / _deflators(inputs, inputs["work_years"] + 1)[-1]
     out["real_dollars"] = True
     return out
 
@@ -901,6 +949,7 @@ def deflate_mc(mc, inputs):
     out["percentiles"] = mc["percentiles"] / d
     out["median_path"] = mc["median_path"] / d
     out["final_balances"] = mc["final_balances"] / d[-1]
+    out["balances_at_leaving"] = mc["balances_at_leaving"] / d[inputs["work_years"]]
     return out
 
 

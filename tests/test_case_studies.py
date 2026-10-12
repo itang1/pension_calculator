@@ -37,7 +37,9 @@ def _replay(preset_id):
     return {
         "factor": plan["factor_pct"],
         "allowance": allowance,
-        "allowance_today": allowance / inflation ** wy,
+        # First payment is at the end of the first retirement year (the app's
+        # single timing convention for today's-dollar conversions).
+        "allowance_today": allowance / inflation ** (wy + 1),
         "received": res["pension_redeemed_total"],
         "at_retirement": pv[wy],
         "final": res["personal_balance"],
@@ -49,12 +51,12 @@ def _replay(preset_id):
 # (preset, personal fund wins?, plan factor, allowance, today's dollars,
 #  total received, fund at retirement, final balance or None, depletion year or None)
 CLAIMS = [
-    ("alice", True, 2.0, 238_100, 113_500, 9.7e6, 3.2e6, 10.0e6, None),
-    ("bob", False, 1.5, 41_100, 25_100, 2.1e6, 332_000, None, 10),
-    ("carol", True, 2.0, 198_800, 83_800, 6.4e6, 2.9e6, 5.2e6, None),
-    ("dave", False, 2.0, 51_900, 35_800, 1.7e6, 276_000, None, 6),
-    ("frank", True, 1.5, 166_500, 89_800, 5.3e6, 2.4e6, 6.5e6, None),
-    ("grace", False, 2.0, 40_100, 29_100, 1.3e6, 251_000, None, 8),
+    ("alice", True, 2.0, 238_100, 110_700, 9.7e6, 3.2e6, 10.0e6, None),
+    ("bob", False, 1.5, 41_100, 24_500, 2.1e6, 332_000, None, 10),
+    ("carol", True, 2.0, 198_800, 81_700, 6.4e6, 2.9e6, 5.2e6, None),
+    ("dave", False, 2.0, 51_900, 34_900, 1.7e6, 276_000, None, 6),
+    ("frank", True, 1.5, 166_500, 87_600, 5.3e6, 2.4e6, 6.5e6, None),
+    ("grace", False, 2.0, 40_100, 28_400, 1.3e6, 251_000, None, 8),
 ]
 
 

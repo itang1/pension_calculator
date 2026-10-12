@@ -61,3 +61,53 @@ def test_unusual_digits_in_promotion_years_show_an_error_not_a_crash():
     at.sidebar.text_input(key="in_promo_years").set_value("²").run()
     assert not at.exception
     assert at.error
+
+
+def _flat_career(at, hire_age, retirement_age):
+    """No raises at all, so dollar figures are easy to check by hand."""
+    at.sidebar.text_input(key="in_promo_years").set_value("").run()
+    at.sidebar.number_input(key="in_cola").set_value(0.0).run()
+    at.sidebar.number_input(key="in_step_count").set_value(0).run()
+    at.sidebar.number_input(key="in_wage").set_value(100000).run()
+    at.sidebar.number_input(key="in_hire_age").set_value(hire_age).run()
+    at.sidebar.number_input(key="in_retirement_age").set_value(retirement_age).run()
+
+
+def test_unvested_compares_refund_with_your_account():
+    # 4 years x $10,000 deposits: refund at 6.5% interest is $44,072; the
+    # account at 0% holds $40,000, so the refund wins.
+    at = _app()
+    _flat_career(at, 51, 55)
+    at.sidebar.number_input(key="in_returns").set_value(0.0).run()
+    assert not at.exception and not at.error
+    banner = next(m.value for m in at.markdown if "🏆" in m.value)
+    assert "refund of your contributions" in banner
+    assert "Winner: The pension's refund" in banner
+    assert _metric(at, "Refund When You Leave") == "$44,072"
+    assert _metric(at, "Your Account When You Leave") == "$40,000"
+    # Above the refund's 6.5% interest, your own account wins instead.
+    at.sidebar.number_input(key="in_returns").set_value(7.0).run()
+    banner = next(m.value for m in at.markdown if "🏆" in m.value)
+    assert "Winner: Your own account" in banner
+
+
+def test_manual_amount_keeps_the_plans_start_age_and_cola():
+    # Hired at 35, leaving at 55 with 20 years: the plan defers the pension to
+    # 60 with no COLA. Typing the amount by hand must not change that.
+    at = _app()
+    _flat_career(at, 35, 55)
+    auto = at.session_state["_inputs"]
+    assert auto["deferral_years"] == 5 and auto["retiree_cola"] == 1.0
+    at.sidebar.radio(key="in_allowance_mode").set_value("Enter manually").run()
+    at.sidebar.radio(key="in_allowance_basis").set_value("Dollars at retirement").run()
+    at.sidebar.number_input(key="allowance_manual").set_value(30000).run()
+    manual = at.session_state["_inputs"]
+    assert manual["deferral_years"] == 5 and manual["retiree_cola"] == 1.0
+    assert manual["starting_allowance"] == 30000
+    assert any("payments start at age 60" in c.value for c in at.sidebar.caption)
+
+
+def test_earlier_hires_are_told_the_rules_do_not_apply():
+    at = _app()
+    at.sidebar.number_input(key="in_hire_year").set_value(2010).run()
+    assert any("hired before 2014" in w.value for w in at.sidebar.warning)
