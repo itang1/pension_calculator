@@ -20,7 +20,7 @@ def _replay(preset_id):
     cola = 1 + v["in_cola"] / 100
     step = 1 + v["in_step"] / 100
     promo_inc = 1 + v["in_promo_pct"] / 100
-    wy, age = v["in_work_years"], v["in_retirement_age"]
+    wy, age = v["in_retirement_age"] - v["in_hire_age"], v["in_retirement_age"]
     fas = s.compute_fas(v["in_wage"], wy, cola, step, promo, promo_inc,
                         v["in_step_count"], v["in_step_midyear"])
     plan = s.plan_benefit(wy, age, fas)
@@ -84,10 +84,11 @@ def test_case_study_market_swing_claims(preset, out_of_100):
     v = common.PRESETS[preset]["values"]
     promo = tuple(int(x) for x in v["in_promo_years"].split(",") if x.strip())
     cola, step, promo_inc = 1 + v["in_cola"] / 100, 1 + v["in_step"] / 100, 1 + v["in_promo_pct"] / 100
-    fas = s.compute_fas(v["in_wage"], v["in_work_years"], cola, step, promo, promo_inc)
-    allowance = s.plan_benefit(v["in_work_years"], v["in_retirement_age"], fas)["allowance"]
+    wy = v["in_retirement_age"] - v["in_hire_age"]
+    fas = s.compute_fas(v["in_wage"], wy, cola, step, promo, promo_inc)
+    allowance = s.plan_benefit(wy, v["in_retirement_age"], fas)["allowance"]
     mc = s.run_monte_carlo(
-        v["in_wage"], v["in_work_years"], cola, step, promo, promo_inc, v["in_contrib"] / 100,
+        v["in_wage"], wy, cola, step, promo, promo_inc, v["in_contrib"] / 100,
         allowance, v["in_retirement_years"], mean_return=v["in_returns"] / 100, std_return=0.15,
         n_simulations=1000, retiree_cola=1.02)
     assert round(mc["depletion_prob"] * 100) == out_of_100
@@ -120,7 +121,7 @@ def test_share_formatting_never_rounds_real_risk_to_zero():
 
 def test_query_param_parsing_rejects_bad_values():
     spec = common._SHARE_SPEC
-    assert common._parse_param("30", spec["in_work_years"]) == 30
+    assert common._parse_param("30", spec["in_hire_age"]) == 30
     assert common._parse_param("7.5", spec["in_returns"]) == 7.5
     assert common._parse_param("99", spec["in_returns"]) is None      # above widget max
     assert common._parse_param("abc", spec["in_wage"]) is None

@@ -287,6 +287,28 @@ def fmt_share(prob):
     return f"{pct:.0f}%"
 
 
+def inputs_summary_html(inputs, res):
+    """One line restating what the results assume, for the sidebar-hint boxes.
+
+    Phone visitors start with the sidebar collapsed, so this tells them what
+    the page is showing. HTML (not markdown), with "&#36;" for dollar signs so
+    nothing is read as math.
+    """
+    if inputs["hire_year"] < CURRENT_YEAR and st.session_state.get("in_wage_mode") == "My wage today":
+        wage = (f"&#36;{st.session_state['in_current_wage']:,.0f} wage today "
+                f"(hired in {inputs['hire_year']})")
+    else:
+        wage = f"&#36;{inputs['starting_wage']:,.0f} starting wage in {inputs['hire_year']}"
+    hire_age = inputs["retirement_age"] - inputs["work_years"]
+    return (
+        f"<strong>Right now the results assume:</strong> {wage} · hired at {hire_age} · "
+        f"retire at {inputs['retirement_age']} · {inputs['retirement_years']} years retired · "
+        f"{res['index_return_pct']:.1f}% returns.<br>"
+        "<span style='font-size:0.9em'>On a phone, tap the » arrow at the top left to open the "
+        "sidebar. This page's link saves your inputs, so you can copy it to share or come back later.</span>"
+    )
+
+
 def render_html(html: str):
     """
     Every ``unsafe_allow_html`` render routes through here. Only ever
@@ -304,7 +326,7 @@ PRESETS = {
         "label": "Alice: personal fund wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
-            "in_wage": 120000, "in_work_years": 30, "in_retirement_age": 55,
+            "in_wage": 120000, "in_hire_age": 25, "in_retirement_age": 55,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 20",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
@@ -316,7 +338,7 @@ PRESETS = {
         "label": "Bob: pension wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
-            "in_wage": 65000, "in_work_years": 20, "in_retirement_age": 60,
+            "in_wage": 65000, "in_hire_age": 40, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
@@ -328,7 +350,7 @@ PRESETS = {
         "label": "Carol: personal fund wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
-            "in_wage": 80000, "in_work_years": 35, "in_retirement_age": 60,
+            "in_wage": 80000, "in_hire_age": 25, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "15",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
@@ -340,7 +362,7 @@ PRESETS = {
         "label": "Dave: pension wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
-            "in_wage": 95000, "in_work_years": 15, "in_retirement_age": 63,
+            "in_wage": 95000, "in_hire_age": 48, "in_retirement_age": 63,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "",
             "in_promo_pct": 8.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
@@ -352,7 +374,7 @@ PRESETS = {
         "label": "Frank: personal fund wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
-            "in_wage": 150000, "in_work_years": 25, "in_retirement_age": 60,
+            "in_wage": 150000, "in_hire_age": 35, "in_retirement_age": 60,
             "in_cola": 3.0, "in_step": 5.5, "in_promo_years": "10, 18",
             "in_promo_pct": 10.0, "in_contrib": 10.0,
             "in_step_count": 4, "in_step_midyear": True,
@@ -444,28 +466,28 @@ This calculator operates in annual periods. Within each year:
                 key="in_wage",
                 help=f"Your salary in your first year on the job, in {hire_year} dollars (what you were actually paid then).",
             )
-        work_years = st.number_input(
-            "Years to Work",
-            value=30, min_value=1, step=1,
-            key="in_work_years",
-            help="How many years you plan to work before retirement."
-        )
-        retirement_age = st.number_input(
+        hire_age = int(st.number_input(
+            "Age When Hired",
+            value=25, min_value=16, max_value=74, step=1,
+            key="in_hire_age",
+            help="How old you were (or will be) when you started the job.",
+        ))
+        retirement_age = int(st.number_input(
             "Age at Retirement",
-            value=55, min_value=18, max_value=75, step=1,
+            value=55, min_value=17, max_value=75, step=1,
             key="in_retirement_age",
-            help="Your age on the day you expect to retire. Your age when hired is this minus Years to Work."
-        )
-        hire_age = int(retirement_age) - int(work_years)
-        if hire_age < 16:
+            help="Your age on the day you expect to retire.",
+        ))
+        work_years = retirement_age - hire_age
+        if work_years < 1:
             st.error(
-                f"Retiring at {int(retirement_age)} after {int(work_years)} years means starting work at "
-                f"age {hire_age}. Raise your retirement age or lower your years of work to continue."
+                f"You retire at {retirement_age} but start at {hire_age}. Make your retirement age "
+                f"later than the age you were hired to continue."
             )
             st.stop()
         st.caption(
-            f"You are hired at age {hire_age} (in {hire_year}) and retire at {int(retirement_age)} "
-            f"(in {hire_year + int(work_years)})."
+            f"That is {work_years} years of work: from {hire_year} (age {hire_age}) "
+            f"to {hire_year + work_years} (age {retirement_age})."
         )
         cola_increase = st.number_input(
             "Cost of Living Adjustment (%)",
@@ -522,7 +544,7 @@ This calculator operates in annual periods. Within each year:
             if _year_now > int(work_years):
                 st.error(
                     f"Hired in {hire_year}, you would have finished your {int(work_years)}-year career "
-                    f"already. Raise Years to Work, or enter your starting wage instead."
+                    f"already. Pick a later retirement age, or enter your starting wage instead."
                 )
                 st.stop()
             _growth = simulation.salary_schedule(
@@ -842,7 +864,7 @@ _SHARE_SPEC = {
     "in_wage_mode": (["My starting wage", "My wage today"], None, None),
     "in_current_wage": (int, 0, 10_000_000),
     "in_wage": (int, 0, 10_000_000),
-    "in_work_years": (int, 1, 60),
+    "in_hire_age": (int, 16, 74),
     "in_retirement_age": (int, 18, 75),
     "in_cola": (float, 0.0, 5.5),
     "in_step": (float, 0.0, 50.0),
@@ -912,7 +934,13 @@ def build_rate_curve_chart(inputs, res):
     assumed rate and the break-even rate are marked so the single break-even
     number becomes something you can see.
     """
-    rates = [r / 2 for r in range(0, 31)]  # 0% to 15% in half-point steps
+    # Show 0% up to a few points past the larger of the user's rate and the
+    # break-even, so a runaway balance at 15% can't flatten the crossing.
+    current = res["index_return_pct"]
+    be = res["breakeven_rate"]
+    focus = max(current, be if math.isfinite(be) else current)
+    top = min(15.0, max(10.0, math.ceil(focus) + 3))
+    rates = [r / 2 for r in range(0, int(top * 2) + 1)]
     real = res.get("real_dollars", False)
     finals = []
     for r in rates:
@@ -930,17 +958,20 @@ def build_rate_curve_chart(inputs, res):
         hovertemplate="Flat return %{x:.1f}%<br>Option B at death: $%{y:,.0f}<extra></extra>",
     ))
     fig.add_hline(y=0, line_width=1.5, line_color=muted)
-    yr = max(abs(min(finals)), abs(max(finals)))
-    fig.add_annotation(x=rates[1], y=yr * 0.9, text="Option B wins here (money left over)",
+    # Zoom on the crossing: size the y-axis from the shortfall side and the
+    # value at the user's rate, and let fast growth at high rates run off the
+    # top (it would otherwise flatten the part of the line that matters).
+    at_current = finals[min(range(len(rates)), key=lambda i: abs(rates[i] - current))]
+    span = max(abs(min(finals + [0.0])), abs(at_current), 1.0)
+    lo, hi = -1.3 * span, 1.6 * span
+    fig.add_annotation(x=rates[1], y=hi * 0.85, text="Above $0: Option B wins (money left over)",
                        showarrow=False, xanchor="left", font=dict(size=12, color=muted))
-    fig.add_annotation(x=rates[-2], y=-yr * 0.9, text="The pension wins here (Option B runs out)",
+    fig.add_annotation(x=rates[-2], y=lo * 0.85, text="Below $0: the pension wins (Option B runs out)",
                        showarrow=False, xanchor="right", font=dict(size=12, color=muted))
 
-    current = res["index_return_pct"]
     fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color=ink,
                   annotation_text=f"Your assumption: {current:.1f}%",
                   annotation_position="top", annotation_font_color=ink)
-    be = res["breakeven_rate"]
     if 0 < be <= rates[-1]:
         fig.add_trace(go.Scatter(
             x=[be], y=[0], mode="markers",
@@ -956,7 +987,7 @@ def build_rate_curve_chart(inputs, res):
                    x=0.5, xanchor="center", font=dict(size=15, color=ink)),
         xaxis=dict(title="Flat annual return (%)", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
         yaxis=dict(title="Money left at death ($)", tickformat=",", gridcolor="#eef0f2",
-                   range=[-yr * 1.1, yr * 1.1]),
+                   range=[lo, hi]),
         plot_bgcolor="white", showlegend=False, hovermode="x",
         margin=dict(l=40, r=20, t=60, b=50),
     )
@@ -1092,7 +1123,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             font=dict(size=16, color="#1e293b"),
         ),
         xaxis_title="Your age",
-        yaxis_title="Dollar Amount ($)",
+        yaxis_title="Option B's balance ($)<br><sup>below $0 = income it couldn't pay</sup>",
         xaxis=dict(
             tickmode="array",
             tickvals=[ages[i] for i in range(0, len(ages), x_tick_step)],
@@ -1144,7 +1175,9 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
                 x=ages[_dep_idx], y=0,
                 text=f"<b>✗ Runs out by age {ages[_dep_idx]}: {len(years) - 1 - _dep_idx} years of retirement left with no money</b>",
                 showarrow=True, arrowhead=2, arrowcolor="#DC2626",
-                ax=-40, ay=-60,
+                # Below and left of the point: the top of the chart holds the
+                # "Working Years" / "Retirement Years" labels.
+                ax=-150, ay=70,
                 font=dict(size=13, color="#DC2626"),
                 bgcolor="rgba(255,255,255,0.85)", borderpad=4,
             )

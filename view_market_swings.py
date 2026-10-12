@@ -14,6 +14,7 @@ from plotly import graph_objects as go
 from common import (
     build_fund_chart,
     deflate_mc,
+    inputs_summary_html,
     dollars_note,
     get_monte_carlo,
     render_feedback_form,
@@ -80,7 +81,7 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
             f"extra money."
         )
     elif tier == "lean_a":
-        bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
         verdict = "Lean toward the pension, even though page 1 picked Option B."
         body = (
             f"Page 1 assumed a smooth {r} every year. With real ups and downs, Option B ran out "
@@ -88,7 +89,7 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
             f"flip, which is too risky for most people's retirement money."
         )
     elif tier == "a_safer":
-        bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
         verdict = "The pension is the safer choice."
         body = (
             f"Page 1 said Option B wins with a smooth {r} every year. But with real ups and downs, "
@@ -105,7 +106,7 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
             f"the pension is the safer choice."
         )
     else:  # a_confirmed
-        bg, bar, symbol = "#E0E7FF", "#4F46E5", "✗"
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
         verdict = "The pension is the safer choice, and bad markets make it clearer."
         body = (
             f"Even with a smooth {r} every year, Option B runs out. With real ups and downs it ran "
@@ -115,7 +116,7 @@ def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
 
     render_html(f"""
 <div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>{symbol} {verdict}</strong><br><br>
+<strong>{symbol + " " if symbol else ""}{verdict}</strong><br><br>
 {body}
 </div>
 """)
@@ -135,6 +136,13 @@ def render():
     work_years = inputs["work_years"]
     retirement_years = inputs["retirement_years"]
 
+    st.header("What If the Market Has Bad Years?")
+    render_html(f"""
+<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+{inputs_summary_html(inputs, res)}
+</div>
+""")
+    st.space("small")
     st.markdown(f"""
 Page 1 pretended the stock market grows by exactly {index_return_pct:.1f}% every single year. Real markets don't work that way. Some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
 
@@ -145,7 +153,7 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
 
     _mc_std_pct = st.slider(
         "How bumpy is the market?",
-        min_value=0.0, max_value=30.0, value=15.0, step=0.5,
+        min_value=0.0, max_value=30.0, value=15.0, step=0.5, format="%.1f%%",
         key="mc_std",
         help=(
             "How far a single year can swing away from the typical year. 15% matches the U.S. "
@@ -164,6 +172,7 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
     median_final = float(np.percentile(final_balances, 50))
     flat_final = res["personal_balance"]
 
+    st.header("Your Result")
     render_risk_verdict(depletion_prob, index_return_pct, _mc_std_pct, flat_b_wins=flat_final > 0)
 
     st.space("small")

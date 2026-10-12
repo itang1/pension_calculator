@@ -16,6 +16,7 @@ from common import (
     build_fund_chart,
     build_rate_curve_chart,
     fmt_rate,
+    inputs_summary_html,
     queue_preset,
     render_breakdown_table,
     render_feedback_form,
@@ -31,7 +32,8 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
     if personal_balance > 0:
         render_html(f"""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>✓ Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
+<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 Winner: Option B, your own account</div>
+<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option B (personal fund) comes out ahead.</strong><br><br>
 After {int(retirement_years)} years of retirement, Option B would still have <strong>${personal_balance:,.0f}</strong>{dollars} remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as Option A every single year. Option A leaves nothing at death (besides potential survivor benefits, if applicable).
 <br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that the market would have to average below {breakeven_rate:.1f}% every year for Option A to win.</em>
 </div>
@@ -39,7 +41,8 @@ After {int(retirement_years)} years of retirement, Option B would still have <st
     else:
         render_html(f"""
 <div style="background-color:#E0E7FF; border-left:5px solid #4F46E5; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<strong>✗ Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
+<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 Winner: Option A, the pension</div>
+<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, Option A (pension) comes out ahead.</strong><br><br>
 Before your {int(retirement_years)}-year retirement was over, Option B would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on Option B cannot keep up with {int(retirement_years)} years of withdrawals, so Option A's guarantee that it pays until you die is the more reliable choice here.
 <br><br><em>Option B would need the market to average at least {fmt_rate(breakeven_rate)} every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>
 </div>
@@ -78,9 +81,10 @@ This calculator asks one question: **if you could put that same money into your 
 """)
 
     render_html(
-        """
+        f"""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <em>&larr; Use the sidebar on the left to enter your own salary, years of work, and retirement plans. Everything on this page updates as you go.</em>
+<br><br>{inputs_summary_html(inputs, res)}
 </div>
 """
     )
@@ -105,7 +109,8 @@ Instead of paying into the pension, imagine putting the same amount (for example
 """)
     st.space("small")
 
-    # The verdict comes first; the chart and metrics below explain it.
+    # The verdict comes first, in its own section; the chart and metrics below explain it.
+    st.header("Your Result")
     render_result_banner(
         personal_balance, retirement_years, res["depletion_year"],
         res["breakeven_rate"], index_return_pct, res.get("real_dollars", False),
@@ -160,20 +165,20 @@ Both options pay you the **same income every year in retirement**. The compariso
     mc1, mc2, mc3 = st.columns(3)
     with mc1:
         st.metric(
-            label="Pension Contributed",
+            label=f"Pension Contributed over {work_years} Years",
             value=f"${pension_contribution_total:,.0f}",
             help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. The personal fund deposits this same amount."
         )
     with mc2:
         st.metric(
-            label="Pension Received",
+            label=f"Pension Received over {retirement_years} Years",
             value=f"${pension_redeemed_total:,.0f}",
             delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
             help="The total pension income paid out over all retirement years, including annual COLA increases. The personal fund withdraws this same amount. The delta shows how much more you received than you put in."
         )
     with mc3:
         st.metric(
-            label="Personal Fund at Retirement",
+            label=f"Personal Fund at Retirement (Age {inputs['retirement_age']})",
             value=f"${personal_fund_values[work_years]:,.0f}",
             help="The balance of your hypothetical personal investment account on the day you retire, after years of contributions and market growth."
         )
@@ -182,16 +187,18 @@ Both options pay you the **same income every year in retirement**. The compariso
     with mc4:
         if personal_balance > 0:
             st.metric(
-                label="Final Personal Fund Balance at Death",
+                label=f"Final Personal Fund Balance at Death (Age {inputs['retirement_age'] + retirement_years})",
                 value=f"${personal_balance:,.0f}",
                 delta="Did not run out ✓",
+                delta_arrow="off",
                 help="The personal fund still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
             )
         else:
             st.metric(
-                label="Final Personal Fund Balance at Death",
+                label=f"Final Personal Fund Balance at Death (Age {inputs['retirement_age'] + retirement_years})",
                 value="$0",
                 delta="Ran out before death ✗",
+                delta_arrow="off",
                 delta_color="inverse",
                 help=(
                     "The personal fund was depleted before your retirement years were up. The pension would have continued paying regardless. "
@@ -214,6 +221,7 @@ Both options pay you the **same income every year in retirement**. The compariso
             label="Years Personal Fund Covers",
             value=f"{_years_covered} / {retirement_years} yrs",
             delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
+            delta_arrow="off",
             delta_color="normal" if _depletion_year is None else "inverse",
             help="How many retirement years Option B (personal fund) can sustain the same annual withdrawal as the pension, out of your total retirement period.",
         )

@@ -49,10 +49,6 @@ common.apply_query_params()
 
 st.title("Is Your Pension Worth It?")
 
-# A one-line summary of the current inputs sits under the title, so phone
-# visitors (whose sidebar starts collapsed) can see what the results assume.
-# It is filled in after the sidebar renders, because it needs those inputs.
-_summary = st.container()
 show_real = st.toggle(
     f"Show amounts in {common.CURRENT_YEAR} dollars",
     value=False,
@@ -81,23 +77,6 @@ _nominal = common.compute_results(inputs)
 st.session_state["_results_nominal"] = _nominal
 st.session_state["_results"] = common.deflate_results(_nominal, inputs) if show_real else _nominal
 common.sync_query_params()
-
-# Echo the wage the visitor actually typed (today's wage, or the starting wage).
-if inputs["hire_year"] < common.CURRENT_YEAR and st.session_state.get("in_wage_mode") == "My wage today":
-    _wage_summary = (f"\\${st.session_state['in_current_wage']:,.0f} wage today "
-                     f"(hired in {inputs['hire_year']})")
-else:
-    _wage_summary = f"\\${inputs['starting_wage']:,.0f} starting wage in {inputs['hire_year']}"
-
-with _summary:
-    st.caption(
-        f"**Your inputs:** {_wage_summary} · "
-        f"{inputs['work_years']} years of work · retire at {inputs['retirement_age']} · "
-        f"{inputs['retirement_years']} years retired · "
-        f"{_nominal['index_return_pct']:.1f}% returns. "
-        "Change them in the sidebar (on a phone, tap the » arrow at the top left). "
-        "This page's link includes your inputs, so you can copy it to share or come back later."
-    )
 
 _comparison_page = st.Page(
     view_comparison.render,
