@@ -343,7 +343,7 @@ def render_html(html: str):
 # dollars as the salary path; tests/test_case_studies.py checks the copy.
 PRESETS = {
     "alice": {
-        "label": "Alice: personal fund wins",
+        "label": "Alice: your own account wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 120000, "in_hire_age": 25, "in_retirement_age": 55,
@@ -367,7 +367,7 @@ PRESETS = {
         },
     },
     "carol": {
-        "label": "Carol: personal fund wins",
+        "label": "Carol: your own account wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 80000, "in_hire_age": 25, "in_retirement_age": 60,
@@ -403,7 +403,7 @@ PRESETS = {
         },
     },
     "frank": {
-        "label": "Frank: personal fund wins",
+        "label": "Frank: your own account wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 150000, "in_hire_age": 35, "in_retirement_age": 60,
@@ -790,7 +790,7 @@ def compute_results(inputs):
 
     personal_fund_values = result["personal_fund_values"]
 
-    # First retirement year where the personal fund is depleted
+    # First retirement year where your own account is depleted
     depletion_year = next(
         (k for k in range(1, inputs["retirement_years"] + 1)
          if personal_fund_values[inputs["work_years"] + k] <= 0),
@@ -957,6 +957,24 @@ def apply_query_params():
         value = _parse_param(raw, spec)
         if value is not None:
             st.session_state[key] = value
+    # Links made before "Age When Hired" existed carry years of work instead.
+    if st.query_params.get("hire_age") is None:
+        hire_age = legacy_hire_age(st.query_params.get("work_years"),
+                                   st.session_state.get("in_retirement_age", 55))
+        if hire_age is not None:
+            st.session_state["in_hire_age"] = hire_age
+
+
+def legacy_hire_age(work_years_raw, retirement_age):
+    """Hire age implied by an old link's ``work_years``, or None if unusable."""
+    if work_years_raw is None:
+        return None
+    try:
+        hire_age = int(retirement_age) - int(float(work_years_raw))
+    except ValueError:
+        return None
+    lo, hi = _SHARE_SPEC["in_hire_age"][1:]
+    return hire_age if lo <= hire_age <= hi else None
 
 
 def sync_query_params():
@@ -1147,7 +1165,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             "Deposit this year: $%{customdata[0]:,.0f}<br>"
             "Withdrawal this year: $%{customdata[1]:,.0f}<br>"
             "Market returns this year: $%{customdata[2]:,.0f}<br>"
-            "Personal fund balance: $%{y:,.0f}"
+            "Your account's balance: $%{y:,.0f}"
             "<extra></extra>"
         ),
     ))
@@ -1205,7 +1223,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     fig.add_vline(x=ages[work_years], line_width=2, line_dash="dash", line_color="#DC2626")
     _fund_depletes = min(personal_fund_values) < 0
     fig.add_hline(y=0, line_width=2, line_color="#666666",
-                  annotation_text="$0 = personal fund depleted" if _fund_depletes else "$0",
+                  annotation_text="$0 = your account is empty" if _fund_depletes else "$0",
                   annotation_position="bottom right")
 
     if verdict_annotation:

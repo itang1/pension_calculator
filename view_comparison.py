@@ -134,13 +134,13 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
     st.space("small")
 
-    st.header("Pension vs. Personal Retirement Fund Over Time")
+    st.header("The Pension vs. Your Own Account Over Time")
 
     with st.expander("How to read this chart"):
         st.markdown("""
 Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does your own account run out of money before you die?**
 
-- **Bold teal line (your own account)** = the personal fund balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, your account wins. If it hits zero, the pension wins.
+- **Bold teal line (your own account)** = your account's balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, your account wins. If it hits zero, the pension wins.
 - **Purple line (optional)** = how much money is paid out each year. The pension pays this to you; the same amount comes out of your own account. Toggle it on/off with the checkbox above the chart.
 - **Horizontal axis** = your age, from the year you are hired to the end of retirement. Hover over a point to see that year's numbers.
 - **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
@@ -166,7 +166,7 @@ Both options pay you the **same income every year in retirement**. The compariso
     st.plotly_chart(fig, width="stretch")
 
     st.markdown(
-        "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from the personal fund. The metrics below mirror each other on both sides.*"
+        "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from your own account. The metrics below mirror each other on both sides.*"
     )
 
     st.space("small")
@@ -183,20 +183,20 @@ Both options pay you the **same income every year in retirement**. The compariso
         st.metric(
             label=f"Pension Contributed over {work_years} Years",
             value=f"${pension_contribution_total:,.0f}",
-            help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. The personal fund deposits this same amount."
+            help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. Your own account receives this same amount as deposits."
         )
     with mc2:
         st.metric(
             label=f"Pension Received over {retirement_years} Years",
             value=f"${pension_redeemed_total:,.0f}",
             delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
-            help="The total pension income paid out over all retirement years, including annual COLA increases. The personal fund withdraws this same amount. The delta shows how much more you received than you put in."
+            help="The total pension income paid out over all retirement years, including annual COLA increases. The same amount is withdrawn from your own account. The delta shows how much more you received than you put in."
         )
     with mc3:
         st.metric(
             label=f"Your Account at Retirement (Age {inputs['retirement_age']})",
             value=f"${personal_fund_values[work_years]:,.0f}",
-            help="The balance of your hypothetical personal investment account on the day you retire, after years of contributions and market growth."
+            help="The balance of your own (hypothetical) investment account on the day you retire, after years of contributions and market growth."
         )
 
     mc4, mc5, mc6 = st.columns(3)
@@ -207,7 +207,7 @@ Both options pay you the **same income every year in retirement**. The compariso
                 value=f"${personal_balance:,.0f}",
                 delta="Did not run out ✓",
                 delta_arrow="off",
-                help="The personal fund still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
+                help="Your own account still has money left after paying out the same income as the pension for every retirement year. This is money you would still own."
             )
         else:
             st.metric(
@@ -217,7 +217,7 @@ Both options pay you the **same income every year in retirement**. The compariso
                 delta_arrow="off",
                 delta_color="inverse",
                 help=(
-                    "The personal fund was depleted before your retirement years were up. The pension would have continued paying regardless. "
+                    "Your own account ran dry before your retirement years were up. The pension would have continued paying regardless. "
                     f"Over the remaining years, your account would have come up ${-personal_balance:,.0f} short of the same income."
                 ),
             )
@@ -230,7 +230,7 @@ Both options pay you the **same income every year in retirement**. The compariso
                 else f"{_rate_buffer:+.1f} points vs. your {_current_rate_pct:.1f}% assumption"
             ),
             delta_color="inverse" if math.isinf(_rate_buffer) else "normal",
-            help="The lowest steady yearly return that keeps your personal fund from running out before you die. If your expected return is above this, your account wins; below it, the pension wins.",
+            help="The lowest steady yearly return that keeps your own account from running out before you die. If your expected return is above this, your account wins; below it, the pension wins.",
         )
     with mc6:
         st.metric(
@@ -346,7 +346,7 @@ Returns are calculated on the balance at the *start* of the year, before that ye
 
     with st.expander("Retirement Years"):
         st.markdown("""
-Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. The personal fund is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), the personal fund has run out. The year it first goes red is the year that you will wish you had chosen the pension option, since the pension provides a lifetime guarantee.
+Once you retire, contributions stop. The pension begins paying you a fixed annual allowance that grows each year with COLA. Your own account is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), your own account has run out. The year it first goes red is the year that you will wish you had chosen the pension option, since the pension provides a lifetime guarantee.
 """)
         col1, col2 = st.columns(2)
         with col1:
@@ -390,7 +390,7 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
 The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above).
 """)
 
-    with st.expander("Case Study A: Personal Fund Wins"):
+    with st.expander("Case Study A: Your Own Account Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$120,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 20 (8% each) · Pension contribution rate 10% · Index returns 10% · Work years 30 · Retires at 55 · Retirement years 30 · Plan factor 2% (first-year allowance about \\$238,100, or \\$113,500 in today's dollars)
 """)
@@ -403,11 +403,11 @@ Alice is a civil servant who starts at \\$120,000. Across a 30-year career, her 
 
 **The pension:** By the time Alice retires, she has paid about **\\$770,000** into the pension. In return, she gets an allowance that starts around \\$238,100 a year (about \\$113,500 in today's dollars, since 30 years of raises and inflation come first) and rises 2% annually. Add up 30 years of those payments and she collects roughly **\\$9.7 million**.
 
-**The personal fund:** Now suppose she had put those same contributions into an account earning 10% a year instead. By retirement it would hold about **\\$3.2 million**. She then withdraws the same amount the pension would have paid each year. Since 10% growth outpaces what she takes out, the balance keeps climbing through retirement and finishes close to **\\$10 million**.
+**Her own account:** Now suppose she had put those same contributions into an account earning 10% a year instead. By retirement it would hold about **\\$3.2 million**. She then withdraws the same amount the pension would have paid each year. Since 10% growth outpaces what she takes out, the balance keeps climbing through retirement and finishes close to **\\$10 million**.
 
-**Verdict:** The personal fund wins, and it is worth being clear about why. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. The personal fund still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. It is also a narrow win: at a flat 9.2% or less, the pension comes out ahead. And it assumes a steady 10% every single year. With realistic ups and downs, Alice's fund runs out in about 38 out of 100 possible futures (see the *What If the Market Has Bad Years?* page).
+**Verdict:** Her own account wins, and it is worth being clear about why. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. Her own account still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. It is also a narrow win: at a flat 9.2% or less, the pension comes out ahead. And it assumes a steady 10% every single year. With realistic ups and downs, Alice's fund runs out in about 38 out of 100 possible futures (see the *What If the Market Has Bad Years?* page).
 
-This is also the scenario people misread most often. They see "\\$9.7 million in pension income" and assume the pension came out ahead, but that number is just the running total of Alice's annual payments; keep in mind that the personal fund paid out that same amount! The \\$10 million is *extra* that she gets to keep (donate, pass on, etc.), on top of the \\$9.7 million that she already withdrew and spent during her life.
+This is also the scenario people misread most often. They see "\\$9.7 million in pension income" and assume the pension came out ahead, but that number is just the running total of Alice's annual payments; keep in mind that her own account paid out that same amount! The \\$10 million is *extra* that she gets to keep (donate, pass on, etc.), on top of the \\$9.7 million that she already withdrew and spent during her life.
 """)
 
     with st.expander("Case Study B: Pension Wins"):
@@ -423,14 +423,14 @@ Bob is a civil servant who starts at \\$65,000 and works a steady 20 years with 
 
 **The pension:** During his 20 working years, Bob pays about **\\$212,000** into the pension. In retirement he collects around \\$41,100 the first year, rising 2% annually. Stretched over 35 years, that comes to roughly **\\$2.1 million**, nearly 10 times what he put in.
 
-**The personal fund:** Those same contributions, growing at 5% a year, would leave Bob with about **\\$332,000** at retirement. Once he starts pulling out \\$41,100 a year (rising 2% annually), the growth cannot keep up with the withdrawals. The account runs dry in **year 10**, leaving nothing for his final 25 years.
+**His own account:** Those same contributions, growing at 5% a year, would leave Bob with about **\\$332,000** at retirement. Once he starts pulling out \\$41,100 a year (rising 2% annually), the growth cannot keep up with the withdrawals. The account runs dry in **year 10**, leaving nothing for his final 25 years.
 
 **Verdict:** The pension wins because Bob outlives his savings. At 5% returns, a \\$332,000 balance just cannot fund 35 years of withdrawals. What carries him through is the pension's promise to keep paying for as long as he lives. Without it, he runs out of money around age 70.
 
-The pension option tends to come out ahead when returns are low, retirement is long, or the personal fund didn't have enough working years to grow.
+The pension option tends to come out ahead when returns are low, retirement is long, or the account didn't have enough working years to grow.
 """)
 
-    with st.expander("Case Study C: Personal Fund Wins"):
+    with st.expander("Case Study C: Your Own Account Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$80,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotion at year 15 (8%) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retires at 60 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$198,800, or \\$83,800 in today's dollars)
 """)
@@ -443,9 +443,9 @@ Carol is a civil servant who starts at \\$80,000 and works a long 35-year career
 
 **The pension:** Over 35 working years, Carol pays about **\\$628,000** into the pension. In return she collects an allowance that starts at \\$198,800 and rises 2% annually. Across 25 years of retirement those payments add up to roughly **\\$6.4 million**.
 
-**The personal fund:** Those same contributions, growing at 9% a year, would hold about **\\$2.9 million** by the time she retires. She then withdraws the same amount the pension would have paid each year. Because 9% growth stays ahead of what she takes out, the balance keeps rising through retirement and finishes above **\\$5.2 million**.
+**Her own account:** Those same contributions, growing at 9% a year, would hold about **\\$2.9 million** by the time she retires. She then withdraws the same amount the pension would have paid each year. Because 9% growth stays ahead of what she takes out, the balance keeps rising through retirement and finishes above **\\$5.2 million**.
 
-**Verdict:** The personal fund wins. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that the personal fund still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with realistic ups and downs, her fund runs out in about 34 out of 100 possible futures.
+**Verdict:** Her own account wins. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that her own account still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with realistic ups and downs, her fund runs out in about 34 out of 100 possible futures.
 """)
 
     with st.expander("Case Study D: Pension Wins"):
@@ -461,7 +461,7 @@ Dave is a civil servant who starts at \\$95,000 but works only 15 years before r
 
 **The pension:** During his 15 working years, Dave pays about **\\$213,000** into the pension. In retirement he collects \\$51,900 the first year, rising 2% annually. Stretched over 25 years, that comes to roughly **\\$1.7 million**, nearly 8 times what he put in.
 
-**The personal fund:** Those same contributions, growing at 4% a year, would leave Dave with only about **\\$276,000** at retirement. Once he starts withdrawing \\$51,900 a year (rising 2% annually), a balance that small cannot keep up. The account runs dry in **year 6** of retirement, leaving nothing for his final 19 years.
+**His own account:** Those same contributions, growing at 4% a year, would leave Dave with only about **\\$276,000** at retirement. Once he starts withdrawing \\$51,900 a year (rising 2% annually), a balance that small cannot keep up. The account runs dry in **year 6** of retirement, leaving nothing for his final 19 years.
 
 **Verdict:** The pension wins, and by a wide margin. A short 15-year career simply does not build enough to self-fund 25 years of retirement, especially at 4% returns. What carries Dave through is the pension's promise to keep paying for as long as he lives. This is Bob's problem in a sharper form: fewer working years and lower returns.
 """)
@@ -479,12 +479,12 @@ Grace changes careers and is hired at 50, starting at \\$90,000 with no promotio
 
 **The pension:** Over 13 working years, Grace pays about **\\$169,000** into the pension. Because she waits until 63, she earns the plan's 2% per year of service instead of the 1.5% she would get by retiring at 60. Her allowance starts at about \\$40,100 a year and rises 2% annually. Over 25 years that adds up to roughly **\\$1.3 million**, nearly 8 times what she put in.
 
-**The personal fund:** Those same contributions, growing at 7% a year, would hold only about **\\$251,000** when she retires. Once she starts withdrawing \\$40,100 a year (rising 2% annually), the account runs dry in **year 8**, leaving nothing for her final 17 years.
+**Her own account:** Those same contributions, growing at 7% a year, would hold only about **\\$251,000** when she retires. Once she starts withdrawing \\$40,100 a year (rising 2% annually), the account runs dry in **year 8**, leaving nothing for her final 17 years.
 
-**Verdict:** The pension wins by the widest margin of any case here. A short, late career gives the personal fund too little time to grow, while the pension still pays for life. The personal fund would need a steady 12.5% a year just to break even, and with realistic ups and downs it runs out in about 97 out of 100 possible futures. For late hires the pension is very hard to beat, and working until 63 instead of 60 makes it even better.
+**Verdict:** The pension wins by the widest margin of any case here. A short, late career gives her own account too little time to grow, while the pension still pays for life. Her own account would need a steady 12.5% a year just to break even, and with realistic ups and downs it runs out in about 97 out of 100 possible futures. For late hires the pension is very hard to beat, and working until 63 instead of 60 makes it even better.
 """)
 
-    with st.expander("Case Study F: Personal Fund Wins"):
+    with st.expander("Case Study F: Your Own Account Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$150,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 18 (10% each) · Pension contribution rate 10% · Index returns 10% · Work years 25 · Retires at 60 · Retirement years 25 · Plan factor 1.5% (first-year allowance about \\$166,500, or \\$89,800 in today's dollars)
 """)
@@ -497,9 +497,9 @@ Frank is a civil servant who starts at \\$150,000 and earns two sizable promotio
 
 **The pension:** Over 25 working years, Frank pays about **\\$742,000** into the pension. In return he collects an allowance that starts at \\$166,500 and rises 2% annually, adding up to roughly **\\$5.3 million** across retirement.
 
-**The personal fund:** Those same contributions, growing at 10% a year, would hold about **\\$2.4 million** by retirement. He then withdraws the same amount the pension would have paid. With 10% growth running well ahead of his withdrawals, the balance climbs throughout retirement and finishes above **\\$6.5 million**.
+**His own account:** Those same contributions, growing at 10% a year, would hold about **\\$2.4 million** by retirement. He then withdraws the same amount the pension would have paid. With 10% growth running well ahead of his withdrawals, the balance climbs throughout retirement and finishes above **\\$6.5 million**.
 
-**Verdict:** The personal fund wins decisively. The \\$5.3 million of pension income is matched dollar for dollar by the personal fund, which then leaves over \\$6.5 million on top for Frank to keep or pass on. High contributions paired with strong returns and a modest retirement factor are the clearest case for the personal fund. Even so, with realistic ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
+**Verdict:** His own account wins decisively. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. High contributions paired with strong returns and a modest retirement factor are the clearest case for your own account. Even so, with realistic ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
 """)
 
     render_feedback_form("comparison")

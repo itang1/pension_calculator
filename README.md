@@ -9,14 +9,14 @@ This Streamlit app compares the long-term financial outcomes of a **traditional 
 The app has two pages that share the same sidebar inputs and link to each other:
 
 - **Base Comparison: Flat Rate** (default): assumes the market returns one flat rate every year and answers which option wins, and by how much.
-- **What If the Market Has Bad Years?** (`/market-swings`): replays the same scenario through 1,000 simulated market histories (Monte Carlo) and answers how often the personal fund runs out of money.
+- **What If the Market Has Bad Years?** (`/market-swings`): replays the same scenario through 1,000 simulated market histories (Monte Carlo) and answers how often your own account runs out of money.
 
 ## Features
 
 - **Result banner** that declares which option comes out ahead under your inputs, with explanation
 - **Interactive line chart** showing Option B's fund balance over your full career and retirement, with labeled working/retirement phases, an optional reference line for annual pension withdrawals, and the verdict annotated at the point where it happens (money left over, or the year the fund runs dry)
 - **Monte Carlo page**: runs 1,000 randomized return sequences and shades the chart with the range of possible outcomes, so you can see how year-to-year market volatility could change the result, plus a risk-tiered verdict, an ending-balance histogram, and a depletion-timing chart
-- **Summary metrics**: total pension contributed, total pension received, fund value at retirement, final fund balance, break-even investment return rate, and years the personal fund covers
+- **Summary metrics**: total pension contributed, total pension received, fund value at retirement, final fund balance, break-even investment return rate, and years your own account covers
 - **Break-even rate**: the minimum annual investment return at which Option B survives your full retirement, compared directly to your assumed rate
 - **Year-over-year breakdown tables** for both working and retirement phases, showing contributions, withdrawals, market returns, and running balances
 - **Pension allowance estimator**: built-in plan rules pick the benefit factor from your age and years of service, apply the early-retirement reduction table, the 80% cap, vesting, and deferred pensions, and grow the pension in retirement by inflation up to a 2% COLA cap

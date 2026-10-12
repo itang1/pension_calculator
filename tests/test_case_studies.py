@@ -177,3 +177,11 @@ def test_out_of_100_never_hides_a_real_risk():
     assert common.out_of_100(0.003) == "fewer than 1"
     assert common.out_of_100(0.0) == "0"
     assert common.out_of_100(0.384) == "38"
+
+
+def test_old_links_with_years_of_work_still_load():
+    assert common.legacy_hire_age("30", 55) == 25
+    assert common.legacy_hire_age("15", 63) == 48
+    assert common.legacy_hire_age(None, 55) is None
+    assert common.legacy_hire_age("abc", 55) is None
+    assert common.legacy_hire_age("50", 55) is None   # hire age 5 is out of range
