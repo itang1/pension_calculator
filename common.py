@@ -501,7 +501,7 @@ def convert_manual_period():
     st.session_state["_allowance_previous_period"] = new
 
 
-def render_dollar_toggle():
+def render_dollar_toggle(inputs, res):
     """Rendered on each page; the entry script reads the value from session_state."""
     st.toggle(
         "Show amounts in today's dollars",
@@ -514,19 +514,9 @@ def render_dollar_toggle():
             "Turn this off to see every amount as paid in each year instead."
         ),
     )
-
-
-def render_inflation_explanation(inputs, res):
     rate = res["index_return_pct"]
     inflation_pct = (inputs["inflation"] - 1) * 100
     real_rate = simulation.purchasing_power_return(inputs["index_returns_rate"], inputs["inflation"]) * 100
-    st.info(
-        f"**What does {rate:.1f}% growth mean?** \\$100 invested grows to "
-        f"\\${inputs['index_returns_rate'] * 100:.2f} in a year. But prices also rise {inflation_pct:.1f}% a year, "
-        f"so that \\${inputs['index_returns_rate'] * 100:.2f} only buys what "
-        f"\\${inputs['index_returns_rate'] / inputs['inflation'] * 100:.2f} buys today. "
-        f"After rising prices, your money really grows about {real_rate:.1f}% a year."
-    )
     if inputs["plan_status"] == "unvested":
         pension_note = "In this scenario you leave before qualifying for a pension, so you get your contributions back instead."
     elif res["retiree_cola_pct"] == 0:
@@ -536,21 +526,21 @@ def render_inflation_explanation(inputs, res):
     if inputs["plan_status"] != "unvested" and inputs["retiree_cola"] < inputs["inflation"]:
         loss = -simulation.purchasing_power_return(inputs["retiree_cola"], inputs["inflation"]) * 100
         pension_note += f" Prices rise faster than that, so each payment buys about {loss:.1f}% less every year."
-    st.caption(pension_note)
-    with st.expander("What do today's dollars, real dollars, and nominal dollars mean?"):
-        _inflation = inputs["inflation"]
+    with st.expander(f"What do today's dollars and {rate:.1f}% growth mean?"):
+        st.markdown(
+            f"**{rate:.1f}% growth:** \\$100 invested grows to "
+            f"\\${inputs['index_returns_rate'] * 100:.2f} in a year. But prices also rise {inflation_pct:.1f}% a year, "
+            f"so that \\${inputs['index_returns_rate'] * 100:.2f} only buys what "
+            f"\\${inputs['index_returns_rate'] / inputs['inflation'] * 100:.2f} buys today. "
+            f"After rising prices, your money really grows about {real_rate:.1f}% a year."
+        )
         st.markdown(
             "**Today's dollars** and **real dollars** both mean amounts adjusted for inflation. "
             f"Here, they show buying power at {CURRENT_YEAR} prices. "
             "**Nominal dollars** means the amounts paid or held in each year, with no inflation adjustment. "
             "Both describe the same money in different ways."
         )
-        st.markdown(
-            f"For example, with {(_inflation - 1) * 100:.1f}% yearly inflation, something that costs "
-            f"\\$1,000 today would cost about \\${1000 * _inflation ** 20:,.0f} in 20 years. "
-            "Those two amounts have the same buying power. The calculator makes this adjustment for each year, "
-            "including years before today if you were hired in the past."
-        )
+        st.markdown(f"**The pension:** {pension_note}")
         st.caption("Investment returns are always entered before inflation. Do not subtract inflation from your return input; the buying-power display already accounts for it.")
 
 
