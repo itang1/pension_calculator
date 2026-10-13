@@ -35,8 +35,7 @@ def test_fixing_an_input_error_keeps_other_inputs():
     at.number_input(key="in_returns").set_value(9.0).run()
     at.number_input(key="in_plan_age").set_value(95).run()
     at.number_input(key="in_inflation").set_value(4.0).run()
-    at.text_input(key="in_promo_years").set_value("10, 20").run()
-    at.number_input(key="in_hire_age").set_value(50).run()   # explicit promotions no longer fit
+    at.text_input(key="in_promo_years").set_value("ten").run()
     assert at.error, "expected an input error"
     at.text_input(key="in_promo_years").set_value("").run()
     assert not at.error and not at.exception
@@ -169,7 +168,8 @@ def test_late_hire_is_not_blocked_by_example_promotions():
     at.number_input(key="in_hire_age").set_value(50).run()
     at.number_input(key="in_retirement_age").set_value(63).run()
     assert not at.exception and not at.error
-    assert at.session_state["_inputs"]["promotion_years"] == ()
+    assert at.session_state["_inputs"]["promotion_years"] == (10,)
+    assert at.warning
     assert at.session_state["_inputs"]["retirement_years"] == 22
 
 

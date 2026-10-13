@@ -655,7 +655,7 @@ This calculator operates in annual periods. Within each year:
             st.caption("Promotions are optional. Enter 10 for a raise after your tenth working year. Leave blank for none.")
             promotion_years_input = st.text_input(
                 "Promotions: Years After You Were Hired",
-                value="",
+                value="10, 20",
                 key="in_promo_years",
                 help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
             )
@@ -670,8 +670,7 @@ This calculator operates in annual periods. Within each year:
                 st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only, then results will update.")
                 problems.append("promotions")
             elif _promo_oob and "ages" not in problems:
-                st.error(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career. Fix or remove them to continue.")
-                problems.append("promotions")
+                st.warning(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career, so they are left out.")
             promotion_increase = st.number_input(
                 "Promotion Increase (%)",
                 value=8.0, min_value=0.0, max_value=100.0, step=1.,
