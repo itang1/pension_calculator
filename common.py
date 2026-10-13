@@ -1295,7 +1295,17 @@ def build_rate_curve_chart(inputs, res):
         customdata=[max(-v, 0.0) for v in finals],
         hovertemplate="Return before inflation: %{x:.1f}%<br>Money left: $%{y:,.0f}<br>Income unpaid: $%{customdata:,.0f}<extra></extra>",
     ))
-    fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color="#64748B")
+    ink, muted = "#1e293b", "#64748B"
+    fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color=muted,
+                  annotation_text=f"Your assumption: {current:.1f}%",
+                  annotation_position="top", annotation_font_color=ink)
+    fig.add_annotation(x=0.01, y=0.88, xref="paper", yref="paper", xanchor="left",
+                       text="Above $0: your account wins (money left over)",
+                       showarrow=False, font=dict(size=12, color=muted))
+    if be > 0:
+        fig.add_annotation(x=0.01, y=0.02, xref="paper", yref="paper", xanchor="left", yanchor="bottom",
+                           text="At $0: the pension wins (your account runs out)",
+                           showarrow=False, font=dict(size=12, color=muted))
     if 0 < be <= rates[-1]:
         fig.add_vline(x=be, line_width=1.5, line_dash="dot", line_color="#0D9488")
         fig.add_trace(go.Scatter(
@@ -1303,18 +1313,21 @@ def build_rate_curve_chart(inputs, res):
             marker=dict(size=10, color="#0D9488"),
             hovertemplate=f"Break-even: {be:.1f}% before inflation<extra></extra>",
         ))
+        fig.add_annotation(x=be, y=0, text=f"Break-even {be:.1f}%", showarrow=True,
+                           arrowhead=0, ax=40, ay=-40, font=dict(size=12, color=ink),
+                           bgcolor="rgba(255,255,255,0.85)")
     fig.update_layout(
         xaxis=dict(title="Yearly return before inflation", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
         yaxis=dict(title="Money left ($)", tickformat=".2s", rangemode="tozero", gridcolor="#eef0f2"),
         plot_bgcolor="white", showlegend=False, hovermode="x",
-        margin=dict(l=15, r=15, t=15, b=30), height=350,
+        margin=dict(l=15, r=15, t=30, b=30), height=350,
     )
     return fig
 
 
 def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
                      verdict_annotation=False):
-    """Nonnegative account balances; conclusions sit in wrapping page text."""
+    """Nonnegative account balances, with on-chart labels stating the verdict."""
     years = res["years"]
     personal_fund_values = [max(v, 0.0) for v in res["personal_fund_values"]]
     pension_fund_values = res["pension_fund_values"]
@@ -1454,10 +1467,47 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         height=420,
     )
 
-    fig.add_vrect(x0=ages[work_years], x1=ages[-1],
-                  fillcolor="rgba(148,163,184,0.08)", layer="below", line_width=0)
+    fig.add_vrect(
+        x0=ages[0], x1=ages[work_years],
+        fillcolor="rgba(0,0,0,0)", layer="below", line_width=0,
+        annotation_text="<b>Working Years</b>", annotation_position="top left",
+        annotation=dict(font_size=13, font_color="#1E3A5F",
+                        bgcolor="rgba(255,255,255,0.75)", borderpad=5),
+    )
+    fig.add_vrect(
+        x0=ages[work_years], x1=ages[-1],
+        fillcolor="rgba(148,163,184,0.08)", layer="below", line_width=0,
+        annotation_text="<b>Retirement Years</b>", annotation_position="top left",
+        annotation=dict(font_size=13, font_color="#7C2D12",
+                        bgcolor="rgba(255,255,255,0.75)", borderpad=5),
+    )
     fig.add_vline(x=ages[work_years], line_width=2, line_dash="dash", line_color="#DC2626")
-    fig.add_hline(y=0, line_width=1, line_color="#666666")
+    _raw_values = res["personal_fund_values"]
+    _fund_depletes = simulation.ran_short(min(_raw_values))
+    fig.add_hline(y=0, line_width=1, line_color="#666666",
+                  annotation_text="$0 = your account is empty" if _fund_depletes else "$0",
+                  annotation_position="bottom right")
+
+    if verdict_annotation:
+        if _fund_depletes:
+            _dep_idx = next(i for i, v in enumerate(_raw_values) if simulation.ran_short(v))
+            fig.add_annotation(
+                x=ages[_dep_idx], y=0,
+                text=f"<b>✗ Runs out by age {ages[_dep_idx]}</b>",
+                showarrow=True, arrowhead=2, arrowcolor="#DC2626",
+                ax=-110, ay=-60,
+                font=dict(size=13, color="#DC2626"),
+                bgcolor="rgba(255,255,255,0.85)", borderpad=4,
+            )
+        else:
+            fig.add_annotation(
+                x=ages[-1], y=personal_fund_values[-1],
+                text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over</b>",
+                showarrow=True, arrowhead=2, arrowcolor="#0D9488",
+                ax=-90, ay=-40,
+                font=dict(size=13, color="#0D9488"),
+                bgcolor="rgba(255,255,255,0.85)", borderpad=4,
+            )
     return fig
 
 
