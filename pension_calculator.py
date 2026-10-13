@@ -51,20 +51,9 @@ common.apply_pending_preset()
 st.title("Is Your Pension Worth It?")
 st.caption(
     "This calculator uses one set of pension rules for members hired in 2014 or later. "
-    "Check that these rules match your pension before using the estimate."
+    "Check that these rules match your pension before using the estimate. "
+    "The rules are listed in the sidebar."
 )
-with st.expander("Check the pension rules used here"):
-    st.markdown("""
-- Members contribute **10% of pay**. Final average salary uses the **highest 3 consecutive years**.
-- With at least 5 years of service, the annual factor is **1.5% at age 60** or **2% at age 63**.
-- With at least 30 years of service, the factor is **2%**, rising to **2.1% at age 63**. Payments are unreduced from age 55. Earlier payments are reduced using an age-based table.
-- The benefit is capped at **80% of final average salary**.
-- Leaving before age 60 with 5 to 29 years of service means payments start at **60**, using the **1.5%** factor, with **no yearly increases**.
-- With fewer than 5 years, there is **no lifetime pension**. Contributions are refunded with **6.5% annual interest**.
-- For eligible pensions, yearly increases follow inflation, capped at **2%**. Salary raises are separate.
-
-These rules do not cover every public pension. Entering a manual amount changes only the payment amount, not these eligibility or increase rules.
-""")
 if "_example_label" in st.session_state:
     st.info("An example scenario is loaded. You can return to the inputs you entered before trying examples.")
     st.button("Restore my previous inputs", key="restore_inputs", on_click=common.restore_previous_inputs)
@@ -87,22 +76,6 @@ if show_real:
     )
 else:
     st.caption("Charts and summaries: amounts paid or held in each year, without adjusting for inflation. Future amounts may look larger even when they buy no more. Turn on buying power to compare them at today's prices.")
-with st.expander("What do today's dollars, real dollars, and nominal dollars mean?"):
-    _inflation = 1 + st.session_state.get("in_inflation", 2.5) / 100
-    st.markdown(
-        "**Today's dollars** and **real dollars** both mean amounts adjusted for inflation. "
-        f"Here, they show buying power at {common.CURRENT_YEAR} prices. "
-        "**Nominal dollars** means the amounts paid or held in each year, with no inflation adjustment. "
-        "Both describe the same money in different ways."
-    )
-    st.markdown(
-        f"For example, with {(_inflation - 1) * 100:.1f}% yearly inflation, something that costs "
-        f"\\$1,000 today would cost about \\${1000 * _inflation ** 20:,.0f} in 20 years. "
-        "Those two amounts have the same buying power. The calculator makes this adjustment for each year, "
-        "including years before today if you were hired in the past."
-    )
-    st.caption("Investment returns are always entered before inflation. Do not subtract inflation from your return input; the buying-power display already accounts for it.")
-
 # Sidebar inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from
 # session_state rather than importing from here (which would re-run the script).

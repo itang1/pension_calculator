@@ -521,6 +521,21 @@ def render_inflation_explanation(inputs, res):
         loss = -simulation.purchasing_power_return(inputs["retiree_cola"], inputs["inflation"]) * 100
         pension_note += f"Because prices rise faster, the payment's buying power falls about {loss:.1f}% a year. "
     st.caption(pension_note + "Salary raises are a separate input. Changing the dollar display does not change which payments the account can cover.")
+    with st.expander("What do today's dollars, real dollars, and nominal dollars mean?"):
+        _inflation = inputs["inflation"]
+        st.markdown(
+            "**Today's dollars** and **real dollars** both mean amounts adjusted for inflation. "
+            f"Here, they show buying power at {CURRENT_YEAR} prices. "
+            "**Nominal dollars** means the amounts paid or held in each year, with no inflation adjustment. "
+            "Both describe the same money in different ways."
+        )
+        st.markdown(
+            f"For example, with {(_inflation - 1) * 100:.1f}% yearly inflation, something that costs "
+            f"\\$1,000 today would cost about \\${1000 * _inflation ** 20:,.0f} in 20 years. "
+            "Those two amounts have the same buying power. The calculator makes this adjustment for each year, "
+            "including years before today if you were hired in the past."
+        )
+        st.caption("Investment returns are always entered before inflation. Do not subtract inflation from your return input; the buying-power display already accounts for it.")
 
 
 def render_sidebar():
@@ -696,6 +711,18 @@ This calculator operates in annual periods. Within each year:
             f"Pension estimates follow the plan's rules for members hired in "
             f"{simulation.PLAN_FIRST_HIRE_YEAR} or later."
         )
+        with st.expander("Check the pension rules used here"):
+            st.markdown("""
+- Members contribute **10% of pay**. Final average salary uses the **highest 3 consecutive years**.
+- With at least 5 years of service, the annual factor is **1.5% at age 60** or **2% at age 63**.
+- With at least 30 years of service, the factor is **2%**, rising to **2.1% at age 63**. Payments are unreduced from age 55. Earlier payments are reduced using an age-based table.
+- The benefit is capped at **80% of final average salary**.
+- Leaving before age 60 with 5 to 29 years of service means payments start at **60**, using the **1.5%** factor, with **no yearly increases**.
+- With fewer than 5 years, there is **no lifetime pension**. Contributions are refunded with **6.5% annual interest**.
+- For eligible pensions, yearly increases follow inflation, capped at **2%**. Salary raises are separate.
+
+These rules do not cover every public pension. Entering a manual amount changes only the payment amount, not these eligibility or increase rules.
+""")
         if hire_year < simulation.PLAN_FIRST_HIRE_YEAR:
             st.warning(
                 f"This calculator is designed for members hired in or after "
