@@ -904,7 +904,7 @@ These rules do not cover every public pension. Entering a manual amount changes 
             col.button(f"{value:g}%", key=f"pick_{value:g}", on_click=_set_returns, help=f"{name}: {why}",
                        args=(value,), width="stretch")
         st.caption(
-            "The starting 7% is an example, not a forecast. Try 5%, 7%, and 10% to see how much the result changes. "
+            "The starting 10% is an example, not a forecast. Try 5%, 7%, and 10% to see how much the result changes. "
             "All are before inflation, not investment recommendations. "
             "The buttons change only the return. Market swings are set separately on the second page."
         )
@@ -919,7 +919,7 @@ These rules do not cover every public pension. Entering a manual amount changes 
         index_returns_rate = (
             st.number_input(
                 "Yearly Investment Return Before Inflation (%)",
-                value=7.0,
+                value=10.0,
                 min_value=0.0,
                 max_value=25.0,
                 step=0.5,
