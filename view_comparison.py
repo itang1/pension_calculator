@@ -284,7 +284,7 @@ You put the same money into your own investment account instead. It grows or shr
                 st.metric(
                     label=f"Your Account at the End (Age {inputs['retirement_age'] + retirement_years})",
                     value="$0",
-                    delta="Some payments were not fully covered",
+                    delta="Ran out early ✗",
                     delta_arrow="off",
                     delta_color="inverse",
                     help=(
@@ -301,13 +301,13 @@ You put the same money into your own investment account instead. It grows or shr
                     else f"{_rate_buffer:+.1f} points vs. your {_current_rate_pct:.1f}% assumption"
                 ),
                 delta_color="inverse" if math.isinf(_rate_buffer) else "normal",
-                help="The lowest steady yearly return, before inflation, that covers all modeled pension payments through your chosen ending age.",
+                help="The lowest steady yearly return, before inflation, that keeps your own account from running out before the end of the comparison. If your expected return is above this, your account wins; below it, the pension wins.",
             )
         with mc6:
             st.metric(
-                label="Fully Funded Retirement Years",
+                label="Years Your Account Covers",
                 value=f"{_years_covered} / {retirement_years} yrs",
-                delta="Full retirement covered ✓" if _depletion_year is None else f"{retirement_years - _years_covered} years include unpaid income",
+                delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
                 delta_arrow="off",
                 delta_color="normal" if _depletion_year is None else "inverse",
                 help="How many retirement years your own account can sustain the same annual withdrawal as the pension, out of your total retirement period.",
@@ -315,8 +315,9 @@ You put the same money into your own investment account instead. It grows or shr
 
         st.subheader("How the answer changes with the return rate")
         st.markdown(
-            "Below the break-even return, the account cannot cover every payment. Above it, money remains. "
-            "Empty accounts are shown at $0. All returns on this chart are before inflation."
+            "The break-even rate is where this line leaves \\$0. Slide along it to see how much "
+            "a point of return is worth: above \\$0 your account ends with money to spare; at \\$0 your account "
+            "runs out and the pension wins. All returns on this chart are before inflation."
         )
         st.caption(f"Dashed gray: your {index_return_pct:.1f}% assumption. Dotted teal: {fmt_rate(res['breakeven_rate'])} break-even return.")
         chart_title(rate_chart_title(res))
@@ -487,10 +488,10 @@ The **Start Balance** earns **+ Returns** ({index_return_pct:.1f}%/year before i
         st.button("Restore my previous inputs", key="restore_example_inputs", on_click=restore_previous_inputs)
 
     st.markdown("""
-These examples show accounts that cover all pension payments and accounts that run short. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above). Each button also sets the market-swings slider on the second page to 15%, which the "out of 100 possible futures" figures below assume.
+The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above). Each button also sets the market-swings slider on the second page to 15%, which the "out of 100 possible futures" figures below assume.
 """)
 
-    with st.expander("Case Study A: Account Covers All Payments"):
+    with st.expander("Case Study A: Your Own Account Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$120,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 20 (8% each) · Pension contribution rate 10% · Index returns 10% · Work years 30 · Retires at 55 · Retirement years 30 · Plan factor 2% (first-year allowance about \\$238,100, or \\$110,700 in today's dollars)
 """)
@@ -505,12 +506,12 @@ Alice is a civil servant who starts at \\$120,000. Across a 30-year career, her 
 
 **Her own account:** Now suppose she had put those same contributions into an account earning 10% a year instead. By retirement it would hold about **\\$3.2 million**. She then withdraws the same amount the pension would have paid each year. Since 10% growth outpaces what she takes out, the balance keeps climbing through retirement and finishes close to **\\$10 million**.
 
-**Result under these assumptions:** The account covers every payment and finishes with money left. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. Her own account still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. At a steady return of 9.2% or less, the account cannot cover all payments. And it assumes a steady 10% every single year. With simulated ups and downs, Alice's fund runs out in about 38 out of 100 possible futures (see the *What If the Market Has Bad Years?* page).
+**Verdict:** Her own account wins, and it is worth being clear about why. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. Her own account still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. It is also a narrow win: at a flat 9.2% or less, the pension comes out ahead. And it assumes a steady 10% every single year. With realistic ups and downs, Alice's fund runs out in about 38 out of 100 possible futures (see the *What If the Market Has Bad Years?* page).
 
 This is also the scenario people misread most often. They see "\\$9.7 million in pension income" and assume the pension came out ahead, but that number is just the running total of Alice's annual payments; keep in mind that her own account paid out that same amount! The \\$10 million is *extra* that she gets to keep (donate, pass on, etc.), on top of the \\$9.7 million that she already withdrew and spent during her life.
 """)
 
-    with st.expander("Case Study B: Account Runs Short"):
+    with st.expander("Case Study B: Pension Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$65,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retires at 60 · Retirement years 35 · Plan factor 1.5% (first-year allowance about \\$41,100, or \\$24,500 in today's dollars)
 """)
@@ -525,12 +526,12 @@ Bob is a civil servant who starts at \\$65,000 and works a steady 20 years with 
 
 **His own account:** Those same contributions, growing at 5% a year, would leave Bob with about **\\$332,000** at retirement. Once he starts pulling out \\$41,100 a year (rising 2% annually), the growth cannot keep up with the withdrawals. The account runs dry in **year 10**, leaving nothing for his final 25 years.
 
-**Result under these assumptions:** The account cannot cover all modeled payments. At 5% returns, a \\$332,000 balance just cannot fund 35 years of withdrawals. What carries him through is the pension's promise to keep paying for as long as he lives. Without it, he runs out of money around age 70.
+**Verdict:** The pension wins because Bob outlives his savings. At 5% returns, a \\$332,000 balance just cannot fund 35 years of withdrawals. What carries him through is the pension's promise to keep paying for as long as he lives. Without it, he runs out of money around age 70.
 
-Lower returns, a longer retirement, or fewer years of contributions can make it harder for the account to cover the modeled payments.
+The pension option tends to come out ahead when returns are low, retirement is long, or the account didn't have enough working years to grow.
 """)
 
-    with st.expander("Case Study C: Account Covers All Payments"):
+    with st.expander("Case Study C: Your Own Account Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$80,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotion at year 15 (8%) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retires at 60 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$198,800, or \\$81,700 in today's dollars)
 """)
@@ -545,10 +546,10 @@ Carol is a civil servant who starts at \\$80,000 and works a long 35-year career
 
 **Her own account:** Those same contributions, growing at 9% a year, would hold about **\\$2.9 million** by the time she retires. She then withdraws the same amount the pension would have paid each year. Because 9% growth stays ahead of what she takes out, the balance keeps rising through retirement and finishes above **\\$5.2 million**.
 
-**Result under these assumptions:** The account covers every payment and finishes with money left. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that her own account still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with simulated ups and downs, her fund runs out in about 34 out of 100 possible futures.
+**Verdict:** Her own account wins. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that her own account still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with realistic ups and downs, her fund runs out in about 34 out of 100 possible futures.
 """)
 
-    with st.expander("Case Study D: Account Runs Short"):
+    with st.expander("Case Study D: Pension Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$95,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 4% · Work years 15 · Retires at 63 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$51,900, or \\$34,900 in today's dollars)
 """)
@@ -563,10 +564,10 @@ Dave is a civil servant who starts at \\$95,000 but works only 15 years before r
 
 **His own account:** Those same contributions, growing at 4% a year, would leave Dave with only about **\\$276,000** at retirement. Once he starts withdrawing \\$51,900 a year (rising 2% annually), a balance that small cannot keep up. The account runs dry in **year 6** of retirement, leaving nothing for his final 19 years.
 
-**Result under these assumptions:** The contributions from this 15-year career, earning 4% a year, do not fund all 25 years of modeled payments. What carries Dave through is the pension's promise to keep paying for as long as he lives. This is Bob's problem in a sharper form: fewer working years and lower returns.
+**Verdict:** The pension wins, and by a wide margin. A short 15-year career simply does not build enough to self-fund 25 years of retirement, especially at 4% returns. What carries Dave through is the pension's promise to keep paying for as long as he lives. This is Bob's problem in a sharper form: fewer working years and lower returns.
 """)
 
-    with st.expander("Case Study E: Account Runs Short (Hired Late)"):
+    with st.expander("Case Study E: Pension Wins (Hired Late)"):
         st.markdown("""
 **Settings:** Starting wage \\$90,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 7% · Hired at 50 · Retires at 63 (13 years of work) · Retirement years 25 · Plan factor 2% (first-year allowance about \\$40,100, or \\$28,400 in today's dollars)
 """)
@@ -581,10 +582,10 @@ Grace changes careers and is hired at 50, starting at \\$90,000 with no promotio
 
 **Her own account:** Those same contributions, growing at 7% a year, would hold only about **\\$251,000** when she retires. Once she starts withdrawing \\$40,100 a year (rising 2% annually), the account runs dry in **year 8**, leaving nothing for her final 17 years.
 
-**Result under these assumptions:** The account cannot cover all payments after this 13-year career. The modeled pension continues paying. Her own account would need a steady 12.5% a year just to break even, and with simulated ups and downs it runs out in about 97 out of 100 possible futures. The result depends on the contribution period, return, retirement duration, and pension formula entered.
+**Verdict:** The pension wins by the widest margin of any case here. A short, late career gives her own account too little time to grow, while the pension still pays for life. Her own account would need a steady 12.5% a year just to break even, and with realistic ups and downs it runs out in about 97 out of 100 possible futures. For late hires the pension is very hard to beat, and working until 63 instead of 60 makes it even better.
 """)
 
-    with st.expander("Case Study F: Account Covers All Payments"):
+    with st.expander("Case Study F: Your Own Account Wins"):
         st.markdown("""
 **Settings:** Starting wage \\$150,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 18 (10% each) · Pension contribution rate 10% · Index returns 10% · Work years 25 · Retires at 60 · Retirement years 25 · Plan factor 1.5% (first-year allowance about \\$166,500, or \\$87,600 in today's dollars)
 """)
@@ -599,7 +600,7 @@ Frank is a civil servant who starts at \\$150,000 and earns two sizable promotio
 
 **His own account:** Those same contributions, growing at 10% a year, would hold about **\\$2.4 million** by retirement. He then withdraws the same amount the pension would have paid. With 10% growth running well ahead of his withdrawals, the balance climbs throughout retirement and finishes above **\\$6.5 million**.
 
-**Result under these assumptions:** The account covers every payment and finishes with money left. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. This result depends on the contributions, assumed returns, and pension formula used here. Even so, with simulated ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
+**Verdict:** His own account wins decisively. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. High contributions paired with strong returns and a modest retirement factor are the clearest case for your own account. Even so, with realistic ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
 """)
 
     render_feedback_form("comparison")

@@ -370,7 +370,7 @@ def render_html(html: str):
 # dollars as the salary path; tests/test_case_studies.py checks the copy.
 PRESETS = {
     "alice": {
-        "label": "Alice: account covers all payments",
+        "label": "Alice: your own account wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 120000, "in_hire_age": 25, "in_retirement_age": 55,
@@ -383,7 +383,7 @@ PRESETS = {
         },
     },
     "bob": {
-        "label": "Bob: account runs short",
+        "label": "Bob: pension wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 65000, "in_hire_age": 40, "in_retirement_age": 60,
@@ -396,7 +396,7 @@ PRESETS = {
         },
     },
     "carol": {
-        "label": "Carol: account covers all payments",
+        "label": "Carol: your own account wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 80000, "in_hire_age": 25, "in_retirement_age": 60,
@@ -409,7 +409,7 @@ PRESETS = {
         },
     },
     "dave": {
-        "label": "Dave: account runs short",
+        "label": "Dave: pension wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 95000, "in_hire_age": 48, "in_retirement_age": 63,
@@ -422,7 +422,7 @@ PRESETS = {
         },
     },
     "grace": {
-        "label": "Grace: account runs short",
+        "label": "Grace: pension wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 90000, "in_hire_age": 50, "in_retirement_age": 63,
@@ -435,7 +435,7 @@ PRESETS = {
         },
     },
     "frank": {
-        "label": "Frank: account covers all payments",
+        "label": "Frank: your own account wins",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 150000, "in_hire_age": 35, "in_retirement_age": 60,
