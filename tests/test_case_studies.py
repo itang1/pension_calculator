@@ -229,3 +229,45 @@ def test_sheet_writes_are_capped_site_wide(monkeypatch):
     allowed = [common._sheet_write_allowed() for _ in range(common._SHEET_WRITES_PER_MINUTE + 5)]
     assert allowed.count(True) == common._SHEET_WRITES_PER_MINUTE
     assert allowed[-1] is False
+
+
+def test_account_chart_and_table_show_cash_not_negative_debt():
+    inputs = {"inflation": 1.025, "work_years": 2, "retirement_years": 5,
+              "retirement_age": 60, "hire_year": common.CURRENT_YEAR}
+    res = s.run_simulation(100000, 2, 1.0, 1.0, (), 1.0, 0.1, 10000, 5, 1.0)
+    res["index_return_pct"] = 0.0
+    fig = common.build_fund_chart(inputs, res, show_ref_line=False)
+    account = next(tr for tr in fig.data if tr.name.startswith("Steady"))
+    assert list(account.y) == [0, 10000, 20000, 10000, 0, 0, 0, 0]
+    table = common.account_payment_table(res["yearly_data"])
+    retirement = table[table.Year.str.startswith("R")]
+    assert list(retirement["Income Unpaid"]) == [0, 0, 10000, 10000, 10000]
+    assert list(retirement["Start Balance"] + retirement["Market Returns"] - retirement["Account Withdrawal"]) == list(retirement["Balance"])
+    assert retirement["Income Unpaid"].sum() == -res["personal_balance"]
+
+
+@pytest.mark.parametrize("depleted", [0.0, 1.0])
+def test_zero_swings_never_claims_bad_markets(depleted, monkeypatch):
+    import view_market_swings
+    html = []
+    monkeypatch.setattr(view_market_swings, "render_html", html.append)
+    view_market_swings.render_risk_verdict(depleted, 7.0, 0.0, flat_b_wins=not depleted)
+    assert "every simulation repeats" in html[0]
+    assert "bad markets" not in html[0] and "real ups and downs" not in html[0]
+    assert ("cannot cover" in html[0]) == bool(depleted)
+
+
+def test_inflation_adjusted_cash_flows_match_nominal_engine_without_double_counting():
+    # Two $10,000 deposits, then $5,000 and $5,100 withdrawals. A 7% nominal
+    # return applies to existing money before each end-of-year cash flow.
+    inputs = {"inflation": 1.025, "work_years": 2, "retirement_years": 2,
+              "retirement_age": 60, "hire_year": common.CURRENT_YEAR}
+    nominal = s.run_simulation(100000, 2, 1.0, 1.0, (), 1.0, 0.1, 5000, 2, 1.07,
+                               retiree_cola=1.02)
+    assert nominal["personal_balance"] == pytest.approx(13249.43)
+    real = common.deflate_results(nominal, inputs)
+    balance = 0.0
+    for year, cash_flow in enumerate([10000, 10000, -5000, -5100], start=1):
+        balance = balance * (1.07 / 1.025) + cash_flow / 1.025 ** year
+    assert real["personal_balance"] == pytest.approx(balance)
+    assert real["personal_balance"] == pytest.approx(13249.43 / 1.025 ** 4)

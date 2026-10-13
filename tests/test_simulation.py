@@ -14,6 +14,16 @@ import pytest
 
 import simulation as s
 
+
+@pytest.mark.parametrize("nominal,inflation,expected", [
+    (1.07, 1.025, 0.0439024390243903),
+    (1.07, 1.0, 0.07),
+    (1.0, 1.025, -0.024390243902439),
+    (1.025, 1.025, 0.0),
+])
+def test_return_in_buying_power(nominal, inflation, expected):
+    assert s.purchasing_power_return(nominal, inflation) == pytest.approx(expected)
+
 # --- Scenario fixtures ----------------------------------------------------------
 
 CASE_A = dict(  # Personal fund wins

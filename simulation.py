@@ -23,6 +23,11 @@ import numpy as np
 import pandas as pd
 
 
+def purchasing_power_return(return_multiplier, inflation_multiplier):
+    """Annual growth in buying power; both inputs are nominal multipliers."""
+    return return_multiplier / inflation_multiplier - 1.0
+
+
 def salary_schedule(starting_wage, work_years, cola_increase, step_increase,
                     promotion_years, promotion_increase, step_count=4,
                     first_step_midyear=True):

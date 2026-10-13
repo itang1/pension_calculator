@@ -24,6 +24,7 @@ from common import (
     get_monte_carlo,
     render_feedback_form,
     render_html,
+    render_inflation_explanation,
 )
 
 
@@ -46,86 +47,27 @@ def risk_tier(depletion_prob, flat_b_wins):
 
 
 def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
-    """The page's answer: a traffic-light verdict on the ruin risk.
-
-    The comparison page answers "on average, does your account end with money?"
-    The depletion probability answers "how often does your account run out once
-    returns vary?" Those are different questions, and a favorable flat-rate
-    result can coexist with an unacceptably high chance of ruin. This banner
-    turns the two numbers into a single risk-tiered recommendation, with a
-    ✓/⚠/✗ status so the tier is readable without relying on color alone.
-    The wording depends on which option won at the flat rate, so the banner
-    never claims a flat-rate result the first page did not show.
-    """
+    """Describe modeled outcomes without recommending a personal choice."""
     n = out_of_100(depletion_prob)
-    r = f"{current_rate_pct:.1f}%"
-    tier = risk_tier(depletion_prob, flat_b_wins)
-
-    if tier == "none" and std_pct == 0:
-        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "With no ups and downs, every future matches page 1."
+    bg, bar = ("#CCFBF1", "#0D9488") if depletion_prob <= 0.10 else ("#E0E7FF", "#4F46E5")
+    symbol = ""
+    if std_pct == 0:
+        verdict = "With market swings at 0%, every simulation repeats the steady-return calculation."
         body = (
-            "The bumpiness slider is at 0%, so every simulated year returns exactly the same amount "
-            "and your account never runs out. Move the slider right to see what real ups and downs do."
+            f"Each year returns exactly {current_rate_pct:.1f}% before inflation. "
+            + ("Your account cannot cover every payment in any of the 1,000 simulations." if depletion_prob else
+               "Your account covers every payment in all 1,000 simulations.")
         )
-    elif tier == "none":
-        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "No failures in these 1,000 futures."
+    elif depletion_prob == 0:
+        verdict = "Your account covers every payment in all 1,000 simulations."
+        body = "None of these simulations ran short. This does not guarantee the same result in real markets."
+    else:
+        verdict = f"Your account runs short in {n} out of 100 simulated scenarios."
         body = (
-            "In all 1,000 possible futures with the ups and downs you chose, your account never ran "
-            "out of money. That is a good sign, though not a guarantee: markets can be worse than "
-            "anything in these simulations."
+            "In those scenarios, the account cannot cover at least one full pension payment. "
+            "The modeled pension continues paying. These are results under your assumptions, "
+            "not a prediction of your personal odds."
         )
-    elif tier == "small":
-        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
-        verdict = "Your account usually lasts, with a small risk of running out."
-        body = (
-            f"Your account ran out of money in <strong>{n} out of 100</strong> possible futures. "
-            f"Most futures work out, but an unlucky one would leave you short late in life."
-        )
-    elif tier == "tradeoff":
-        bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
-        verdict = "A real trade-off: neither option is clearly better."
-        body = (
-            f"Your account usually ends with more money, but it ran out in <strong>{n} out of 100</strong> "
-            f"possible futures. The pension can never run out. If running out of money in old age "
-            f"would be a disaster for you, the pension's guarantee may be worth more than your account's "
-            f"extra money."
-        )
-    elif tier == "lean_a":
-        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
-        verdict = "Your account runs out in a large share of futures, even though page 1 picked it."
-        body = (
-            f"Page 1 assumed a smooth {r} every year. With real ups and downs, your account ran out "
-            f"of money in <strong>{n} out of 100</strong> possible futures. That is close to a coin "
-            f"flip, while the pension pays for life no matter what."
-        )
-    elif tier == "a_safer":
-        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
-        verdict = "The pension is the safer choice."
-        body = (
-            f"Page 1 said your account wins with a smooth {r} every year. But with real ups and downs, "
-            f"your account ran out of money in <strong>{n} out of 100</strong> possible futures. When "
-            f"most futures end with an empty account, the pension's paycheck for life is the safer bet."
-        )
-    elif tier == "a_close":
-        bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
-        verdict = "The pension wins, though your account sometimes gets lucky."
-        body = (
-            f"Even with a smooth {r} every year, your account runs out. With real ups and downs it ran "
-            f"out in <strong>{n} out of 100</strong> possible futures, and the rest only made it "
-            f"because they happened to get good years. Choosing your own account here is a bet on luck; "
-            f"the pension is the safer choice."
-        )
-    else:  # a_confirmed
-        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
-        verdict = "The pension is the safer choice, and bad markets make it clearer."
-        body = (
-            f"Even with a smooth {r} every year, your account runs out. With real ups and downs it ran "
-            f"out in <strong>{n} out of 100</strong> possible futures. The pension's paycheck for "
-            f"life is the more reliable choice."
-        )
-
     render_html(f"""
 <div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>{symbol + " " if symbol else ""}{verdict}</strong><br><br>
@@ -149,21 +91,22 @@ def render():
 """)
     st.space("small")
     st.markdown(f"""
-Page 1 pretended the stock market grows by exactly {index_return_pct:.1f}% every single year. Real markets don't work that way. Some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
+The steady-return page assumes investments grow by exactly {index_return_pct:.1f}% every single year before inflation. Real markets don't work that way. Some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
 
-**So this page asks: with real ups and downs, how often does your account run out of money?**
+**So this page asks: with simulated ups and downs, how often does your account run short?**
 
 To find out, we made up **1,000 possible futures** for the stock market. Each one is a different random mix of good and bad years, like rolling dice for every year of your {work_years} working years and {retirement_years} retired years. Then we ran your plan through every one of them.
 """)
+
+    render_inflation_explanation(inputs, res)
 
     _mc_std_pct = st.slider(
         "How bumpy is the market?",
         min_value=0.0, max_value=30.0, value=15.0, step=0.5, format="%.1f%%",
         key="mc_std",
         help=(
-            "How far a single year can swing away from the typical year. 15% matches the U.S. "
-            f"stock market's history: with a typical year of {index_return_pct:.0f}%, most years land "
-            f"somewhere between about {index_return_pct - 15:.0f}% and {index_return_pct + 15:.0f}%. "
+            "How widely yearly returns vary. This is the standard deviation, not a maximum loss or gain. "
+            "15% is an example assumption, not a prediction or a recommended investment mix. "
             "Slide left for a calmer market, right for a wilder one. At 0, every year is the same, "
             "just like page 1."
         ),
@@ -186,12 +129,12 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
         render_html(f"""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>You would get a refund, not a lifetime pension.</strong><br><br>
-With real ups and downs, your own account ended up with more than the refund (about &#36;{refund:,.0f}) in
+With the selected market swings, your own account ended up with more than the refund (about &#36;{refund:,.0f}) in
 <strong>{out_of_100(wins / len(mc["balances_at_leaving"]))} out of 100</strong> possible futures. The refund grows at a
 guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has to beat that to come out ahead.
 </div>
 """)
-        st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to Base Comparison: Flat Rate**", icon="⚖️")
+        st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to Steady Yearly Return**", icon="⚖️")
         render_feedback_form("market-swings")
         return
 
@@ -217,9 +160,9 @@ guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has 
         )
     with m3:
         st.metric(
-            label="The flat-rate result says",
+            label="Steady-return ending balance",
             value=f"${max(flat_final, 0):,.0f}",
-            help="What page 1 says is left at the end, when the market grows by the same amount every year. Compare it with the typical result to the left; a smooth market makes things look better than they usually turn out.",
+            help="What page 1 says is left at the end, when the market grows by the same amount every year. Compare it with the typical result to the left; the order of returns can change how many payments the account covers.",
         )
 
     st.subheader("Why ups and downs matter")
@@ -237,27 +180,29 @@ Page 1 uses the same {index_return_pct:.1f}% every year. This page keeps {index_
 
 Bad years early in retirement do lasting damage. You still have to take out money to live on, so you end up selling investments while prices are low, and that money is gone before prices recover. That is why the typical result here is usually worse than page 1, and why some futures run out.
 
-Page 1 tells you who wins in a smooth, average market. This page tells you the risk. For retirement money, the risk usually matters more.
+The steady-return page shows one unchanging return. This page explores how different sequences of returns affect the same payments. Neither predicts your actual outcome.
 """)
 
     if flat_final > 0 and median_final < flat_final:
         st.markdown(
-            f"Notice that the typical outcome (**\\${median_final:,.0f}**) is smaller than the flat-rate answer (**\\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% average return. That's the order effect from the example above: withdrawals made after a drop lock in the loss. A flat rate usually paints a rosier picture of retirement than the bumpy reality it summarizes."
+            f"Notice that the typical outcome (**\\${median_final:,.0f}**) is smaller than the flat-rate answer (**\\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% typical yearly return before inflation. Changing returns affects both account growth and the impact of withdrawals, so the two ending balances need not match."
         )
 
     st.header("The range of your account across 1,000 futures")
 
     chart_title(fund_chart_title(
         res, f"Your account: a steady {index_return_pct:.1f}% a year vs. 1,000 possible futures"))
+    st.caption(f"Retirement starts at age {inputs['retirement_age']} (the red dashed line). Empty accounts stay at $0; unpaid income is not debt.")
     fig = build_fund_chart(inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"])
     st.plotly_chart(fig, width="stretch")
+    st.caption("Chart amounts: k = thousand; M = million.")
 
     with st.expander("How to read this chart"):
         st.markdown("""
-- **Bold teal line** = page 1's answer: your own account if the market grew by the same amount every year.
+- **Bold teal line** = the steady-return answer: your own account if the market grew by the same amount every year.
 - **Shaded bands** = at each age, the range your account's balance falls into across the 1,000 futures. Blue = the middle half (the most likely range). Red = the unlucky futures just below that, and green = the lucky ones just above it, which can go off the top of the chart. The very unluckiest and luckiest 5% are left off so the chart stays readable.
 - **Red dashed vertical line** = the year retirement begins.
-- **Horizontal gray line** = the \\$0 mark. Once a simulated future hits \\$0, it has run out of money permanently.
+- **Horizontal gray line** = the \\$0 mark. Empty accounts stay at \\$0, unpaid payments count as failures, but paying everything and ending at exactly $0 does not.
 """)
 
     st.header("How the 1,000 futures ended")
@@ -286,38 +231,21 @@ Page 1 tells you who wins in a smooth, average market. This page tells you the r
             x=[-_w / 2], y=[ran_out_count], width=_w * 0.92, marker_color="#DC2626",
             hovertemplate="Ran out of money ($0)<br>Number of futures: %{y}<extra></extra>",
         ))
-        hist.add_annotation(
-            x=-_w / 2, y=ran_out_count,
-            text=f"<b>✗ {ran_out_count} futures ran out ($0)</b>",
-            showarrow=True, arrowhead=2, arrowcolor="#DC2626",
-            ax=80, ay=-30, font=dict(size=12, color="#DC2626"),
-            bgcolor="rgba(255,255,255,0.85)", borderpad=4,
-        )
     hist.update_layout(
         xaxis_title="Money left at the end of retirement ($)",
         yaxis_title="Number of futures",
-        xaxis=dict(tickformat=",", separatethousands=True),
+        xaxis=dict(tickformat=".2s", separatethousands=True),
         plot_bgcolor="white",
         barmode="overlay",
         margin=dict(l=40, r=20, t=90, b=60),
         showlegend=False,
     )
-    # Both markers are labelled above the plot, on different rows, so the two
-    # captions never collide when the flat-rate and typical lines land close
-    # together (previously "flat-rate answer" and "typical outcome" overlapped).
-    if flat_final > 0 and flat_final <= _cap:
-        hist.add_vline(
-            x=flat_final, line_width=2, line_dash="dash", line_color="#0D9488",
-            annotation_text="flat-rate answer", annotation_position="top",
-            annotation_font_color="#0D9488", annotation_yshift=34,
-        )
+    if 0 < flat_final <= _cap:
+        hist.add_vline(x=flat_final, line_width=2, line_dash="dash", line_color="#0D9488")
     if median_final > 0:
-        hist.add_vline(
-            x=median_final, line_width=2, line_dash="dot", line_color="#1e293b",
-            annotation_text="typical outcome", annotation_position="top",
-            annotation_font_color="#1e293b", annotation_yshift=14,
-        )
-    chart_title(f"Ending balance at death, across all 1,000 futures{dollars_note(res)}")
+        hist.add_vline(x=median_final, line_width=2, line_dash="dot", line_color="#1e293b")
+    st.caption(f"{ran_out_count:,} scenarios could not cover all payments. Dashed teal: steady-return result. Dotted gray: middle result.")
+    chart_title(f"Ending balance, across all 1,000 futures{dollars_note(res)}")
     st.plotly_chart(hist, width="stretch")
     st.caption(
         "The tallest bars show the most common outcomes. The red bar left of $0 counts "
@@ -363,6 +291,6 @@ This page runs a **Monte Carlo simulation**, a standard technique for understand
 One limitation: real markets have slightly fatter tails than this curve (extreme years are a bit more common than this model assumes), and returns can cluster (crashes are often followed by recoveries). This simulation is more realistic than a flat rate, but it is still a simplification.
 """)
 
-    st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to Base Comparison: Flat Rate**", icon="⚖️")
+    st.page_link(st.session_state["_pages"]["comparison"], label="**← Back to Steady Yearly Return**", icon="⚖️")
 
     render_feedback_form("market-swings")

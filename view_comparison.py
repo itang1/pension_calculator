@@ -28,6 +28,9 @@ from common import (
     render_breakdown_table,
     render_feedback_form,
     render_html,
+    render_inflation_explanation,
+    account_payment_table,
+    restore_previous_inputs,
 )
 
 
@@ -39,50 +42,49 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
     ``runs_out`` is page 2's count ("N" out of 100 futures), shown here so a
     reader who never opens page 2 still sees the risk behind a smooth-market win.
     """
-    short = simulation.ran_short(personal_balance)
-    tie = not short and personal_balance <= 0.5
-    if not short:
-        swings = (f"<br><br><strong>One catch:</strong> real markets don't grow smoothly. With realistic "
-                  f"ups and downs, your account runs out in <strong>{runs_out} out of 100</strong> possible futures.")
+    short = depletion_year is not None
+    dollars = f" (in {CURRENT_YEAR} dollars)" if real_dollars else " (in the dollars of the final year)"
+    if short:
+        title = "Your account cannot cover every pension payment in this scenario."
+        following = int(retirement_years) - depletion_year
+        body = (
+            f"It fully covers the first {depletion_year - 1} years of the comparison. "
+            f"It cannot cover the full payment in retirement year {depletion_year}. "
+            + (f"The remaining {following} years are also unfunded. " if following else "")
+            + "The modeled pension continues paying for the full period."
+        )
+        bg, bar = "#E0E7FF", "#4F46E5"
+    elif personal_balance <= 0.5:
+        title = "Your account covers every payment, with nothing left at the end."
+        body = f"Both options cover the same income over the {int(retirement_years)} years shown."
+        bg, bar = "#F1F5F9", "#64748B"
     else:
-        swings = (f"<br><br>Real markets also have ups and downs. With those, your account runs out in "
-                  f"<strong>{runs_out} out of 100</strong> possible futures.")
-    if runs_out is None:
-        swings = ""
-    rate_buffer = current_rate_pct - breakeven_rate
-    dollars = f" (in {CURRENT_YEAR} dollars)" if real_dollars else ""
-    if tie:
-        # Every payment is made and nothing is left: neither option is ahead.
-        render_html(f"""
-<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🤝 It's a tie</div>
-<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, your own account pays every year's income and ends with nothing left over, just like the pension.</strong>{swings}
+        title = "Your account covers every payment and finishes with money left."
+        body = (
+            f"After {int(retirement_years)} years, it has <strong>${personal_balance:,.0f}</strong>{dollars} "
+            "left after covering the same income as the pension. Survivor benefits are not included."
+        )
+        bg, bar = "#CCFBF1", "#0D9488"
+    render_html(f"""
+<div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<strong>{title}</strong><br><br>
+This calculation assumes your investments grow by <strong>{current_rate_pct:.1f}% every year before inflation</strong>, with no market ups and downs.<br><br>
+{body}<br><br>
+The account needs a steady return of <strong>{fmt_rate(breakeven_rate)} before inflation</strong> to cover all payments under these assumptions.
 </div>
 """)
-    elif not short:
-        render_html(f"""
-<div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 Winner: Your own account</div>
-<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, your own account comes out ahead.</strong><br><br>
-After {int(retirement_years)} years of retirement, your account would still have <strong>${personal_balance:,.0f}</strong>{dollars} remaining for you to keep (donate, pass on, etc.), on top of having paid out the same income as the pension every single year. The pension leaves nothing at death (besides potential survivor benefits, if applicable).
-<br><br><em>You are {rate_buffer:.1f} percentage points above the {breakeven_rate:.1f}% break-even return rate, which means that in this calculation, a steady return below {breakeven_rate:.1f}% every year would make the pension win. When returns change from year to year, the order of good and bad years matters too.</em>{swings}
-</div>
-""")
-    else:
-        render_html(f"""
-<div style="background-color:#E0E7FF; border-left:5px solid #4F46E5; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 Winner: The pension</div>
-<strong>Assuming a flat {current_rate_pct:.1f}% return every single year, the pension comes out ahead.</strong><br><br>
-Before your {int(retirement_years)}-year retirement was over, your account would have run out of money in retirement year {depletion_year}, leaving {int(retirement_years) - depletion_year} years with no money in the account. At a flat {current_rate_pct:.1f}% return, the investment growth on your account cannot keep up with {int(retirement_years)} years of withdrawals, so the pension's guarantee that it pays until you die is the more reliable choice here.
-<br><br><em>Your account would need a steady return of at least {fmt_rate(breakeven_rate)} every year to last your full retirement. You entered {current_rate_pct:.1f}%.</em>{swings}
-</div>
-""")
+    if runs_out is not None:
+        std = st.session_state.get("mc_std", 15.0)
+        if std == 0:
+            st.caption("Market swings are set to 0%, so the simulations on the second page repeat this same calculation.")
+        else:
+            st.caption(f"With the current market-swing setting ({std:g}%), the account runs short in {runs_out} out of 100 simulated scenarios. These are model results, not a prediction of your personal odds.")
     # st.page_link (not an HTML anchor inside the banner) so navigation stays
-    # client-side and the visitor's sidebar inputs survive the page switch.
+    # client-side and the visitor's input panel inputs survive the page switch.
     st.page_link(
         st.session_state["_pages"]["market"],
         label=(
-            '*To see how a realistic sequence of ups and downs could change this outcome, visit the "What If the Market Has Bad Years?" page →*'
+            '*See how market ups and downs change this result →*'
         ),
         icon="🎢",
     )
@@ -100,17 +102,17 @@ def render_refund_result(inputs, res):
     rate = simulation.PLAN_REFUND_INTEREST_PCT
     dollars = f" (in {CURRENT_YEAR} dollars)" if res.get("real_dollars") else ""
     if abs(account - refund) <= max(1.0, 1e-9 * refund):
-        winner, color, bar = "It's a tie", "#F1F5F9", "#64748B"
+        winner, color, bar = "The refund and account have the same value", "#F1F5F9", "#64748B"
     elif account > refund:
-        winner, color, bar = "Winner: Your own account", "#CCFBF1", "#0D9488"
+        winner, color, bar = "Your account is larger than the refund", "#CCFBF1", "#0D9488"
     else:
-        winner, color, bar = "Winner: The pension's refund", "#E0E7FF", "#4F46E5"
+        winner, color, bar = "The contribution refund is larger than your account", "#E0E7FF", "#4F46E5"
     st.header("Your Result")
     render_html(f"""
 <div style="background-color:{color}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">🏆 {winner}</div>
+<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">{winner}</div>
 <strong>You qualify for a refund of your contributions, not a lifetime pension.</strong><br><br>
-With {inputs["work_years"]} years of service you would not vest, so when you leave the plan pays back what you put in, plus {rate:g}% interest a year: about <strong>&#36;{refund:,.0f}</strong>{dollars}. Your own account, earning {res["index_return_pct"]:.1f}% a year on the same deposits, would hold about <strong>&#36;{account:,.0f}</strong>{dollars} when you leave.
+With {inputs["work_years"]} years of service you would not vest, so when you leave the plan pays back what you put in, plus {rate:g}% interest a year: about <strong>&#36;{refund:,.0f}</strong>{dollars}. Your own account, earning {res["index_return_pct"]:.1f}% a year before inflation on the same deposits, would hold about <strong>&#36;{account:,.0f}</strong>{dollars} when you leave.
 <br><br><em>Because both grow from the same deposits, your own account comes out ahead only if it earns more than {rate:g}% a year. Staying at least {simulation.PLAN_VESTING_YEARS} years would earn you a lifetime pension instead of a refund.</em>
 </div>
 """)
@@ -141,13 +143,13 @@ def render():
     st.markdown("""
 Many public employees, like teachers, police officers, and city workers, must put part of every paycheck (for example, 10%) into a pension. In return, the pension pays them a set amount every year after they retire, for the rest of their life, no matter what the stock market does.
 
-This calculator asks one question: **if you could put that same money into your own retirement account instead, which choice would leave you better off?**
+This calculator asks one question: **if you could put that same money into your own retirement account instead, would the account cover the same pension payments, and would any money remain?**
 """)
 
     render_html(
         f"""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<em>&larr; Use the sidebar on the left to enter your own salary, years of work, and retirement plans. Everything on this page updates as you go.</em>
+<em>Open the input panel above to enter your salary, ages, and pension details. Results update as you go.</em>
 <br><br>{inputs_summary_html(inputs, res)}
 </div>
 """
@@ -173,6 +175,8 @@ Instead of paying into the pension, imagine putting the same amount (for example
 """)
     st.space("small")
 
+    render_inflation_explanation(inputs, res)
+
     if inputs["plan_status"] == "unvested":
         # No pension to compare: show the refund against your own account instead
         # of lifetime-income charts that do not apply.
@@ -188,24 +192,24 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
         st.space("small")
 
-        st.header("The Pension vs. Your Own Account Over Time")
+        st.header("Would Your Account Cover the Pension Payments?")
 
         with st.expander("How to read this chart"):
             st.markdown("""
     Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does your own account run out of money before you die?**
 
-    - **Bold teal line (your own account)** = your account's balance using the flat return rate you set in the sidebar, applied at the same rate every year. If it stays above zero through all retirement years, your account wins. If it hits zero, the pension wins.
+    - **Bold teal line (your own account)** = your account's balance using the flat return rate you set in the input panel, applied at the same rate every year. It stops at $0 when the account is empty. Any income it could not pay is shown separately below.
     - **Purple line (optional)** = how much money is paid out each year. The pension pays this to you; the same amount comes out of your own account. Toggle it on/off with the checkbox above the chart.
     - **Horizontal axis** = your age, from the year you are hired to the end of retirement. Hover over a point to see that year's numbers.
     - **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
     - **Red dashed vertical line** = the year retirement begins.
-    - **Horizontal gray line** = the $0 mark. If the teal line crosses below it, your account has run out of money.
+    - **Horizontal gray line** = the $0 mark. The line stays here once the account is empty. Ending at exactly $0 after paying everything is fully funded.
 
     *Wondering what happens when the market doesn't return the same rate every year? That's the whole subject of the "What If the Market Has Bad Years?" page.*
     """)
 
         _show_ref_line = st.checkbox(
-            "Show annual payout reference line",
+            "Show the yearly pension payment",
             value=False,
             help=(
                 "Adds a purple line showing how much money changes hands each year. "
@@ -217,11 +221,19 @@ Instead of paying into the pension, imagine putting the same amount (for example
         )
 
         chart_title(fund_chart_title(res))
+        st.caption(
+            f"Retirement starts at age {inputs['retirement_age']}. "
+            + (f"The first payment the account cannot fully cover is at age {inputs['retirement_age'] + res['depletion_year']}." if res['depletion_year'] else "The account covers all payments through the ending age.")
+        )
         fig = build_fund_chart(inputs, res, _show_ref_line, verdict_annotation=True)
         st.plotly_chart(fig, width="stretch")
+        st.caption("Chart amounts: k = thousand; M = million.")
 
+        if res["depletion_year"] is not None:
+            st.metric("Total Income the Account Could Not Pay", f"${-personal_balance:,.0f}",
+                      help="Unpaid pension-equivalent income, not money you owe. Uses the dollar display selected above.")
         st.markdown(
-            "*Reminder: in this comparison, every dollar the pension pays is also a dollar withdrawn from your own account. The metrics below mirror each other on both sides.*"
+            "*Both options aim to pay the same income. Once the account is empty, any payments it cannot cover are counted as unpaid income.*"
         )
 
         st.space("small")
@@ -256,9 +268,9 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
         mc4, mc5, mc6 = st.columns(3)
         with mc4:
-            if not simulation.ran_short(personal_balance):
+            if res["depletion_year"] is None:
                 st.metric(
-                    label=f"Your Account at Death (Age {inputs['retirement_age'] + retirement_years})",
+                    label=f"Your Account at the End (Age {inputs['retirement_age'] + retirement_years})",
                     value=f"${max(personal_balance, 0):,.0f}",
                     delta="Did not run out ✓",
                     delta_arrow="off",
@@ -266,9 +278,9 @@ Instead of paying into the pension, imagine putting the same amount (for example
                 )
             else:
                 st.metric(
-                    label=f"Your Account at Death (Age {inputs['retirement_age'] + retirement_years})",
+                    label=f"Your Account at the End (Age {inputs['retirement_age'] + retirement_years})",
                     value="$0",
-                    delta="Ran out before death ✗",
+                    delta="Some payments were not fully covered",
                     delta_arrow="off",
                     delta_color="inverse",
                     help=(
@@ -285,13 +297,13 @@ Instead of paying into the pension, imagine putting the same amount (for example
                     else f"{_rate_buffer:+.1f} points vs. your {_current_rate_pct:.1f}% assumption"
                 ),
                 delta_color="inverse" if math.isinf(_rate_buffer) else "normal",
-                help="The lowest steady yearly return that keeps your own account from running out before you die. If your expected return is above this, your account wins; below it, the pension wins.",
+                help="The lowest steady yearly return, before inflation, that covers all modeled pension payments through your chosen ending age.",
             )
         with mc6:
             st.metric(
-                label="Years Your Account Covers",
+                label="Fully Funded Retirement Years",
                 value=f"{_years_covered} / {retirement_years} yrs",
-                delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
+                delta="Full retirement covered ✓" if _depletion_year is None else f"{retirement_years - _years_covered} years include unpaid income",
                 delta_arrow="off",
                 delta_color="normal" if _depletion_year is None else "inverse",
                 help="How many retirement years your own account can sustain the same annual withdrawal as the pension, out of your total retirement period.",
@@ -299,12 +311,13 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
         st.subheader("How the answer changes with the return rate")
         st.markdown(
-            "The break-even rate is where this line crosses \\$0. Slide along it to see how much "
-            "a point of return is worth: above \\$0 your account ends with money to spare, below it your account "
-            "runs out and the pension wins."
+            "Below the break-even return, the account cannot cover every payment. Above it, money remains. "
+            "Empty accounts are shown at $0. All returns on this chart are before inflation."
         )
+        st.caption(f"Dashed gray: your {index_return_pct:.1f}% assumption. Dotted teal: {fmt_rate(res['breakeven_rate'])} break-even return.")
         chart_title(rate_chart_title(res))
         st.plotly_chart(build_rate_curve_chart(inputs, res), width="stretch")
+        st.caption("Chart amounts: k = thousand; M = million.")
 
         st.markdown("""
     **What you leave behind at your death:**
@@ -326,9 +339,9 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
     **Only your own contributions are compared.** Most pensions are also funded by your employer. This comparison assumes only your share of the money goes into your own account; the employer's share does not follow you, so it is not counted there.
 
-    **Vesting and leaving early matter.** With fewer than 5 years of service there is no pension, only a refund of your contributions with interest. With 5 or more years but under 30, the pension can't start before age 60; leaving earlier gives a deferred pension from 60 with no COLA. The sidebar estimate applies both rules. Survivor and disability benefits are not modeled.
+    **Vesting and leaving early matter.** With fewer than 5 years of service there is no pension, only a refund of your contributions with interest. With 5 or more years but under 30, the pension can't start before age 60; leaving earlier gives a deferred pension from 60 with no COLA. The input panel estimate applies both rules. Survivor and disability benefits are not modeled.
 
-    **Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the sidebar for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
+    **Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the input panel for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
 
     *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
     """)
@@ -352,7 +365,7 @@ This comparison uses the inputs above to show how a pension and a personal accou
 
 {_first_tip}
 - **This comparison assumes the same yearly payment from either option.** It does not include survivor or disability benefits, taxes on actual withdrawals, or other personal circumstances described above.
-- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a yearly amount; payment timing and annual increases still follow the built-in rules described in the sidebar.
+- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a yearly amount; payment timing and annual increases still follow the built-in rules described in the input panel.
 
 *This calculator is for exploring a scenario. It is not a personal financial recommendation.*
 """)
@@ -412,7 +425,9 @@ Returns are calculated on the balance at the *start* of the year, before that ye
             )
 
     with st.expander("Retirement Years"):
-        if inputs["deferral_years"]:
+        if inputs["plan_status"] == "unvested":
+            _pension_start = "There are no pension payments in this scenario. The contribution refund is shown above."
+        elif inputs["deferral_years"]:
             _pension_start = (
                 f"Once you leave, contributions stop. The pension does not start until age "
                 f"{inputs['retirement_age'] + inputs['deferral_years']}, and then pays the same dollar "
@@ -424,7 +439,7 @@ Returns are calculated on the balance at the *start* of the year, before that ye
                 "allowance that grows each year with COLA."
             )
         st.markdown(f"""
-{_pension_start} Your own account is drawn down by that same amount each year, but continues earning investment returns on whatever balance remains. If the **= Balance** ever turns red (negative), your own account has run out. The year it first goes red is the year that you will wish you had chosen the pension option, since the pension provides a lifetime guarantee.
+{_pension_start} Your account tries to pay the same amount each year and earns returns on its remaining balance. Once it is empty, the **Income Unpaid** column shows payments it could not cover. That is missing income, not debt.
 """)
         col1, col2 = st.columns(2)
         with col1:
@@ -435,7 +450,7 @@ The pension pays a set annual amount, {f'growing by {res["retiree_cola_pct"]:.1f
         with col2:
             st.markdown("**Your Own Account**")
             st.markdown(f"""
-Each year, you withdraw the same dollar amount as the pension would have paid. The column headers show the formula: the **Start Balance** earns **+ Returns** ({index_return_pct:.1f}%/year), then the **− Withdrawal** is subtracted, leaving **= Balance**. If returns exceed the withdrawal, the balance grows. If not, it shrinks.
+The **Start Balance** earns **+ Returns** ({index_return_pct:.1f}%/year before inflation), then the amount actually paid (**− Withdrawal**) is subtracted, leaving **= Balance**. The account cannot pay more than it holds. **Income Unpaid** is the part of the pension payment it could not match.
 """)
         col1, col2 = st.columns(2)
         with col1:
@@ -450,11 +465,11 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
         with col2:
             st.dataframe(
                 render_breakdown_table(
-                    table_data[["Year", "Age", "Start Balance", "Market Returns", "Pension Redeemed", "Balance"]],
+                    account_payment_table(table_data)[["Year", "Age", "Start Balance", "Market Returns", "Account Withdrawal", "Income Unpaid", "Balance"]],
                     "R",
                     {"Start Balance": "Start Balance",
                      "Market Returns": "+ Returns",
-                     "Pension Redeemed": "− Withdrawal",
+                     "Account Withdrawal": "− Withdrawal",
                      "Balance": "= Balance"},
                     balance_col="= Balance",
                 ),
@@ -463,12 +478,15 @@ Each year, you withdraw the same dollar amount as the pension would have paid. T
 
     st.divider()
     st.header("Case Studies")
+    st.caption("Case-study totals below use dollars from each year, regardless of the display setting above. Today's-dollar figures are marked separately. All investment returns are before inflation.")
+    if "_before_example" in st.session_state:
+        st.button("Restore my previous inputs", key="restore_example_inputs", on_click=restore_previous_inputs)
 
     st.markdown("""
-The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above). Each button also sets the market-swings slider on the second page to 15%, which the "out of 100 possible futures" figures below assume.
+These examples show accounts that cover all pension payments and accounts that run short. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above). Each button also sets the market-swings slider on the second page to 15%, which the "out of 100 possible futures" figures below assume.
 """)
 
-    with st.expander("Case Study A: Your Own Account Wins"):
+    with st.expander("Case Study A: Account Covers All Payments"):
         st.markdown("""
 **Settings:** Starting wage \\$120,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 20 (8% each) · Pension contribution rate 10% · Index returns 10% · Work years 30 · Retires at 55 · Retirement years 30 · Plan factor 2% (first-year allowance about \\$238,100, or \\$110,700 in today's dollars)
 """)
@@ -483,12 +501,12 @@ Alice is a civil servant who starts at \\$120,000. Across a 30-year career, her 
 
 **Her own account:** Now suppose she had put those same contributions into an account earning 10% a year instead. By retirement it would hold about **\\$3.2 million**. She then withdraws the same amount the pension would have paid each year. Since 10% growth outpaces what she takes out, the balance keeps climbing through retirement and finishes close to **\\$10 million**.
 
-**Verdict:** Her own account wins, and it is worth being clear about why. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. Her own account still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. It is also a narrow win: at a flat 9.2% or less, the pension comes out ahead. And it assumes a steady 10% every single year. With realistic ups and downs, Alice's fund runs out in about 38 out of 100 possible futures (see the *What If the Market Has Bad Years?* page).
+**Result under these assumptions:** The account covers every payment and finishes with money left. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. Her own account still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. At a steady return of 9.2% or less, the account cannot cover all payments. And it assumes a steady 10% every single year. With simulated ups and downs, Alice's fund runs out in about 38 out of 100 possible futures (see the *What If the Market Has Bad Years?* page).
 
 This is also the scenario people misread most often. They see "\\$9.7 million in pension income" and assume the pension came out ahead, but that number is just the running total of Alice's annual payments; keep in mind that her own account paid out that same amount! The \\$10 million is *extra* that she gets to keep (donate, pass on, etc.), on top of the \\$9.7 million that she already withdrew and spent during her life.
 """)
 
-    with st.expander("Case Study B: Pension Wins"):
+    with st.expander("Case Study B: Account Runs Short"):
         st.markdown("""
 **Settings:** Starting wage \\$65,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 5% · Work years 20 · Retires at 60 · Retirement years 35 · Plan factor 1.5% (first-year allowance about \\$41,100, or \\$24,500 in today's dollars)
 """)
@@ -503,12 +521,12 @@ Bob is a civil servant who starts at \\$65,000 and works a steady 20 years with 
 
 **His own account:** Those same contributions, growing at 5% a year, would leave Bob with about **\\$332,000** at retirement. Once he starts pulling out \\$41,100 a year (rising 2% annually), the growth cannot keep up with the withdrawals. The account runs dry in **year 10**, leaving nothing for his final 25 years.
 
-**Verdict:** The pension wins because Bob outlives his savings. At 5% returns, a \\$332,000 balance just cannot fund 35 years of withdrawals. What carries him through is the pension's promise to keep paying for as long as he lives. Without it, he runs out of money around age 70.
+**Result under these assumptions:** The account cannot cover all modeled payments. At 5% returns, a \\$332,000 balance just cannot fund 35 years of withdrawals. What carries him through is the pension's promise to keep paying for as long as he lives. Without it, he runs out of money around age 70.
 
-The pension option tends to come out ahead when returns are low, retirement is long, or the account didn't have enough working years to grow.
+Lower returns, a longer retirement, or fewer years of contributions can make it harder for the account to cover the modeled payments.
 """)
 
-    with st.expander("Case Study C: Your Own Account Wins"):
+    with st.expander("Case Study C: Account Covers All Payments"):
         st.markdown("""
 **Settings:** Starting wage \\$80,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotion at year 15 (8%) · Pension contribution rate 10% · Index returns 9% · Work years 35 · Retires at 60 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$198,800, or \\$81,700 in today's dollars)
 """)
@@ -523,10 +541,10 @@ Carol is a civil servant who starts at \\$80,000 and works a long 35-year career
 
 **Her own account:** Those same contributions, growing at 9% a year, would hold about **\\$2.9 million** by the time she retires. She then withdraws the same amount the pension would have paid each year. Because 9% growth stays ahead of what she takes out, the balance keeps rising through retirement and finishes above **\\$5.2 million**.
 
-**Verdict:** Her own account wins. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that her own account still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with realistic ups and downs, her fund runs out in about 34 out of 100 possible futures.
+**Result under these assumptions:** The account covers every payment and finishes with money left. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that her own account still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with simulated ups and downs, her fund runs out in about 34 out of 100 possible futures.
 """)
 
-    with st.expander("Case Study D: Pension Wins"):
+    with st.expander("Case Study D: Account Runs Short"):
         st.markdown("""
 **Settings:** Starting wage \\$95,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 4% · Work years 15 · Retires at 63 · Retirement years 25 · Plan factor 2% (first-year allowance about \\$51,900, or \\$34,900 in today's dollars)
 """)
@@ -541,10 +559,10 @@ Dave is a civil servant who starts at \\$95,000 but works only 15 years before r
 
 **His own account:** Those same contributions, growing at 4% a year, would leave Dave with only about **\\$276,000** at retirement. Once he starts withdrawing \\$51,900 a year (rising 2% annually), a balance that small cannot keep up. The account runs dry in **year 6** of retirement, leaving nothing for his final 19 years.
 
-**Verdict:** The pension wins, and by a wide margin. A short 15-year career simply does not build enough to self-fund 25 years of retirement, especially at 4% returns. What carries Dave through is the pension's promise to keep paying for as long as he lives. This is Bob's problem in a sharper form: fewer working years and lower returns.
+**Result under these assumptions:** The contributions from this 15-year career, earning 4% a year, do not fund all 25 years of modeled payments. What carries Dave through is the pension's promise to keep paying for as long as he lives. This is Bob's problem in a sharper form: fewer working years and lower returns.
 """)
 
-    with st.expander("Case Study E: Pension Wins (Hired Late)"):
+    with st.expander("Case Study E: Account Runs Short (Hired Late)"):
         st.markdown("""
 **Settings:** Starting wage \\$90,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · No promotions · Pension contribution rate 10% · Index returns 7% · Hired at 50 · Retires at 63 (13 years of work) · Retirement years 25 · Plan factor 2% (first-year allowance about \\$40,100, or \\$28,400 in today's dollars)
 """)
@@ -559,10 +577,10 @@ Grace changes careers and is hired at 50, starting at \\$90,000 with no promotio
 
 **Her own account:** Those same contributions, growing at 7% a year, would hold only about **\\$251,000** when she retires. Once she starts withdrawing \\$40,100 a year (rising 2% annually), the account runs dry in **year 8**, leaving nothing for her final 17 years.
 
-**Verdict:** The pension wins by the widest margin of any case here. A short, late career gives her own account too little time to grow, while the pension still pays for life. Her own account would need a steady 12.5% a year just to break even, and with realistic ups and downs it runs out in about 97 out of 100 possible futures. For late hires the pension is very hard to beat, and working until 63 instead of 60 makes it even better.
+**Result under these assumptions:** The account cannot cover all payments after this 13-year career. The modeled pension continues paying. Her own account would need a steady 12.5% a year just to break even, and with simulated ups and downs it runs out in about 97 out of 100 possible futures. The result depends on the contribution period, return, retirement duration, and pension formula entered.
 """)
 
-    with st.expander("Case Study F: Your Own Account Wins"):
+    with st.expander("Case Study F: Account Covers All Payments"):
         st.markdown("""
 **Settings:** Starting wage \\$150,000 · Step increase 5.5% · Salary COLA 3% · Pension COLA 2% · Promotions at years 10 and 18 (10% each) · Pension contribution rate 10% · Index returns 10% · Work years 25 · Retires at 60 · Retirement years 25 · Plan factor 1.5% (first-year allowance about \\$166,500, or \\$87,600 in today's dollars)
 """)
@@ -577,7 +595,7 @@ Frank is a civil servant who starts at \\$150,000 and earns two sizable promotio
 
 **His own account:** Those same contributions, growing at 10% a year, would hold about **\\$2.4 million** by retirement. He then withdraws the same amount the pension would have paid. With 10% growth running well ahead of his withdrawals, the balance climbs throughout retirement and finishes above **\\$6.5 million**.
 
-**Verdict:** His own account wins decisively. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. High contributions paired with strong returns and a modest retirement factor are the clearest case for your own account. Even so, with realistic ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
+**Result under these assumptions:** The account covers every payment and finishes with money left. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. This result depends on the contributions, assumed returns, and pension formula used here. Even so, with simulated ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
 """)
 
     render_feedback_form("comparison")

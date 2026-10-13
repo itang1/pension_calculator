@@ -32,12 +32,13 @@ def test_fixing_an_input_error_keeps_other_inputs():
     # An invalid combination used to st.stop() mid-sidebar, so every widget
     # below it was forgotten and snapped back to its default.
     at = _app()
-    at.sidebar.number_input(key="in_returns").set_value(9.0).run()
-    at.sidebar.number_input(key="in_retirement_years").set_value(40).run()
-    at.sidebar.number_input(key="in_inflation").set_value(4.0).run()
-    at.sidebar.number_input(key="in_hire_age").set_value(50).run()   # promotions 10, 20 no longer fit
+    at.number_input(key="in_returns").set_value(9.0).run()
+    at.number_input(key="in_plan_age").set_value(95).run()
+    at.number_input(key="in_inflation").set_value(4.0).run()
+    at.text_input(key="in_promo_years").set_value("10, 20").run()
+    at.number_input(key="in_hire_age").set_value(50).run()   # explicit promotions no longer fit
     assert at.error, "expected an input error"
-    at.sidebar.text_input(key="in_promo_years").set_value("").run()
+    at.text_input(key="in_promo_years").set_value("").run()
     assert not at.error and not at.exception
     assert at.session_state["in_returns"] == 9.0
     assert at.session_state["in_retirement_years"] == 40
@@ -58,37 +59,37 @@ def test_malformed_links_never_crash(params):
 
 def test_unusual_digits_in_promotion_years_show_an_error_not_a_crash():
     at = _app()
-    at.sidebar.text_input(key="in_promo_years").set_value("²").run()
+    at.text_input(key="in_promo_years").set_value("²").run()
     assert not at.exception
     assert at.error
 
 
 def _flat_career(at, hire_age, retirement_age):
     """No raises at all, so dollar figures are easy to check by hand."""
-    at.sidebar.text_input(key="in_promo_years").set_value("").run()
-    at.sidebar.number_input(key="in_cola").set_value(0.0).run()
-    at.sidebar.number_input(key="in_step_count").set_value(0).run()
-    at.sidebar.number_input(key="in_wage").set_value(100000).run()
-    at.sidebar.number_input(key="in_hire_age").set_value(hire_age).run()
-    at.sidebar.number_input(key="in_retirement_age").set_value(retirement_age).run()
+    at.text_input(key="in_promo_years").set_value("").run()
+    at.number_input(key="in_cola").set_value(0.0).run()
+    at.number_input(key="in_step_count").set_value(0).run()
+    at.number_input(key="in_wage").set_value(100000).run()
+    at.number_input(key="in_hire_age").set_value(hire_age).run()
+    at.number_input(key="in_retirement_age").set_value(retirement_age).run()
 
 
 def test_unvested_compares_refund_with_your_account():
     # 4 years x $10,000 deposits: refund at 6.5% interest is $44,072; the
     # account at 0% holds $40,000, so the refund wins.
-    at = _app()
+    at = _app(real="false")
     _flat_career(at, 51, 55)
-    at.sidebar.number_input(key="in_returns").set_value(0.0).run()
+    at.number_input(key="in_returns").set_value(0.0).run()
     assert not at.exception and not at.error
-    banner = next(m.value for m in at.markdown if "🏆" in m.value)
+    banner = next(m.value for m in at.markdown if "refund of your contributions" in m.value)
     assert "refund of your contributions" in banner
-    assert "Winner: The pension's refund" in banner
+    assert "The contribution refund is larger than your account" in banner
     assert _metric(at, "Refund When You Leave") == "$44,072"
     assert _metric(at, "Your Account When You Leave") == "$40,000"
     # Above the refund's 6.5% interest, your own account wins instead.
-    at.sidebar.number_input(key="in_returns").set_value(7.0).run()
-    banner = next(m.value for m in at.markdown if "🏆" in m.value)
-    assert "Winner: Your own account" in banner
+    at.number_input(key="in_returns").set_value(7.0).run()
+    banner = next(m.value for m in at.markdown if "refund of your contributions" in m.value)
+    assert "Your account is larger than the refund" in banner
 
 
 def test_manual_amount_keeps_the_plans_start_age_and_cola():
@@ -98,19 +99,19 @@ def test_manual_amount_keeps_the_plans_start_age_and_cola():
     _flat_career(at, 35, 55)
     auto = at.session_state["_inputs"]
     assert auto["deferral_years"] == 5 and auto["retiree_cola"] == 1.0
-    at.sidebar.radio(key="in_allowance_mode").set_value("Enter manually").run()
-    at.sidebar.radio(key="in_allowance_basis").set_value("Dollars at retirement").run()
-    at.sidebar.number_input(key="allowance_manual").set_value(30000).run()
+    at.radio(key="in_allowance_mode").set_value("Enter manually").run()
+    at.radio(key="in_allowance_basis").set_value("Dollars at retirement").run()
+    at.number_input(key="allowance_manual").set_value(30000).run()
     manual = at.session_state["_inputs"]
     assert manual["deferral_years"] == 5 and manual["retiree_cola"] == 1.0
     assert manual["starting_allowance"] == 30000
-    assert any("payments start at age 60" in c.value for c in at.sidebar.caption)
+    assert any("payments start at age 60" in c.value for c in at.caption)
 
 
 def test_earlier_hires_are_told_the_rules_do_not_apply():
     at = _app()
-    at.sidebar.number_input(key="in_hire_year").set_value(2010).run()
-    warning = next(w.value for w in at.sidebar.warning if "calculator is designed" in w.value)
+    at.number_input(key="in_hire_year").set_value(2010).run()
+    warning = next(w.value for w in at.warning if "calculator is designed" in w.value)
     assert "hired in or after 2014" in warning
     assert "does not model the pension rules" in warning
     assert "Entering a manual pension amount does not change when payments start" in warning
@@ -123,8 +124,7 @@ def test_case_study_button_sets_the_swings_its_figures_assume():
     next(b for b in at.button if b.key == "load_alice").click().run()
     at.run()
     assert at.session_state["mc_std"] == 15.0
-    banner = next(m.value for m in at.markdown if "🏆" in m.value)
-    assert "38 out of 100" in banner
+    assert any("38 out of 100" in c.value for c in at.caption)
 
 
 def test_loading_a_link_fills_inputs_then_clears_the_address_bar():
@@ -135,13 +135,13 @@ def test_loading_a_link_fills_inputs_then_clears_the_address_bar():
 
 def test_share_link_is_made_on_request_with_only_active_inputs():
     at = _app()
-    assert not at.sidebar.code  # nothing until asked
-    next(b for b in at.sidebar.button if b.key == "make_share_link").click().run()
-    link = at.sidebar.code[0].value
+    assert not at.code  # nothing until asked
+    next(b for b in at.button if b.key == "make_share_link").click().run()
+    link = at.code[0].value
     assert "wage=120000" in link and "hire_age=25" in link
     assert "allowance_manual" not in link and "current_wage" not in link
-    at.sidebar.radio(key="in_allowance_mode").set_value("Enter manually").run()
-    assert "allowance_manual=" in at.sidebar.code[0].value
+    at.radio(key="in_allowance_mode").set_value("Enter manually").run()
+    assert "allowance_manual=" in at.code[0].value
 
 
 def test_privacy_notice_is_on_the_page():
@@ -162,3 +162,113 @@ def test_feedback_leaves_calculator_details_out_unless_ticked(monkeypatch):
     assert row[1] == "Helpful, thanks"
     assert all(v == "" for v in row[2:16])          # calculator details left blank
     assert row[-2:] == ["", ""]                     # swing details left blank
+
+
+def test_late_hire_is_not_blocked_by_example_promotions():
+    at = _app()
+    at.number_input(key="in_hire_age").set_value(50).run()
+    at.number_input(key="in_retirement_age").set_value(63).run()
+    assert not at.exception and not at.error
+    assert at.session_state["_inputs"]["promotion_years"] == ()
+    assert at.session_state["_inputs"]["retirement_years"] == 22
+
+
+def test_invalid_planning_age_can_be_fixed_without_losing_inputs():
+    at = _app()
+    at.number_input(key="in_plan_age").set_value(50).run()
+    assert at.error and not at.exception
+    at.number_input(key="in_plan_age").set_value(90).run()
+    assert not at.error and not at.exception
+    assert at.session_state["_inputs"]["retirement_years"] == 35
+
+
+def test_monthly_entry_preserves_amount_across_unit_changes():
+    at = _app()
+    at.radio(key="in_allowance_mode").set_value("Enter manually").run()
+    at.radio(key="in_allowance_basis").set_value("Dollars at retirement").run()
+    at.number_input(key="allowance_manual").set_value(30000.0).run()
+    at.radio(key="in_allowance_period").set_value("Monthly").run()
+    assert not at.exception
+    assert at.session_state["allowance_manual"] == pytest.approx(2500)
+    assert at.session_state["_inputs"]["starting_allowance"] == pytest.approx(30000)
+    at.number_input(key="allowance_manual").set_value(3500.0).run()
+    at.radio(key="in_allowance_period").set_value("Yearly").run()
+    assert at.session_state["allowance_manual"] == pytest.approx(42000)
+    assert at.session_state["_inputs"]["starting_allowance"] == pytest.approx(42000)
+
+
+def test_examples_can_restore_manual_inputs_and_display_preferences():
+    import common
+    at = _app()
+    at.radio(key="in_allowance_mode").set_value("Enter manually").run()
+    at.radio(key="in_allowance_period").set_value("Monthly").run()
+    at.number_input(key="allowance_manual").set_value(3500.0).run()
+    at.number_input(key="in_plan_age").set_value(91).run()
+    at.toggle(key="in_real").set_value(False).run()
+    before = {k: at.session_state[k] for k in common._SHARE_SPEC if k in at.session_state}
+    at.button(key="load_alice").click().run()
+    at.run()
+    at.button(key="load_bob").click().run()
+    at.run()
+    at.button(key="restore_inputs").click().run()
+    assert not at.exception and not at.error
+    for key, value in before.items():
+        assert at.session_state[key] == value, key
+    assert at.session_state["_inputs"]["allowance_source"] == "manual"
+
+
+def test_monthly_and_planning_age_round_trip_in_shared_links():
+    from urllib.parse import parse_qsl, urlsplit
+    at = _app()
+    at.radio(key="in_allowance_mode").set_value("Enter manually").run()
+    at.radio(key="in_allowance_period").set_value("Monthly").run()
+    at.number_input(key="allowance_manual").set_value(3123.45).run()
+    at.number_input(key="in_plan_age").set_value(96).run()
+    at.button(key="make_share_link").click().run()
+    other = _app(**dict(parse_qsl(urlsplit(at.code[0].value).query)))
+    assert not other.exception and not other.error
+    assert other.session_state["_inputs"] == at.session_state["_inputs"]
+
+
+def test_bad_monthly_link_amount_does_not_exceed_widget_limit():
+    at = _app(allowance_mode="Enter manually", allowance_period="Monthly", allowance_manual="9000000")
+    assert not at.exception
+
+
+def test_show_results_closes_the_native_input_panel():
+    at = _app()
+    at.session_state["input_panel"] = True
+    at.run()
+    at.button(key="show_results").click().run()
+    assert at.session_state["input_panel"] is False
+    assert not at.exception
+
+
+def test_older_links_keep_their_original_retirement_duration():
+    at = _app(retirement_age="63", retirement_years="25")
+    assert at.session_state["in_plan_age"] == 88
+    assert at.session_state["_inputs"]["retirement_years"] == 25
+
+
+def test_dollar_display_changes_amounts_not_funding_or_return_assumptions():
+    at = _app()
+    real = at.session_state["_results"]
+    assert at.session_state["in_real"] is True
+    at.toggle(key="in_real").set_value(False).run()
+    nominal = at.session_state["_results"]
+    assert real["depletion_year"] == nominal["depletion_year"]
+    assert real["years_covered"] == nominal["years_covered"]
+    assert real["breakeven_rate"] == nominal["breakeven_rate"]
+    assert real["index_return_pct"] == pytest.approx(7.0)
+    assert real["pension_redeemed_total"] < nominal["pension_redeemed_total"]
+    assert any("4.4%" in info.value and "before inflation" in info.value for info in at.info)
+
+
+def test_inflation_caps_pension_increases_without_replacing_salary_raise():
+    at = _app()
+    original_salary_raise = at.session_state["_inputs"]["cola_increase"]
+    at.number_input(key="in_inflation").set_value(1.0).run()
+    assert at.session_state["_inputs"]["retiree_cola"] == pytest.approx(1.01)
+    at.number_input(key="in_inflation").set_value(5.0).run()
+    assert at.session_state["_inputs"]["retiree_cola"] == pytest.approx(1.02)
+    assert at.session_state["_inputs"]["cola_increase"] == original_salary_raise

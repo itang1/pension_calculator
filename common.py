@@ -1,7 +1,7 @@
 """Shared infrastructure for the multipage app.
 
 Holds everything both pages need: Google Sheets plumbing, client metadata,
-the sidebar inputs, cached simulation wrappers, the fund chart builder, and
+the shared inputs, cached simulation wrappers, the fund chart builder, and
 the feedback form. Page-specific copy and layout live in the view modules.
 
 Per-user data is passed between the entry script and the views via
@@ -315,9 +315,9 @@ def fmt_share(prob):
 
 
 def inputs_summary_html(inputs, res):
-    """One line restating what the results assume, for the sidebar-hint boxes.
+    """One line restating what the results assume, for the input panel-hint boxes.
 
-    Phone visitors start with the sidebar collapsed, so this tells them what
+    Phone visitors start with the input panel collapsed, so this tells them what
     the page is showing. HTML (not markdown), with "&#36;" for dollar signs so
     nothing is read as math.
     """
@@ -331,8 +331,8 @@ def inputs_summary_html(inputs, res):
         f"<strong>Right now the results assume:</strong> {wage} · hired at {hire_age} · "
         f"retire at {inputs['retirement_age']} · {inputs['retirement_years']} years retired · "
         f"{res['index_return_pct']:.1f}% returns.<br>"
-        "<span style='font-size:0.9em'>Until you change them, these are example numbers. On a phone, tap the » arrow at the top left to open the "
-        "sidebar. To share these inputs or come back later, use <em>Share These Inputs</em> at the bottom of the sidebar.</span>"
+        "<span style='font-size:0.9em'>Check these inputs before reading the result. Use <em>Start here: enter your details</em> "
+        "above to change them. To save or share this scenario, use <em>Share These Inputs</em> in the input panel.</span>"
     )
 
 
@@ -343,12 +343,12 @@ def out_of_100(prob):
     return f"{round(prob * 100)}"
 
 
-# Quick picks for the return input, from cautious to optimistic. Set through a
+# Quick picks for the return input, from lower to higher growth. Set through a
 # button callback, which runs before the widget is created on the next rerun.
 RETURN_PICKS = [
-    (5.0, "Cautious", "lots of bonds, or a rough few decades"),
-    (7.0, "Middle", "a typical mix of stocks and bonds"),
-    (9.0, "Optimistic", "mostly stocks and good markets"),
+    (5.0, "Lower growth", "an example return before inflation"),
+    (7.0, "Middle growth", "an example return before inflation"),
+    (9.0, "Higher growth", "an example return before inflation"),
 ]
 
 
@@ -364,13 +364,13 @@ def render_html(html: str):
     st.markdown(html, unsafe_allow_html=True)
 
 
-# One-click scenarios for the case studies. Keys/types must match the sidebar
+# One-click scenarios for the case studies. Keys/types must match the input panel
 # widgets exactly (int widgets need ints, float widgets floats). Every preset
 # uses the allowance estimator so the pension figure is in the same future
 # dollars as the salary path; tests/test_case_studies.py checks the copy.
 PRESETS = {
     "alice": {
-        "label": "Alice: your own account wins",
+        "label": "Alice: account covers all payments",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 120000, "in_hire_age": 25, "in_retirement_age": 55,
@@ -383,7 +383,7 @@ PRESETS = {
         },
     },
     "bob": {
-        "label": "Bob: pension wins",
+        "label": "Bob: account runs short",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 65000, "in_hire_age": 40, "in_retirement_age": 60,
@@ -396,7 +396,7 @@ PRESETS = {
         },
     },
     "carol": {
-        "label": "Carol: your own account wins",
+        "label": "Carol: account covers all payments",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 80000, "in_hire_age": 25, "in_retirement_age": 60,
@@ -409,7 +409,7 @@ PRESETS = {
         },
     },
     "dave": {
-        "label": "Dave: pension wins",
+        "label": "Dave: account runs short",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 95000, "in_hire_age": 48, "in_retirement_age": 63,
@@ -422,7 +422,7 @@ PRESETS = {
         },
     },
     "grace": {
-        "label": "Grace: pension wins",
+        "label": "Grace: account runs short",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 90000, "in_hire_age": 50, "in_retirement_age": 63,
@@ -435,7 +435,7 @@ PRESETS = {
         },
     },
     "frank": {
-        "label": "Frank: your own account wins",
+        "label": "Frank: account covers all payments",
         "values": {
             "in_hire_year": CURRENT_YEAR, "in_wage_mode": "My starting wage",
             "in_wage": 150000, "in_hire_age": 35, "in_retirement_age": 60,
@@ -454,7 +454,7 @@ def queue_preset(preset_id):
     """Ask the entry script to load a preset on the next rerun.
 
     Widget state can only be written before the widget is instantiated, and
-    the sidebar widgets render at the top of every run, so a button handler
+    the input panel widgets render at the top of every run, so a button handler
     (which fires mid-run) parks the preset here and the entry script applies
     it first thing on the rerun.
     """
@@ -463,23 +463,78 @@ def queue_preset(preset_id):
 
 
 def apply_pending_preset():
-    """Apply a queued preset to the sidebar widget state. Call before render_sidebar()."""
+    """Apply a queued preset to the input panel widget state. Call before render_inputs()."""
+    if st.session_state.pop("_restore_requested", False):
+        saved = st.session_state.pop("_before_example", {})
+        for key in _SHARE_SPEC:
+            if key in saved:
+                st.session_state[key] = saved[key]
+            else:
+                st.session_state.pop(key, None)
+        st.session_state.pop("_example_label", None)
+        st.session_state["_allowance_previous_period"] = st.session_state.get("in_allowance_period", "Yearly")
     preset_id = st.session_state.pop("_pending_preset", None)
     if preset_id:
+        if "_before_example" not in st.session_state:
+            st.session_state["_before_example"] = {
+                k: st.session_state[k] for k in _SHARE_SPEC if k in st.session_state
+            }
         preset = PRESETS[preset_id]
         for k, v in preset["values"].items():
             st.session_state[k] = v
+        st.session_state["in_plan_age"] = preset["values"]["in_retirement_age"] + preset["values"]["in_retirement_years"]
+        st.session_state["_example_label"] = preset["label"]
         st.toast(f"Loaded the scenario: {preset['label']}. The whole page now shows these numbers.", icon="✅")
 
 
-def render_sidebar():
-    """Render all shared inputs in the sidebar and return them as a dict.
+def restore_previous_inputs():
+    st.session_state["_restore_requested"] = True
+
+
+def convert_manual_period():
+    """Changing entry units preserves the same annual pension amount."""
+    old = st.session_state.get("_allowance_previous_period", "Yearly")
+    new = st.session_state["in_allowance_period"]
+    if old != new and "allowance_manual" in st.session_state:
+        amount = st.session_state["allowance_manual"]
+        st.session_state["allowance_manual"] = amount / 12 if new == "Monthly" else amount * 12
+    st.session_state["_allowance_previous_period"] = new
+
+
+def set_input_panel(open_panel):
+    st.session_state["input_panel"] = open_panel
+
+
+def render_inflation_explanation(inputs, res):
+    rate = res["index_return_pct"]
+    inflation_pct = (inputs["inflation"] - 1) * 100
+    real_rate = simulation.purchasing_power_return(inputs["index_returns_rate"], inputs["inflation"]) * 100
+    st.info(
+        f"**What does {rate:.1f}% mean?** It is investment growth before inflation. "
+        f"With prices rising {inflation_pct:.1f}% a year, that is about {real_rate:.1f}% a year "
+        f"in buying power. For example, \\$100 becomes \\${inputs['index_returns_rate'] * 100:.2f} "
+        f"after a year, worth \\${inputs['index_returns_rate'] / inputs['inflation'] * 100:.2f} "
+        "at today's prices, before deposits or withdrawals."
+    )
+    pension_note = (
+        "This scenario pays a contribution refund instead of a lifetime pension. "
+        if inputs["plan_status"] == "unvested" else
+        f"The modeled pension payment increases {res['retiree_cola_pct']:.1f}% a year under the eligibility rules and 2% cap. "
+    )
+    if inputs["plan_status"] != "unvested" and inputs["retiree_cola"] < inputs["inflation"]:
+        loss = -simulation.purchasing_power_return(inputs["retiree_cola"], inputs["inflation"]) * 100
+        pension_note += f"Because prices rise faster, the payment's buying power falls about {loss:.1f}% a year. "
+    st.caption(pension_note + "Salary raises are a separate input. Changing the dollar display does not change which payments the account can cover.")
+
+
+def render_inputs():
+    """Render all shared inputs in the input panel and return them as a dict.
 
     Called from the entry script on every rerun (i.e. on every page), so the
     widgets keep their state across page switches without any session_state
     pinning.
     """
-    with st.sidebar:
+    with st.container():
         st.header("Your Details")
 
         with st.expander("Timing Assumptions"):
@@ -519,14 +574,14 @@ This calculator operates in annual periods. Within each year:
             )
         if _wage_mode == "My wage today":
             current_wage = st.number_input(
-                "Your Annual Wage Today ($)",
+                "Annual Salary Today, Before Taxes ($)",
                 value=120000, min_value=0, max_value=10_000_000, step=2500,
                 key="in_current_wage",
                 help=f"What you are paid now, in {CURRENT_YEAR}.",
             )
         else:
             starting_wage = st.number_input(
-                "Starting Annual Wage ($)",
+                "Starting Annual Salary, Before Taxes ($)",
                 value=120000, min_value=0, max_value=10_000_000, step=2500,
                 key="in_wage",
                 help=f"Your salary in your first year on the job, in {hire_year} dollars (what you were actually paid then).",
@@ -544,9 +599,9 @@ This calculator operates in annual periods. Within each year:
             help="Your age on the day you expect to retire.",
         ))
         # Input problems are collected instead of stopping the script here:
-        # st.stop() mid-sidebar would skip the widgets below, and Streamlit then
+        # st.stop() mid-input panel would skip the widgets below, and Streamlit then
         # forgets their values. Each problem uses a safe stand-in value so the
-        # rest of the sidebar still renders; the entry script withholds results.
+        # rest of the input panel still renders; the entry script withholds results.
         problems = []
         work_years = retirement_age - hire_age
         if work_years < 1:
@@ -561,55 +616,62 @@ This calculator operates in annual periods. Within each year:
                 f"That is {work_years} years of work: from {hire_year} (age {hire_age}) "
                 f"to {hire_year + work_years} (age {retirement_age})."
             )
-        cola_increase = st.number_input(
-            "Yearly Cost-of-Living Raise (%)",
-            value=3.0, min_value=0.0, max_value=5.5, step=0.1,
-            key="in_cola",
-            help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. This is for your salary while working; the pension's own COLA in retirement follows inflation (see Expected Inflation below)."
-        ) / 100 + 1
-        step_increase = st.number_input(
-            "Step Increase (%)",
-            value=5.5, min_value=0., max_value=50.0, step=0.1,
-            key="in_step",
-            help="Raise from each step on your pay scale."
-        ) / 100 + 1
-        step_count = st.number_input(
-            "Number of Step Raises",
-            value=4, min_value=0, max_value=20, step=1,
-            key="in_step_count",
-            help="How many step raises you get before reaching the top of your pay scale. One raise is applied at the end of each of your first this-many years.",
+        with st.expander("Salary changes (optional)"):
+            cola_increase = st.number_input(
+                "Yearly Cost-of-Living Raise (%)",
+                value=3.0, min_value=0.0, max_value=5.5, step=0.1,
+                key="in_cola",
+                help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. This is for your salary while working; the pension's own COLA in retirement follows inflation (see Expected Inflation below)."
+            ) / 100 + 1
+            step_increase = st.number_input(
+                "Step Increase (%)",
+                value=5.5, min_value=0., max_value=50.0, step=0.1,
+                key="in_step",
+                help="Raise from each step on your pay scale."
+            ) / 100 + 1
+            step_count = st.number_input(
+                "Number of Step Raises",
+                value=0, min_value=0, max_value=20, step=1,
+                key="in_step_count",
+                help="How many step raises you get before reaching the top of your pay scale. One raise is applied at the end of each of your first this-many years.",
+            )
+            first_step_midyear = st.checkbox(
+                "First step raise comes mid-year",
+                value=False,
+                key="in_step_midyear",
+                help="Check this if your first step raise takes effect partway through Year 1 (for example, after a 6-month probation). Year 1 is then averaged half at your starting step and half at the next step.",
+            )
+            st.caption("Promotions are optional. Enter 10 for a raise after your tenth working year. Leave blank for none.")
+            promotion_years_input = st.text_input(
+                "Promotions: Years After You Were Hired",
+                value="",
+                key="in_promo_years",
+                help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
+            )
+            # Parse promotion years exactly once. Only plain ASCII digits count:
+            # str.isdigit() also accepts characters like "²" that int() rejects.
+            _promo_tokens = [t.strip() for t in promotion_years_input.split(",") if t.strip()]
+            _promo_bad = [t for t in _promo_tokens if not re.fullmatch(r"[0-9]{1,3}", t)]
+            _promo_good = tuple(int(t) for t in _promo_tokens if re.fullmatch(r"[0-9]{1,3}", t))
+            _promo_oob = [y for y in _promo_good if y < 1 or y > int(work_years)]
+            promotion_years = tuple(y for y in _promo_good if 1 <= y <= int(work_years))
+            if _promo_bad:
+                st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only, then results will update.")
+                problems.append("promotions")
+            elif _promo_oob and "ages" not in problems:
+                st.error(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career. Fix or remove them to continue.")
+                problems.append("promotions")
+            promotion_increase = st.number_input(
+                "Promotion Increase (%)",
+                value=8.0, min_value=0.0, max_value=100.0, step=1.,
+                key="in_promo_pct",
+                help="Expected salary bump each time you are promoted."
+            ) / 100 + 1
+        st.caption(
+            f"Salary assumptions: {(cola_increase - 1) * 100:.1f}% yearly raise, "
+            f"{int(step_count)} step raises, "
+            + (f"promotions after career years {', '.join(map(str, promotion_years))}." if promotion_years else "no promotions.")
         )
-        first_step_midyear = st.checkbox(
-            "First step raise comes mid-year",
-            value=True,
-            key="in_step_midyear",
-            help="Check this if your first step raise takes effect partway through Year 1 (for example, after a 6-month probation). Year 1 is then averaged half at your starting step and half at the next step.",
-        )
-        promotion_years_input = st.text_input(
-            "Promotion Years",
-            value="10, 20",
-            key="in_promo_years",
-            help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
-        )
-        # Parse promotion years exactly once. Only plain ASCII digits count:
-        # str.isdigit() also accepts characters like "²" that int() rejects.
-        _promo_tokens = [t.strip() for t in promotion_years_input.split(",") if t.strip()]
-        _promo_bad = [t for t in _promo_tokens if not re.fullmatch(r"[0-9]{1,3}", t)]
-        _promo_good = tuple(int(t) for t in _promo_tokens if re.fullmatch(r"[0-9]{1,3}", t))
-        _promo_oob = [y for y in _promo_good if y < 1 or y > int(work_years)]
-        promotion_years = tuple(y for y in _promo_good if 1 <= y <= int(work_years))
-        if _promo_bad:
-            st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only, then results will update.")
-            problems.append("promotions")
-        elif _promo_oob and "ages" not in problems:
-            st.error(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career. Fix or remove them to continue.")
-            problems.append("promotions")
-        promotion_increase = st.number_input(
-            "Promotion Increase (%)",
-            value=8.0, min_value=0.0, max_value=100.0, step=1.,
-            key="in_promo_pct",
-            help="Expected salary bump each time you are promoted."
-        ) / 100 + 1
 
         if _wage_mode == "My wage today":
             # This calendar year is career year (years_so_far + 1). Undo every
@@ -691,7 +753,7 @@ This calculator operates in annual periods. Within each year:
             # keyed, disabled widget always shows the freshly computed figure.
             st.session_state["allowance_formula"] = round(starting_allowance)
             st.number_input(
-                "Pension Income in the First Year ($)",
+                f"Yearly Pension in {_first_pay_year} Dollars ($)",
                 min_value=0,
                 step=500,
                 disabled=True,
@@ -704,22 +766,32 @@ This calculator operates in annual periods. Within each year:
                 ),
             )
         else:
+            st.session_state.setdefault("_allowance_previous_period", st.session_state.get("in_allowance_period", "Yearly"))
+            period = st.radio(
+                "Enter a monthly or yearly pension amount",
+                ["Yearly", "Monthly"], horizontal=True,
+                key="in_allowance_period", on_change=convert_manual_period,
+            )
             manual_allowance = st.number_input(
-                "Pension Income in the First Year ($)",
-                value=70000,
-                min_value=0,
-                max_value=10_000_000,
-                step=2500,
+                "Pension Payment Before Taxes ($)",
+                value=70000.0 if period == "Yearly" else 70000.0 / 12,
+                min_value=0.0,
+                max_value=10_000_000.0 if period == "Yearly" else 10_000_000.0 / 12,
+                step=100.0,
+                format="%.2f",
                 key="allowance_manual",
                 help=(
-                    "Your yearly pension payment in its first year. Find this from your plan's retirement "
+                    "Your pension payment in its first year, before taxes. Find this from your plan's retirement "
                     "estimator. When payments start and how they grow still follow the plan's rules."
                 ),
             )
+            if period == "Monthly":
+                manual_allowance *= 12
+            st.caption(f"That is ${manual_allowance:,.0f} a year, or ${manual_allowance / 12:,.0f} a month, before taxes.")
             _basis = st.radio(
                 "This amount is in",
                 ["Today's dollars", "Dollars at retirement"],
-                format_func=lambda o: f"{CURRENT_YEAR} dollars" if o == "Today's dollars" else o,
+                format_func=lambda o: f"{CURRENT_YEAR} dollars" if o == "Today's dollars" else f"Dollars when payments start ({_first_pay_year})",
                 key="in_allowance_basis",
                 help=(
                     "Plan estimators usually show your benefit in today's dollars. The calculator "
@@ -774,13 +846,20 @@ This calculator operates in annual periods. Within each year:
                 )
 
         st.subheader("Retirement")
-        retirement_years = st.number_input(
-            "Years in Retirement",
-            value=30, min_value=1, max_value=60, step=1,
-            key="in_retirement_years",
-            help="How many years you expect to spend in retirement before you die."
+        st.session_state.setdefault("in_plan_age", retirement_age + st.session_state.get("in_retirement_years", 30))
+        plan_age = st.number_input(
+            "Plan Through Age",
+            min_value=18, max_value=135, step=1,
+            key="in_plan_age",
+            help="How long should this comparison cover? This is a planning assumption, not a prediction of how long you will live."
         )
-        st.caption(f"Retirement runs from age {int(retirement_age)} to {int(retirement_age) + int(retirement_years)}.")
+        retirement_years = int(plan_age) - retirement_age
+        if not 1 <= retirement_years <= 60:
+            st.error(f"Choose an ending age from {retirement_age + 1} to {min(135, retirement_age + 60)} to model 1 to 60 years of retirement.")
+            problems.append("horizon")
+            retirement_years = min(60, max(1, retirement_years))
+        st.session_state["in_retirement_years"] = retirement_years
+        st.caption(f"This comparison covers {retirement_years} years of retirement, from age {retirement_age} to {int(plan_age)}.")
         inflation_pct = st.number_input(
             "Expected Inflation (%)",
             value=2.5, min_value=0.0, max_value=10.0, step=0.1,
@@ -791,17 +870,17 @@ This calculator operates in annual periods. Within each year:
                 f"slowly erodes it. Also used to show amounts in {CURRENT_YEAR} dollars."
             ),
         )
-        st.markdown("**Not sure what return to expect? Pick one:**")
+        st.markdown("**Try an example yearly return:**")
         for col, (value, name, why) in zip(st.columns(len(RETURN_PICKS)), RETURN_PICKS):
             col.button(f"{value:g}%", key=f"pick_{value:g}", on_click=_set_returns, help=f"{name}: {why}",
                        args=(value,), width="stretch")
         st.caption(
-            " · ".join(f"**{value:g}%** {name.lower()}: {why}" for value, name, why in RETURN_PICKS)
-            + ". U.S. stocks alone have averaged about 10% a year over the past century, with big swings."
+            "These are growth assumptions before inflation, not investment recommendations. "
+            "The buttons change only the return. Market swings are set separately on the second page."
         )
         index_returns_rate = (
             st.number_input(
-                "Yearly Investment Return (%)",
+                "Yearly Investment Return Before Inflation (%)",
                 value=7.0,
                 min_value=0.0,
                 max_value=25.0,
@@ -810,12 +889,13 @@ This calculator operates in annual periods. Within each year:
                 help=(
                     "Expected annual return on your own investment account (not inflation-adjusted), "
                     "as a compound rate: the growth you would get if every year returned the same. "
-                    "⚠ This number matters more than any other input: a 1% change can flip the winner."
+                    "A small change can determine whether the account covers every payment."
                 ),
             )
             / 100
             + 1
         )
+        st.button("Show my results", key="show_results", on_click=set_input_panel, args=(False,), disabled=bool(problems), width="stretch")
 
     retiree_cola_pct = min(inflation_pct, simulation.PLAN_RETIREE_COLA_CAP_PCT)
     if not plan["cola_applies"]:
@@ -1002,7 +1082,7 @@ def dollars_note(res):
 
 
 # --- Shareable links ----------------------------------------------------------------
-# Every sidebar input (plus the display toggle and the swing slider) is mirrored
+# Every input panel input (plus the display toggle and the swing slider) is mirrored
 # into the page URL, so a copied link reopens the same scenario. Values are
 # parsed and range-checked here before they touch widget state.
 _SHARE_SPEC = {
@@ -1020,9 +1100,11 @@ _SHARE_SPEC = {
     "in_promo_pct": (float, 0.0, 100.0),
     "in_contrib": (float, 0.0, 100.0),
     "in_allowance_mode": (["Estimate for me", "Enter manually"], None, None),
-    "allowance_manual": (int, 0, 10_000_000),
+    "allowance_manual": (float, 0, 10_000_000),
+    "in_allowance_period": (["Yearly", "Monthly"], None, None),
     "in_allowance_basis": (["Today's dollars", "Dollars at retirement"], None, None),
     "in_retirement_years": (int, 1, 60),
+    "in_plan_age": (int, 18, 135),
     "in_inflation": (float, 0.0, 10.0),
     "in_returns": (float, 0.0, 25.0),
     "in_real": (bool, None, None),
@@ -1069,6 +1151,11 @@ def apply_query_params():
         value = _parse_param(raw, spec)
         if value is not None:
             st.session_state[key] = value
+    manual_limit = 10_000_000 / (12 if st.session_state.get("in_allowance_period") == "Monthly" else 1)
+    if st.session_state.get("allowance_manual", 0) > manual_limit:
+        st.session_state.pop("allowance_manual", None)
+    if "in_plan_age" not in st.session_state and "in_retirement_years" in st.session_state:
+        st.session_state["in_plan_age"] = st.session_state.get("in_retirement_age", 55) + st.session_state["in_retirement_years"]
     # Links made before "Age When Hired" existed carry years of work instead.
     if st.query_params.get("hire_age") is None:
         hire_age = legacy_hire_age(st.query_params.get("work_years"),
@@ -1104,7 +1191,7 @@ def active_share_params(inputs):
     """
     keys = ["in_hire_year", "in_hire_age", "in_retirement_age", "in_cola", "in_step",
             "in_step_count", "in_step_midyear", "in_promo_years", "in_promo_pct", "in_contrib",
-            "in_allowance_mode", "in_retirement_years", "in_inflation", "in_returns", "in_real",
+            "in_allowance_mode", "in_plan_age", "in_inflation", "in_returns", "in_real",
             "mc_std"]
     today_mode = (inputs["hire_year"] < CURRENT_YEAR
                   and st.session_state.get("in_wage_mode") == "My wage today")
@@ -1112,7 +1199,7 @@ def active_share_params(inputs):
         keys.append("in_wage_mode")
     keys.append("in_current_wage" if today_mode else "in_wage")
     if inputs["allowance_source"] == "manual":
-        keys += ["allowance_manual", "in_allowance_basis"]
+        keys += ["allowance_manual", "in_allowance_basis", "in_allowance_period"]
     return {_param_name(k): str(st.session_state[k]) for k in keys if k in st.session_state}
 
 
@@ -1130,7 +1217,7 @@ def share_link(inputs):
 
 def render_share_section(inputs):
     """Sidebar control that makes a shareable link only when asked."""
-    with st.sidebar:
+    with st.container():
         st.subheader("Share These Inputs")
         if st.button("Create a shareable link", key="make_share_link"):
             st.session_state["_show_share_link"] = True
@@ -1149,7 +1236,7 @@ def chart_title(text):
 
 
 def rate_chart_title(res):
-    return f"Your account's money left at death, by flat return rate{dollars_note(res)}"
+    return f"Money left at the end, by yearly return{dollars_note(res)}"
 
 
 def fund_chart_title(res, title=None):
@@ -1178,59 +1265,34 @@ def build_rate_curve_chart(inputs, res):
         sim = run_simulation(*_engine_args(inputs), 1 + r / 100, **_engine_kwargs(inputs))
         final = deflate_results(sim, inputs)["personal_balance"] if real else sim["personal_balance"]
         finals.append(final)
-    ink, muted = "#1e293b", "#64748B"
-
     fig = go.Figure(go.Scatter(
-        x=rates, y=finals, mode="lines",
-        line=dict(color="#0D9488", width=2),
-        hovertemplate="Flat return %{x:.1f}%<br>Your account at death: $%{y:,.0f}<extra></extra>",
+        x=rates, y=[max(v, 0.0) for v in finals], mode="lines",
+        line=dict(color="#0D9488", width=3),
+        customdata=[max(-v, 0.0) for v in finals],
+        hovertemplate="Return before inflation: %{x:.1f}%<br>Money left: $%{y:,.0f}<br>Income unpaid: $%{customdata:,.0f}<extra></extra>",
     ))
-    fig.add_hline(y=0, line_width=1.5, line_color=muted)
-    # Zoom on the crossing: size the y-axis from the shortfall side and the
-    # value at the user's rate, and let fast growth at high rates run off the
-    # top (it would otherwise flatten the part of the line that matters).
-    at_current = finals[min(range(len(rates)), key=lambda i: abs(rates[i] - current))]
-    span = max(abs(min(finals + [0.0])), abs(at_current), 1.0)
-    lo, hi = -1.3 * span, 1.6 * span
-    fig.add_annotation(x=rates[1], y=hi * 0.85, text="Above $0: your account wins (money left over)",
-                       showarrow=False, xanchor="left", font=dict(size=12, color=muted))
-    fig.add_annotation(x=rates[-2], y=lo * 0.85, text="Below $0: the pension wins (your account runs out)",
-                       showarrow=False, xanchor="right", font=dict(size=12, color=muted))
-
-    fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color=ink,
-                  annotation_text=f"Your assumption: {current:.1f}%",
-                  annotation_position="top", annotation_font_color=ink)
+    fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color="#64748B")
     if 0 < be <= rates[-1]:
+        fig.add_vline(x=be, line_width=1.5, line_dash="dot", line_color="#0D9488")
         fig.add_trace(go.Scatter(
             x=[be], y=[0], mode="markers",
-            marker=dict(size=10, color="#0D9488", line=dict(width=2, color="white")),
-            hovertemplate=f"Break-even: {be:.1f}%<extra></extra>",
+            marker=dict(size=10, color="#0D9488"),
+            hovertemplate=f"Break-even: {be:.1f}% before inflation<extra></extra>",
         ))
-        fig.add_annotation(x=be, y=0, text=f"Break-even {be:.1f}%", showarrow=True,
-                           arrowhead=0, ax=40, ay=40, font=dict(size=12, color=ink),
-                           bgcolor="rgba(255,255,255,0.85)")
-
     fig.update_layout(
-        xaxis=dict(title="Flat annual return (%)", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
-        yaxis=dict(title="Money left at death ($)", tickformat=",", gridcolor="#eef0f2",
-                   range=[lo, hi]),
+        xaxis=dict(title="Yearly return before inflation", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
+        yaxis=dict(title="Money left ($)", tickformat=".2s", rangemode="tozero", gridcolor="#eef0f2"),
         plot_bgcolor="white", showlegend=False, hovermode="x",
-        margin=dict(l=40, r=20, t=30, b=50),
+        margin=dict(l=15, r=15, t=15, b=30), height=350,
     )
     return fig
 
 
 def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
                      verdict_annotation=False):
-    """Build the fund-over-time chart, optionally with Monte Carlo bands.
-
-    With ``verdict_annotation=True`` the chart states its own conclusion at
-    the spot where it happens (money left over at the end, or the year the
-    fund runs dry), so a reader who never touches the legend still gets the
-    answer.
-    """
+    """Nonnegative account balances; conclusions sit in wrapping page text."""
     years = res["years"]
-    personal_fund_values = res["personal_fund_values"]
+    personal_fund_values = [max(v, 0.0) for v in res["personal_fund_values"]]
     pension_fund_values = res["pension_fund_values"]
     yearly_data = res["yearly_data"]
     work_years = inputs["work_years"]
@@ -1330,7 +1392,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         x=ages,
         y=personal_fund_values,
         mode="lines+markers",
-        name=f"Your account (steady {index_return_pct:.1f}%)",
+        name=f"Steady {index_return_pct:.1f}% before inflation",
         line=dict(color="#0D9488", width=3),
         customdata=_personal_customdata,
         hovertemplate=(
@@ -1346,11 +1408,11 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     _y_pad = data_range * 0.12
     fig.update_layout(
         xaxis_title="Your age",
-        yaxis_title="Your account's balance ($)<br><sup>below $0 = income it couldn't pay</sup>",
+        yaxis_title="Account balance ($)",
         xaxis=dict(
             tickmode="array",
             tickvals=[ages[i] for i in range(0, len(ages), x_tick_step)],
-            tickfont=dict(size=10),
+            tickfont=dict(size=12),
             showgrid=True,
             gridcolor="lightgray",
         ),
@@ -1358,63 +1420,32 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             showgrid=True,
             gridcolor="lightgray",
             dtick=y_tick_interval,
-            tickformat=",",
+            tickformat=".2s",
             separatethousands=True,
-            range=[data_min - _y_pad, data_max + _y_pad],
+            range=[0, data_max + _y_pad],
         ),
         plot_bgcolor="white",
         legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
-        margin=dict(l=40, r=20, t=30, b=120),
+        margin=dict(l=15, r=15, t=20, b=40),
+        height=420,
     )
 
-    fig.add_vrect(
-        x0=ages[0] - 0.5, x1=ages[work_years] + 0.5,
-        fillcolor="rgba(0,0,0,0)", layer="below", line_width=0,
-        annotation_text="<b>Working Years</b>", annotation_position="top left",
-        annotation=dict(
-            font_size=13, font_color="#1E3A5F",
-            bgcolor="rgba(255,255,255,0.75)", borderpad=5,
-        ),
-    )
-    fig.add_vrect(
-        x0=ages[work_years] + 0.5, x1=ages[-1] + 0.5,
-        fillcolor="rgba(0,0,0,0)", layer="below", line_width=0,
-        annotation_text="<b>Retirement Years</b>", annotation_position="top left",
-        annotation=dict(
-            font_size=13, font_color="#7C2D12",
-            bgcolor="rgba(255,255,255,0.75)", borderpad=5,
-        ),
-    )
+    fig.add_vrect(x0=ages[work_years], x1=ages[-1],
+                  fillcolor="rgba(148,163,184,0.08)", layer="below", line_width=0)
     fig.add_vline(x=ages[work_years], line_width=2, line_dash="dash", line_color="#DC2626")
-    _fund_depletes = simulation.ran_short(min(personal_fund_values))
-    fig.add_hline(y=0, line_width=2, line_color="#666666",
-                  annotation_text="$0 = your account is empty" if _fund_depletes else "$0",
-                  annotation_position="bottom right")
-
-    if verdict_annotation:
-        if _fund_depletes:
-            _dep_idx = next(i for i, v in enumerate(personal_fund_values) if simulation.ran_short(v))
-            fig.add_annotation(
-                x=ages[_dep_idx], y=0,
-                text=f"<b>✗ Runs out by age {ages[_dep_idx]}</b>",
-                showarrow=True, arrowhead=2, arrowcolor="#DC2626",
-                # Below and left of the point: the top of the chart holds the
-                # "Working Years" / "Retirement Years" labels.
-                ax=-150, ay=70,
-                font=dict(size=13, color="#DC2626"),
-                bgcolor="rgba(255,255,255,0.85)", borderpad=4,
-            )
-        else:
-            fig.add_annotation(
-                x=ages[-1], y=personal_fund_values[-1],
-                text=f"<b>✓ ${personal_fund_values[-1]:,.0f} left over</b>",
-                showarrow=True, arrowhead=2, arrowcolor="#0D9488",
-                ax=-90, ay=-40,
-                font=dict(size=13, color="#0D9488"),
-                bgcolor="rgba(255,255,255,0.85)", borderpad=4,
-            )
-
+    fig.add_hline(y=0, line_width=1, line_color="#666666")
     return fig
+
+
+def account_payment_table(df):
+    """Present actual account cash flows separately from income it could not pay."""
+    table = df.copy()
+    table["Start Balance"] = table["Start Balance"].clip(lower=0)
+    available = table["Start Balance"] + table["Market Returns"]
+    table["Account Withdrawal"] = np.minimum(available, table["Pension Redeemed"])
+    table["Income Unpaid"] = table["Pension Redeemed"] - table["Account Withdrawal"]
+    table["Balance"] = table["Balance"].clip(lower=0)
+    return table
 
 
 def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
