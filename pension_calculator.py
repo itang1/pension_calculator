@@ -49,7 +49,6 @@ common.apply_query_params()
 common.apply_pending_preset()
 
 st.title("Is Your Pension Worth It?")
-st.caption("Built for pension members hired in 2014 or later. The pension rules it uses are listed in the sidebar.")
 if "_example_label" in st.session_state:
     st.info("An example scenario is loaded. You can return to the inputs you entered before trying examples.")
     st.button("Restore my previous inputs", key="restore_inputs", on_click=common.restore_previous_inputs)
@@ -59,15 +58,12 @@ show_real = st.toggle(
     value=True,
     key="in_real",
     help=(
-        f"On: charts and summaries show what the money could buy at {common.CURRENT_YEAR} prices. "
-        "Off: they show the amounts paid or held in each year, without adjusting for rising prices. "
-        "This changes the dollar display, not the investment return or which payments the account covers."
+        f"Charts and summaries: buying power at today's ({common.CURRENT_YEAR}) prices. "
+        "A displayed \\$1,000 means it could buy what \\$1,000 buys today. "
+        "Yearly tables and case studies show amounts paid in each year, as labeled. "
+        "Turn this off to see every amount as paid in each year instead."
     ),
 )
-if show_real:
-    st.caption("Future amounts are shown as what they would buy today, so they are easy to compare.")
-else:
-    st.caption("Amounts are shown as paid in each year. Later amounts look bigger because prices rise over time.")
 # Sidebar inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from
 # session_state rather than importing from here (which would re-run the script).
