@@ -197,9 +197,7 @@ def estimate_allowance(work_years, fas, factor_pct, early_reduction_pct=0.0,
 
 
 # --- Built-in plan rules ---------------------------------------------------------
-# The plan's rules for members hired on or after January 1, 2014, taken from
-# the plan's member handbook (rev. November 2022) and its July 1, 2026
-# actuarial valuation (summary of plan provisions).
+# Default rules, for members hired on or after January 1, 2014.
 
 PLAN_FIRST_HIRE_YEAR = 2014        # these rules cover members hired this year or later
 PLAN_CONTRIBUTION_PCT = 10.0       # member contribution, % of pay
