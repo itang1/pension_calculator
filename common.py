@@ -1509,17 +1509,6 @@ def render_breakdown_table(df, phase_prefix, rename_map, balance_col=None):
     return styler
 
 
-def render_privacy_notice():
-    """What the site collects, shown at the bottom of every page."""
-    with st.expander("Privacy: what this site collects"):
-        st.markdown("""
-- **Page views** are counted with GoatCounter, which does not use cookies or follow you to other sites.
-- **Each visit** is recorded in a private Google Sheet that only the site owner can see: your IP address and, where available, the approximate location and internet provider it points to; your browser, device type, and language; and the page that linked you here.
-- **Feedback** you send is saved to the same sheet with those visit details. Your calculator inputs and results are included only if you tick the box on the form.
-- **Your calculator inputs** are not saved anywhere unless you include them with feedback. A shareable link contains them only if you create one, and anyone with that link can see them.
-""")
-
-
 def render_feedback_form(page_name):
     """Shared feedback form. Reads current inputs/results from session_state.
 
@@ -1558,7 +1547,7 @@ def render_feedback_form(page_name):
         )
         st.caption(
             "Feedback is saved to a private Google Sheet that only the site owner can see, along "
-            "with the basic visit details listed under Privacy at the bottom of the page."
+            "with basic visit details."
         )
         if st.form_submit_button("Submit"):
             # [H-3] Abuse controls: enforce a length cap (belt-and-suspenders with

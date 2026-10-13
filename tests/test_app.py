@@ -143,11 +143,6 @@ def test_share_link_is_made_on_request_with_only_active_inputs():
     assert "allowance_manual=" in at.code[0].value
 
 
-def test_privacy_notice_is_on_the_page():
-    at = _app()
-    assert any(e.label.startswith("Privacy") for e in at.expander)
-
-
 def test_feedback_leaves_calculator_details_out_unless_ticked(monkeypatch):
     import common
     rows = []

@@ -113,7 +113,6 @@ pg.run()
 
 # Analytics run after the page has rendered, so the visit logging (a
 # geolocation lookup plus a Sheets write) never delays the first paint.
-common.render_privacy_notice()
 common.count_pageview(pg)
 if "session_tracked" not in st.session_state:
     st.session_state.session_tracked = True
