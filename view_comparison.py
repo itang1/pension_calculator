@@ -45,7 +45,8 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
     short = depletion_year is not None
     dollars = f" in buying power at today's ({CURRENT_YEAR}) prices" if real_dollars else " in the dollars of the final year, without adjusting for inflation"
     if short:
-        title = "Your account cannot cover every pension payment in this scenario."
+        headline = "🏆 The pension wins"
+        title = "Your own account runs out of money before retirement ends. The pension keeps paying."
         following = int(retirement_years) - depletion_year
         body = (
             f"It fully covers the first {depletion_year - 1} years of the comparison. "
@@ -55,10 +56,12 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
         )
         bg, bar = "#E0E7FF", "#4F46E5"
     elif personal_balance <= 0.5:
+        headline = "🤝 It's a tie"
         title = "Your account covers every payment, with nothing left at the end."
         body = f"Both options cover the same income over the {int(retirement_years)} years shown."
         bg, bar = "#F1F5F9", "#64748B"
     else:
+        headline = "🏆 Your own account wins"
         title = "Your account covers every payment and finishes with money left."
         body = (
             f"After {int(retirement_years)} years, it has <strong>${personal_balance:,.0f}</strong>{dollars} "
@@ -67,6 +70,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
         bg, bar = "#CCFBF1", "#0D9488"
     render_html(f"""
 <div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">{headline}</div>
 <strong>{title}</strong><br><br>
 This calculation assumes your investments grow by <strong>{current_rate_pct:.1f}% every year before inflation</strong>, with no market ups and downs.<br><br>
 {body}<br><br>
