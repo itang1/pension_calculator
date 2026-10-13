@@ -894,7 +894,7 @@ These rules do not cover every public pension. Entering a manual amount changes 
                 "Salary raises are entered separately."
             ),
         )
-        st.markdown("**Try an example yearly return:**")
+        st.markdown("**Try an example yearly return (before inflation):**")
         for col, (value, name, why) in zip(st.columns(len(RETURN_PICKS)), RETURN_PICKS):
             col.button(f"{value:g}%", key=f"pick_{value:g}", on_click=_set_returns, help=f"{name}: {why}",
                        args=(value,), width="stretch")
@@ -903,6 +903,14 @@ These rules do not cover every public pension. Entering a manual amount changes 
             "All are before inflation, not investment recommendations. "
             "The buttons change only the return. Market swings are set separately on the second page."
         )
+        _show_real = st.session_state.get("in_real", True)
+        if _show_real:
+            _after = [simulation.purchasing_power_return(1 + v / 100, 1 + inflation_pct / 100) * 100
+                      for v, _, _ in RETURN_PICKS]
+            st.caption(
+                f"After {inflation_pct:.1f}% inflation, those are about "
+                + ", ".join(f"{a:.1f}%" for a in _after[:-1]) + f", and {_after[-1]:.1f}% a year."
+            )
         index_returns_rate = (
             st.number_input(
                 "Yearly Investment Return Before Inflation (%)",
@@ -920,6 +928,9 @@ These rules do not cover every public pension. Entering a manual amount changes 
             / 100
             + 1
         )
+        if _show_real:
+            _real_return = simulation.purchasing_power_return(index_returns_rate, 1 + inflation_pct / 100) * 100
+            st.caption(f"About {_real_return:.1f}% a year after {inflation_pct:.1f}% inflation.")
 
     retiree_cola_pct = min(inflation_pct, simulation.PLAN_RETIREE_COLA_CAP_PCT)
     if not plan["cola_applies"]:
