@@ -330,7 +330,7 @@ def inputs_summary_html(inputs, res):
     return (
         f"<strong>Right now the results assume:</strong> {wage} · hired at {hire_age} · "
         f"retire at {inputs['retirement_age']} · {inputs['retirement_years']} years retired · "
-        f"{res['index_return_pct']:.1f}% returns.<br>"
+        f"{res['index_return_pct']:.1f}% returns before inflation.<br>"
         "<span style='font-size:0.9em'>Check these inputs before reading the result. Use <em>Start here: enter your details</em> "
         "above to change them. To save or share this scenario, use <em>Share These Inputs</em> in the input panel.</span>"
     )
@@ -348,7 +348,7 @@ def out_of_100(prob):
 RETURN_PICKS = [
     (5.0, "Lower growth", "an example return before inflation"),
     (7.0, "Middle growth", "an example return before inflation"),
-    (9.0, "Higher growth", "an example return before inflation"),
+    (10.0, "Higher growth", "an example return before inflation"),
 ]
 
 
@@ -791,20 +791,20 @@ This calculator operates in annual periods. Within each year:
             _basis = st.radio(
                 "This amount is in",
                 ["Today's dollars", "Dollars at retirement"],
-                format_func=lambda o: f"{CURRENT_YEAR} dollars" if o == "Today's dollars" else f"Dollars when payments start ({_first_pay_year})",
+                format_func=lambda o: f"Buying power at today's ({CURRENT_YEAR}) prices" if o == "Today's dollars" else f"Amount paid when payments start ({_first_pay_year})",
                 key="in_allowance_basis",
                 help=(
-                    "Plan estimators usually show your benefit in today's dollars. The calculator "
-                    "grows your salary in future dollars, so a today's-dollars figure is first "
-                    "grown by inflation to the year of your first payment. Mixing the two would "
-                    "make the pension look several times smaller than it is."
+                    "Check how your pension estimate labels its amount. Choose buying power if it says "
+                    "today's dollars or inflation-adjusted. Choose amount paid if it gives the payment "
+                    "expected in the year payments start. If the estimate does not say, check with your plan. "
+                    "This choice describes your input; the display switch above only changes how results are shown."
                 ),
             )
             if _basis == "Today's dollars":
                 starting_allowance = simulation.to_retirement_dollars(
                     manual_allowance, _years_to_first_pay, inflation)
                 if plan["status"] != "unvested":
-                    st.caption(f"That is about ${starting_allowance:,.0f} in {_first_pay_year}, when your first payment is due.")
+                    st.caption(f"To have that buying power, the first year's payments would total about ${starting_allowance:,.0f} in {_first_pay_year}, using your inflation assumption.")
             else:
                 starting_allowance = manual_allowance
 
@@ -831,7 +831,7 @@ This calculator operates in annual periods. Within each year:
                 if plan["capped"]:
                     _rule += ", capped at 80% of your final average salary"
                 _today = starting_allowance / inflation ** _years_to_first_pay
-                st.caption(f"{_rule}. That is about ${_today:,.0f} a year in {CURRENT_YEAR} dollars.")
+                st.caption(f"{_rule}. The first year's pension would buy about what ${_today:,.0f} buys today ({CURRENT_YEAR} prices).")
             else:
                 st.caption(
                     f"Under the plan's rules, payments start at age {_start_age} and "
@@ -861,13 +861,14 @@ This calculator operates in annual periods. Within each year:
         st.session_state["in_retirement_years"] = retirement_years
         st.caption(f"This comparison covers {retirement_years} years of retirement, from age {retirement_age} to {int(plan_age)}.")
         inflation_pct = st.number_input(
-            "Expected Inflation (%)",
+            "Yearly Rise in Prices (Inflation %)",
             value=2.5, min_value=0.0, max_value=10.0, step=0.1,
             key="in_inflation",
             help=(
-                "Average yearly rise in prices (CPI). The pension's COLA in retirement follows "
-                f"inflation up to {simulation.PLAN_RETIREE_COLA_CAP_PCT:g}% a year, so higher inflation "
-                f"slowly erodes it. Also used to show amounts in {CURRENT_YEAR} dollars."
+                "How much you assume prices rise each year. For example, at 2.5%, a $100 grocery bill "
+                "becomes $102.50 next year. Eligible pension payments rise with this rate, capped at "
+                f"{simulation.PLAN_RETIREE_COLA_CAP_PCT:g}% a year. It also converts amounts to today's buying power. "
+                "Salary raises are entered separately."
             ),
         )
         st.markdown("**Try an example yearly return:**")
@@ -875,7 +876,8 @@ This calculator operates in annual periods. Within each year:
             col.button(f"{value:g}%", key=f"pick_{value:g}", on_click=_set_returns, help=f"{name}: {why}",
                        args=(value,), width="stretch")
         st.caption(
-            "These are growth assumptions before inflation, not investment recommendations. "
+            "The starting 7% is an example, not a forecast. Try 5%, 7%, and 10% to see how much the result changes. "
+            "All are before inflation, not investment recommendations. "
             "The buttons change only the return. Market swings are set separately on the second page."
         )
         index_returns_rate = (
@@ -887,9 +889,9 @@ This calculator operates in annual periods. Within each year:
                 step=0.5,
                 key="in_returns",
                 help=(
-                    "Expected annual return on your own investment account (not inflation-adjusted), "
-                    "as a compound rate: the growth you would get if every year returned the same. "
-                    "A small change can determine whether the account covers every payment."
+                    "The growth you assume before adjusting for rising prices. Do not subtract inflation here. "
+                    "The first page uses this exact return every year. The market-swings page uses it as the "
+                    "middle yearly return, with good and bad years around it. It is not a guaranteed return."
                 ),
             )
             / 100
@@ -1078,7 +1080,7 @@ def deflate_mc(mc, inputs):
 
 def dollars_note(res):
     """Suffix for chart titles saying which dollars are shown."""
-    return f" (in {CURRENT_YEAR} dollars)" if res.get("real_dollars") else ""
+    return f" (buying power at {CURRENT_YEAR} prices)" if res.get("real_dollars") else " (amounts in each year)"
 
 
 # --- Shareable links ----------------------------------------------------------------

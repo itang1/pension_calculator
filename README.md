@@ -21,7 +21,7 @@ The app has two pages that share the same expandable input panel and link to eac
 - **Year-over-year breakdown tables** for both working and retirement phases, showing contributions, withdrawals, market returns, and running balances
 - **Pension allowance estimator**: built-in plan rules pick the benefit factor from your age and years of service, apply the early-retirement reduction table, the 80% cap, vesting, and deferred pensions, and grow the pension in retirement by inflation up to a 2% COLA cap
 - **Configurable assumptions**: starting salary, salary COLA, step increases (size and number of steps), promotion years, pension contribution rate, expected inflation, index return rate, retirement age, and the age to plan through
-- **Inflation explained**: charts and summaries default to today's buying power. Investment returns are entered before inflation. A manual pension amount can be monthly or yearly and is converted, when needed, using inflation through the first payment year
+- **Inflation explained**: charts and summaries default to buying power at today's prices, with a plain-language glossary and a price example. Investment returns are entered before inflation; the 7% default is an example, with 5%, 7%, and 10% shortcuts to compare assumptions. A manual pension amount can be monthly or yearly and is converted, when needed, using inflation through the first payment year
 - **Ages on every chart**, a **today's-dollars toggle**, a **return-rate chart** showing how the answer changes with the return, and **shareable links** created on request with the active inputs
 - **Case studies** showing different funding outcomes, with one-click loading and an option to restore your previous inputs
 - **Feedback form** to submit questions and comments

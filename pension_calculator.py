@@ -71,22 +71,38 @@ if "_example_label" in st.session_state:
     st.button("Restore my previous inputs", key="restore_inputs", on_click=common.restore_previous_inputs)
 
 show_real = st.toggle(
-    f"Show amounts in {common.CURRENT_YEAR} dollars",
+    "Show buying power at today's prices",
     value=True,
     key="in_real",
     help=(
-        f"Prices rise over time, so a dollar in 2060 will buy much less than a dollar in "
-        f"{common.CURRENT_YEAR}. Turn this on to see every amount as what it would buy in "
-        f"{common.CURRENT_YEAR}, using the inflation rate in the input panel. Return rates stay as entered."
+        f"On: charts and summaries show what the money could buy at {common.CURRENT_YEAR} prices. "
+        "Off: they show the amounts paid or held in each year, without adjusting for rising prices. "
+        "This changes the dollar display, not the investment return or which payments the account covers."
     ),
 )
 if show_real:
     st.caption(
-        f"Charts and summary amounts show what the money could buy in {common.CURRENT_YEAR}. "
-        "The yearly tables and case studies use dollars from each year and are labeled separately."
+        f"Charts and summaries: buying power at today's ({common.CURRENT_YEAR}) prices. "
+        "A displayed \\$1,000 means it could buy what \\$1,000 buys today. "
+        "Yearly tables and case studies show amounts paid in each year, as labeled."
     )
 else:
-    st.caption("Amounts are shown in the dollars of the year they occur. Future amounts can look large because prices rise. Turn on today's dollars to compare buying power.")
+    st.caption("Charts and summaries: amounts paid or held in each year, without adjusting for inflation. Future amounts may look larger even when they buy no more. Turn on buying power to compare them at today's prices.")
+with st.expander("What do today's dollars, real dollars, and nominal dollars mean?"):
+    _inflation = 1 + st.session_state.get("in_inflation", 2.5) / 100
+    st.markdown(
+        "**Today's dollars** and **real dollars** both mean amounts adjusted for inflation. "
+        f"Here, they show buying power at {common.CURRENT_YEAR} prices. "
+        "**Nominal dollars** means the amounts paid or held in each year, with no inflation adjustment. "
+        "Both describe the same money in different ways."
+    )
+    st.markdown(
+        f"For example, with {(_inflation - 1) * 100:.1f}% yearly inflation, something that costs "
+        f"\\$1,000 today would cost about \\${1000 * _inflation ** 20:,.0f} in 20 years. "
+        "Those two amounts have the same buying power. The calculator makes this adjustment for each year, "
+        "including years before today if you were hired in the past."
+    )
+    st.caption("Investment returns are always entered before inflation. Do not subtract inflation from your return input; the buying-power display already accounts for it.")
 
 # Shared inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from

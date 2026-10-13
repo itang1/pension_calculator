@@ -43,7 +43,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
     reader who never opens page 2 still sees the risk behind a smooth-market win.
     """
     short = depletion_year is not None
-    dollars = f" (in {CURRENT_YEAR} dollars)" if real_dollars else " (in the dollars of the final year)"
+    dollars = f" in buying power at today's ({CURRENT_YEAR}) prices" if real_dollars else " in the dollars of the final year, without adjusting for inflation"
     if short:
         title = "Your account cannot cover every pension payment in this scenario."
         following = int(retirement_years) - depletion_year
@@ -100,7 +100,7 @@ def render_refund_result(inputs, res):
     refund = res["refund"]
     account = res["account_at_leaving"]
     rate = simulation.PLAN_REFUND_INTEREST_PCT
-    dollars = f" (in {CURRENT_YEAR} dollars)" if res.get("real_dollars") else ""
+    dollars = f" in buying power at today's ({CURRENT_YEAR}) prices" if res.get("real_dollars") else " in the dollars of the year you leave"
     if abs(account - refund) <= max(1.0, 1e-9 * refund):
         winner, color, bar = "The refund and account have the same value", "#F1F5F9", "#64748B"
     elif account > refund:
@@ -257,7 +257,7 @@ Instead of paying into the pension, imagine putting the same amount (for example
                 label=f"Pension Received over {retirement_years} Years",
                 value=f"${pension_redeemed_total:,.0f}",
                 delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
-                help="The total pension income paid out over all retirement years, including annual COLA increases. The same amount is withdrawn from your own account. The delta shows how much more you received than you put in."
+                help="The total pension income over all retirement years, including yearly increases. Your own account attempts to match these payments while money remains. With buying power switched on, each year's amount is adjusted to today's prices before adding them up. The difference below shows total income minus total contributions."
             )
         with mc3:
             st.metric(
@@ -378,10 +378,10 @@ This comparison uses the inputs above to show how a pension and a personal accou
     table_data = st.session_state["_results_nominal"]["yearly_data"].copy()
     table_data.insert(1, "Age", ages_for(inputs)[1:])
     if res.get("real_dollars"):
-        st.caption(f"These tables stay in the dollars of each year, even with {CURRENT_YEAR} dollars switched on above, so each row adds up exactly.")
+        st.caption("These tables show amounts paid in each year, without adjusting for inflation, even when buying power is switched on above. This keeps each row's arithmetic easy to follow.")
 
     st.markdown("""
-Each row is one year. The left table tracks **the pension**, while the right tracks **your own account**. Both tables use dollars from the year shown. The bold **Total** row adds these amounts without adjusting for inflation, so it differs from the summary amounts when today's dollars is switched on.
+Each row is one year. The left table tracks **the pension**, while the right tracks **your own account**. Both tables use amounts paid or held in the year shown. The bold **Total** row adds these amounts without adjusting for inflation. To compare these totals with the summary amounts, switch off **Show buying power at today's prices** above.
 """)
 
     with st.expander("Working Years"):
@@ -478,7 +478,7 @@ The **Start Balance** earns **+ Returns** ({index_return_pct:.1f}%/year before i
 
     st.divider()
     st.header("Case Studies")
-    st.caption("Case-study totals below use dollars from each year, regardless of the display setting above. Today's-dollar figures are marked separately. All investment returns are before inflation.")
+    st.caption("Case-study totals below add amounts paid in each year, without adjusting for inflation, regardless of the display switch above. Figures labeled 'today's dollars' show buying power at today's prices. All investment returns are before inflation.")
     if "_before_example" in st.session_state:
         st.button("Restore my previous inputs", key="restore_example_inputs", on_click=restore_previous_inputs)
 
