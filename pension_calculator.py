@@ -38,7 +38,7 @@ common.render_html(
 # any widget that is not rendered during a rerun, so widgets that live in a
 # page body (not the always-rendered sidebar), or only show in one allowance
 # mode, need this re-assignment pin.
-for _k in ("mc_std", "allowance_manual", "in_allowance_basis", "in_allowance_period",
+for _k in ("mc_std", "in_real", "allowance_manual", "in_allowance_basis", "in_allowance_period",
            "in_wage", "in_wage_mode", "in_current_wage"):
     if _k in st.session_state:
         st.session_state[_k] = st.session_state[_k]
@@ -53,17 +53,7 @@ if "_example_label" in st.session_state:
     st.info("An example scenario is loaded. You can return to the inputs you entered before trying examples.")
     st.button("Restore my previous inputs", key="restore_inputs", on_click=common.restore_previous_inputs)
 
-show_real = st.toggle(
-    "Show amounts in today's dollars",
-    value=True,
-    key="in_real",
-    help=(
-        f"Charts and summaries: buying power at today's ({common.CURRENT_YEAR}) prices. "
-        "A displayed \\$1,000 means it could buy what \\$1,000 buys today. "
-        "Yearly tables and case studies show amounts paid in each year, as labeled. "
-        "Turn this off to see every amount as paid in each year instead."
-    ),
-)
+show_real = st.session_state.get("in_real", True)
 # Sidebar inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from
 # session_state rather than importing from here (which would re-run the script).

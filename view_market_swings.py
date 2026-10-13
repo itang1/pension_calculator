@@ -24,6 +24,7 @@ from common import (
     get_monte_carlo,
     render_feedback_form,
     render_html,
+    render_dollar_toggle,
     render_inflation_explanation,
 )
 
@@ -98,8 +99,6 @@ The steady-return page assumes investments grow by exactly {index_return_pct:.1f
 To find out, we made up **1,000 possible futures** for the stock market. Each one is a different random mix of good and bad years, like rolling dice for every year of your {work_years} working years and {retirement_years} retired years. Then we ran your plan through every one of them.
 """)
 
-    render_inflation_explanation(inputs, res)
-
     _mc_std_pct = st.slider(
         "How bumpy is the market?",
         min_value=0.0, max_value=30.0, value=15.0, step=0.5, format="%.1f%%",
@@ -126,6 +125,7 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
         refund = res["refund"]
         wins = int((mc["balances_at_leaving"] > refund).sum())
         st.header("Your Result")
+        render_dollar_toggle()
         render_html(f"""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>You would get a refund, not a lifetime pension.</strong><br><br>
@@ -139,6 +139,7 @@ guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has 
         return
 
     st.header("Your Result")
+    render_dollar_toggle()
     render_risk_verdict(depletion_prob, index_return_pct, _mc_std_pct, flat_b_wins=not simulation.ran_short(flat_final))
 
     st.space("small")
@@ -164,6 +165,8 @@ guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has 
             value=f"${max(flat_final, 0):,.0f}",
             help="What page 1 says is left at the end, when the market grows by the same amount every year. Compare it with the typical result to the left; the order of returns can change how many payments the account covers.",
         )
+
+    render_inflation_explanation(inputs, res)
 
     st.subheader("Why ups and downs matter")
     st.markdown("**Here is the whole idea in one example:**")

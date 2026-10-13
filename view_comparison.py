@@ -28,6 +28,7 @@ from common import (
     render_breakdown_table,
     render_feedback_form,
     render_html,
+    render_dollar_toggle,
     render_inflation_explanation,
     account_payment_table,
     restore_previous_inputs,
@@ -112,6 +113,7 @@ def render_refund_result(inputs, res):
     else:
         winner, color, bar = "The contribution refund is larger than your account", "#E0E7FF", "#4F46E5"
     st.header("Your Result")
+    render_dollar_toggle()
     render_html(f"""
 <div style="background-color:{color}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">{winner}</div>
@@ -179,20 +181,21 @@ You put the same money into your own investment account instead. It grows or shr
 """)
     st.space("small")
 
-    render_inflation_explanation(inputs, res)
-
     if inputs["plan_status"] == "unvested":
         # No pension to compare: show the refund against your own account instead
         # of lifetime-income charts that do not apply.
         render_refund_result(inputs, res)
+        render_inflation_explanation(inputs, res)
     else:
         # The verdict comes first, in its own section; the chart and metrics below explain it.
         st.header("Your Result")
+        render_dollar_toggle()
         render_result_banner(
             personal_balance, retirement_years, res["depletion_year"],
             res["breakeven_rate"], index_return_pct, res.get("real_dollars", False),
             runs_out=out_of_100(get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))["depletion_prob"]),
         )
+        render_inflation_explanation(inputs, res)
 
         st.space("small")
 

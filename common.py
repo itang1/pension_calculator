@@ -501,6 +501,21 @@ def convert_manual_period():
     st.session_state["_allowance_previous_period"] = new
 
 
+def render_dollar_toggle():
+    """Rendered on each page; the entry script reads the value from session_state."""
+    st.toggle(
+        "Show amounts in today's dollars",
+        value=True,
+        key="in_real",
+        help=(
+            f"Charts and summaries: buying power at today's ({CURRENT_YEAR}) prices. "
+            "A displayed \\$1,000 means it could buy what \\$1,000 buys today. "
+            "Yearly tables and case studies show amounts paid in each year, as labeled. "
+            "Turn this off to see every amount as paid in each year instead."
+        ),
+    )
+
+
 def render_inflation_explanation(inputs, res):
     rate = res["index_return_pct"]
     inflation_pct = (inputs["inflation"] - 1) * 100
