@@ -147,13 +147,13 @@ def render():
     st.markdown("""
 Many public employees, like teachers, police officers, and city workers, must put part of every paycheck (for example, 10%) into a pension. In return, the pension pays them a set amount every year after they retire, for the rest of their life, no matter what the stock market does.
 
-This calculator asks one question: **if you could put that same money into your own retirement account instead, would the account cover the same pension payments, and would any money remain?**
+This calculator asks one question: **what if you invested that same money yourself? Would your own account pay you as much as the pension, every year, and would any money be left?**
 """)
 
     render_html(
         f"""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<em>&larr; Use the sidebar on the left to enter your salary, ages, and pension details. Results update as you go.</em>
+<em>&larr; Enter your own salary, ages, and pension details in the sidebar. Results update as you go.</em>
 <br><br>{inputs_summary_html(inputs, res)}
 </div>
 """
@@ -167,14 +167,14 @@ This calculator asks one question: **if you could put that same money into your 
         render_html("""
 <div style="background-color:#E0E7FF; border-left:5px solid #4F46E5; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option A: The Pension</strong><br><br>
-Each year, a set part of your paycheck (for example, 10%) goes straight into the pension fund, where professional managers invest it. Once you retire, the pension pays you a guaranteed amount every year for the rest of your life, even if the stock market crashes. How much you get depends on your salary, your years of work, and your plan's formula.
+Part of every paycheck goes into the pension. After you retire, it pays you a set amount every year for the rest of your life, even if the stock market crashes. The amount depends on your salary and how long you worked.
 </div>
 """)
     with col_b:
         render_html("""
 <div style="background-color:#CCFBF1; border-left:5px solid #0D9488; padding:1rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
 <strong>Option B: Your Own Account</strong><br><br>
-Instead of paying into the pension, imagine putting the same amount (for example, 10%) into your own investment account each year. You choose how to invest it, and it grows or shrinks with the market. In retirement, you take out the same amount each year that the pension would have paid you. Anything left when you die is yours to pass on or give away.
+You put the same money into your own investment account instead. It grows or shrinks with the market. In retirement, you take out what the pension would have paid you each year. Anything left over is yours to keep or pass on. If it runs out, the payments stop.
 </div>
 """)
     st.space("small")

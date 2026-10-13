@@ -328,11 +328,11 @@ def inputs_summary_html(inputs, res):
         wage = f"&#36;{inputs['starting_wage']:,.0f} starting wage in {inputs['hire_year']}"
     hire_age = inputs["retirement_age"] - inputs["work_years"]
     return (
-        f"<strong>Right now the results assume:</strong> {wage} · hired at {hire_age} · "
+        f"<strong>Your results below assume:</strong> {wage} · hired at {hire_age} · "
         f"retire at {inputs['retirement_age']} · {inputs['retirement_years']} years retired · "
-        f"{res['index_return_pct']:.1f}% returns before inflation.<br>"
-        "<span style='font-size:0.9em'>Check these inputs before reading the result. On a phone, tap the » arrow at the top left to open the "
-        "sidebar. To save or share this scenario, use <em>Share These Inputs</em> at the bottom of the sidebar.</span>"
+        f"{res['index_return_pct']:.1f}% yearly investment growth.<br>"
+        "<span style='font-size:0.9em'>On a phone, tap the » arrow at the top left to open the sidebar. "
+        "To save or share your numbers, use <em>Share These Inputs</em> at the bottom of the sidebar.</span>"
     )
 
 
@@ -506,21 +506,22 @@ def render_inflation_explanation(inputs, res):
     inflation_pct = (inputs["inflation"] - 1) * 100
     real_rate = simulation.purchasing_power_return(inputs["index_returns_rate"], inputs["inflation"]) * 100
     st.info(
-        f"**What does {rate:.1f}% mean?** It is investment growth before inflation. "
-        f"With prices rising {inflation_pct:.1f}% a year, that is about {real_rate:.1f}% a year "
-        f"in buying power. For example, \\$100 becomes \\${inputs['index_returns_rate'] * 100:.2f} "
-        f"after a year, worth \\${inputs['index_returns_rate'] / inputs['inflation'] * 100:.2f} "
-        "at today's prices, before deposits or withdrawals."
+        f"**What does {rate:.1f}% growth mean?** \\$100 invested grows to "
+        f"\\${inputs['index_returns_rate'] * 100:.2f} in a year. But prices also rise {inflation_pct:.1f}% a year, "
+        f"so that \\${inputs['index_returns_rate'] * 100:.2f} only buys what "
+        f"\\${inputs['index_returns_rate'] / inputs['inflation'] * 100:.2f} buys today. "
+        f"After rising prices, your money really grows about {real_rate:.1f}% a year."
     )
-    pension_note = (
-        "This scenario pays a contribution refund instead of a lifetime pension. "
-        if inputs["plan_status"] == "unvested" else
-        f"The modeled pension payment increases {res['retiree_cola_pct']:.1f}% a year under the eligibility rules and 2% cap. "
-    )
+    if inputs["plan_status"] == "unvested":
+        pension_note = "In this scenario you leave before qualifying for a pension, so you get your contributions back instead."
+    elif res["retiree_cola_pct"] == 0:
+        pension_note = "In this scenario the pension payment stays the same every year."
+    else:
+        pension_note = f"The pension payment goes up {res['retiree_cola_pct']:.1f}% each year (it follows prices, up to 2%)."
     if inputs["plan_status"] != "unvested" and inputs["retiree_cola"] < inputs["inflation"]:
         loss = -simulation.purchasing_power_return(inputs["retiree_cola"], inputs["inflation"]) * 100
-        pension_note += f"Because prices rise faster, the payment's buying power falls about {loss:.1f}% a year. "
-    st.caption(pension_note + "Salary raises are a separate input. Changing the dollar display does not change which payments the account can cover.")
+        pension_note += f" Prices rise faster than that, so each payment buys about {loss:.1f}% less every year."
+    st.caption(pension_note)
     with st.expander("What do today's dollars, real dollars, and nominal dollars mean?"):
         _inflation = inputs["inflation"]
         st.markdown(

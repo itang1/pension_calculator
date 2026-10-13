@@ -247,7 +247,7 @@ def test_dollar_display_changes_amounts_not_funding_or_return_assumptions():
     assert real["breakeven_rate"] == nominal["breakeven_rate"]
     assert real["index_return_pct"] == pytest.approx(7.0)
     assert real["pension_redeemed_total"] < nominal["pension_redeemed_total"]
-    assert any("4.4%" in info.value and "before inflation" in info.value for info in at.info)
+    assert any("4.4%" in info.value and "rising prices" in info.value for info in at.info)
 
 
 def test_inflation_caps_pension_increases_without_replacing_salary_raise():
