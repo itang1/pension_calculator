@@ -315,9 +315,9 @@ def fmt_share(prob):
 
 
 def inputs_summary_html(inputs, res):
-    """One line restating what the results assume, for the input panel-hint boxes.
+    """One line restating what the results assume, for the sidebar-hint boxes.
 
-    Phone visitors start with the input panel collapsed, so this tells them what
+    Phone visitors start with the sidebar collapsed, so this tells them what
     the page is showing. HTML (not markdown), with "&#36;" for dollar signs so
     nothing is read as math.
     """
@@ -331,8 +331,8 @@ def inputs_summary_html(inputs, res):
         f"<strong>Right now the results assume:</strong> {wage} · hired at {hire_age} · "
         f"retire at {inputs['retirement_age']} · {inputs['retirement_years']} years retired · "
         f"{res['index_return_pct']:.1f}% returns before inflation.<br>"
-        "<span style='font-size:0.9em'>Check these inputs before reading the result. Use <em>Start here: enter your details</em> "
-        "above to change them. To save or share this scenario, use <em>Share These Inputs</em> in the input panel.</span>"
+        "<span style='font-size:0.9em'>Check these inputs before reading the result. On a phone, tap the » arrow at the top left to open the "
+        "sidebar. To save or share this scenario, use <em>Share These Inputs</em> at the bottom of the sidebar.</span>"
     )
 
 
@@ -364,7 +364,7 @@ def render_html(html: str):
     st.markdown(html, unsafe_allow_html=True)
 
 
-# One-click scenarios for the case studies. Keys/types must match the input panel
+# One-click scenarios for the case studies. Keys/types must match the sidebar
 # widgets exactly (int widgets need ints, float widgets floats). Every preset
 # uses the allowance estimator so the pension figure is in the same future
 # dollars as the salary path; tests/test_case_studies.py checks the copy.
@@ -454,7 +454,7 @@ def queue_preset(preset_id):
     """Ask the entry script to load a preset on the next rerun.
 
     Widget state can only be written before the widget is instantiated, and
-    the input panel widgets render at the top of every run, so a button handler
+    the sidebar widgets render at the top of every run, so a button handler
     (which fires mid-run) parks the preset here and the entry script applies
     it first thing on the rerun.
     """
@@ -463,7 +463,7 @@ def queue_preset(preset_id):
 
 
 def apply_pending_preset():
-    """Apply a queued preset to the input panel widget state. Call before render_inputs()."""
+    """Apply a queued preset to the sidebar widget state. Call before render_sidebar()."""
     if st.session_state.pop("_restore_requested", False):
         saved = st.session_state.pop("_before_example", {})
         for key in _SHARE_SPEC:
@@ -501,10 +501,6 @@ def convert_manual_period():
     st.session_state["_allowance_previous_period"] = new
 
 
-def set_input_panel(open_panel):
-    st.session_state["input_panel"] = open_panel
-
-
 def render_inflation_explanation(inputs, res):
     rate = res["index_return_pct"]
     inflation_pct = (inputs["inflation"] - 1) * 100
@@ -527,14 +523,14 @@ def render_inflation_explanation(inputs, res):
     st.caption(pension_note + "Salary raises are a separate input. Changing the dollar display does not change which payments the account can cover.")
 
 
-def render_inputs():
-    """Render all shared inputs in the input panel and return them as a dict.
+def render_sidebar():
+    """Render all shared inputs in the sidebar and return them as a dict.
 
     Called from the entry script on every rerun (i.e. on every page), so the
     widgets keep their state across page switches without any session_state
     pinning.
     """
-    with st.container():
+    with st.sidebar:
         st.header("Your Details")
 
         with st.expander("Timing Assumptions"):
@@ -599,9 +595,9 @@ This calculator operates in annual periods. Within each year:
             help="Your age on the day you expect to retire.",
         ))
         # Input problems are collected instead of stopping the script here:
-        # st.stop() mid-input panel would skip the widgets below, and Streamlit then
+        # st.stop() mid-sidebar would skip the widgets below, and Streamlit then
         # forgets their values. Each problem uses a safe stand-in value so the
-        # rest of the input panel still renders; the entry script withholds results.
+        # rest of the sidebar still renders; the entry script withholds results.
         problems = []
         work_years = retirement_age - hire_age
         if work_years < 1:
@@ -897,7 +893,6 @@ This calculator operates in annual periods. Within each year:
             / 100
             + 1
         )
-        st.button("Show my results", key="show_results", on_click=set_input_panel, args=(False,), disabled=bool(problems), width="stretch")
 
     retiree_cola_pct = min(inflation_pct, simulation.PLAN_RETIREE_COLA_CAP_PCT)
     if not plan["cola_applies"]:
@@ -1084,7 +1079,7 @@ def dollars_note(res):
 
 
 # --- Shareable links ----------------------------------------------------------------
-# Every input panel input (plus the display toggle and the swing slider) is mirrored
+# Every sidebar input (plus the display toggle and the swing slider) is mirrored
 # into the page URL, so a copied link reopens the same scenario. Values are
 # parsed and range-checked here before they touch widget state.
 _SHARE_SPEC = {
@@ -1219,7 +1214,7 @@ def share_link(inputs):
 
 def render_share_section(inputs):
     """Sidebar control that makes a shareable link only when asked."""
-    with st.container():
+    with st.sidebar:
         st.subheader("Share These Inputs")
         if st.button("Create a shareable link", key="make_share_link"):
             st.session_state["_show_share_link"] = True

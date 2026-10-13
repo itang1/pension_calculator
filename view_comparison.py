@@ -80,7 +80,7 @@ The account needs a steady return of <strong>{fmt_rate(breakeven_rate)} before i
         else:
             st.caption(f"With the current market-swing setting ({std:g}%), the account runs short in {runs_out} out of 100 simulated scenarios. These are model results, not a prediction of your personal odds.")
     # st.page_link (not an HTML anchor inside the banner) so navigation stays
-    # client-side and the visitor's input panel inputs survive the page switch.
+    # client-side and the visitor's sidebar inputs survive the page switch.
     st.page_link(
         st.session_state["_pages"]["market"],
         label=(
@@ -149,7 +149,7 @@ This calculator asks one question: **if you could put that same money into your 
     render_html(
         f"""
 <div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-<em>Open the input panel above to enter your salary, ages, and pension details. Results update as you go.</em>
+<em>&larr; Use the sidebar on the left to enter your salary, ages, and pension details. Results update as you go.</em>
 <br><br>{inputs_summary_html(inputs, res)}
 </div>
 """
@@ -198,7 +198,7 @@ Instead of paying into the pension, imagine putting the same amount (for example
             st.markdown("""
     Both options pay you the **same income every year in retirement**. The comparison comes down to one question: **does your own account run out of money before you die?**
 
-    - **Bold teal line (your own account)** = your account's balance using the flat return rate you set in the input panel, applied at the same rate every year. It stops at $0 when the account is empty. Any income it could not pay is shown separately below.
+    - **Bold teal line (your own account)** = your account's balance using the flat return rate you set in the sidebar, applied at the same rate every year. It stops at $0 when the account is empty. Any income it could not pay is shown separately below.
     - **Purple line (optional)** = how much money is paid out each year. The pension pays this to you; the same amount comes out of your own account. Toggle it on/off with the checkbox above the chart.
     - **Horizontal axis** = your age, from the year you are hired to the end of retirement. Hover over a point to see that year's numbers.
     - **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
@@ -339,9 +339,9 @@ Instead of paying into the pension, imagine putting the same amount (for example
 
     **Only your own contributions are compared.** Most pensions are also funded by your employer. This comparison assumes only your share of the money goes into your own account; the employer's share does not follow you, so it is not counted there.
 
-    **Vesting and leaving early matter.** With fewer than 5 years of service there is no pension, only a refund of your contributions with interest. With 5 or more years but under 30, the pension can't start before age 60; leaving earlier gives a deferred pension from 60 with no COLA. The input panel estimate applies both rules. Survivor and disability benefits are not modeled.
+    **Vesting and leaving early matter.** With fewer than 5 years of service there is no pension, only a refund of your contributions with interest. With 5 or more years but under 30, the pension can't start before age 60; leaving earlier gives a deferred pension from 60 with no COLA. The sidebar estimate applies both rules. Survivor and disability benefits are not modeled.
 
-    **Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the input panel for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
+    **Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the sidebar for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
 
     *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
     """)
@@ -365,7 +365,7 @@ This comparison uses the inputs above to show how a pension and a personal accou
 
 {_first_tip}
 - **This comparison assumes the same yearly payment from either option.** It does not include survivor or disability benefits, taxes on actual withdrawals, or other personal circumstances described above.
-- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a monthly or yearly payment before taxes; payment timing and annual increases still follow the built-in rules described in the input panel.
+- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a monthly or yearly payment before taxes; payment timing and annual increases still follow the built-in rules described in the sidebar.
 
 *This calculator is for exploring a scenario. It is not a personal financial recommendation.*
 """)

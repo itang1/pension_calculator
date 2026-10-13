@@ -36,7 +36,7 @@ common.render_html(
 
 # Keep conditionally rendered widget state alive. Streamlit drops the state of
 # any widget that is not rendered during a rerun, so widgets that live in a
-# page body (not the always-rendered input panel), or only show in one allowance
+# page body (not the always-rendered sidebar), or only show in one allowance
 # mode, need this re-assignment pin.
 for _k in ("mc_std", "allowance_manual", "in_allowance_basis", "in_allowance_period",
            "in_wage", "in_wage_mode", "in_current_wage"):
@@ -49,7 +49,6 @@ common.apply_query_params()
 common.apply_pending_preset()
 
 st.title("Is Your Pension Worth It?")
-input_panel = st.expander("Start here: enter your details", key="input_panel", on_change="rerun")
 st.caption(
     "This calculator uses one set of pension rules for members hired in 2014 or later. "
     "Check that these rules match your pension before using the estimate."
@@ -104,21 +103,19 @@ with st.expander("What do today's dollars, real dollars, and nominal dollars mea
     )
     st.caption("Investment returns are always entered before inflation. Do not subtract inflation from your return input; the buying-power display already accounts for it.")
 
-# Shared inputs render on every page, so their widget state persists across
+# Sidebar inputs render on every page, so their widget state persists across
 # page switches without any pinning. Views read inputs/results from
 # session_state rather than importing from here (which would re-run the script).
-with input_panel:
-    inputs = common.render_inputs()
+inputs = common.render_sidebar()
 if inputs["problems"]:
-    # Stop only after all inputs render, so no input is forgotten.
-    st.error("Open 'Start here: enter your details' and fix the input marked in red to see your results.")
+    # Stop only after the whole sidebar has rendered, so no input is forgotten.
+    st.error("Fix the input marked in red in the sidebar to see your results.")
     st.stop()
 st.session_state["_inputs"] = inputs
 _nominal = common.compute_results(inputs)
 st.session_state["_results_nominal"] = _nominal
 st.session_state["_results"] = common.deflate_results(_nominal, inputs) if show_real else _nominal
-with input_panel:
-    common.render_share_section(inputs)
+common.render_share_section(inputs)
 
 _comparison_page = st.Page(
     view_comparison.render,

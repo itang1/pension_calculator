@@ -6,7 +6,7 @@
 
 This Streamlit app compares the long-term financial outcomes of a **traditional pension (Option A)** against a **personal investment account (Option B)**. Enter your salary, career assumptions, and pension details, and the app runs both scenarios side by side using the same annual dollar amounts.
 
-The app has two pages that share the same expandable input panel and link to each other:
+The app has two pages that share the same sidebar inputs and link to each other:
 
 - **Steady Yearly Return** (default): assumes the same return before inflation every year and shows whether the account can cover all pension payments.
 - **What If the Market Has Bad Years?** (`/market-swings`): replays the same scenario through 1,000 simulated market histories (Monte Carlo) and answers how often your own account runs out of money.

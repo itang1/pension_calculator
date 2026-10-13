@@ -235,15 +235,6 @@ def test_bad_monthly_link_amount_does_not_exceed_widget_limit():
     assert not at.exception
 
 
-def test_show_results_closes_the_native_input_panel():
-    at = _app()
-    at.session_state["input_panel"] = True
-    at.run()
-    at.button(key="show_results").click().run()
-    assert at.session_state["input_panel"] is False
-    assert not at.exception
-
-
 def test_older_links_keep_their_original_retirement_duration():
     at = _app(retirement_age="63", retirement_years="25")
     assert at.session_state["in_plan_age"] == 88
