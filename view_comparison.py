@@ -365,7 +365,7 @@ This comparison uses the inputs above to show how a pension and a personal accou
 
 {_first_tip}
 - **This comparison assumes the same yearly payment from either option.** It does not include survivor or disability benefits, taxes on actual withdrawals, or other personal circumstances described above.
-- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a yearly amount; payment timing and annual increases still follow the built-in rules described in the input panel.
+- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a monthly or yearly payment before taxes; payment timing and annual increases still follow the built-in rules described in the input panel.
 
 *This calculator is for exploring a scenario. It is not a personal financial recommendation.*
 """)
@@ -381,7 +381,7 @@ This comparison uses the inputs above to show how a pension and a personal accou
         st.caption(f"These tables stay in the dollars of each year, even with {CURRENT_YEAR} dollars switched on above, so each row adds up exactly.")
 
     st.markdown("""
-Each row is one year. The left table tracks **the pension**, while the right tracks **your own account**. They use the same dollar amounts each year so the comparison is apples-to-apples. The bold **Total** row at the bottom of each table ties back to the summary metrics above.
+Each row is one year. The left table tracks **the pension**, while the right tracks **your own account**. Both tables use dollars from the year shown. The bold **Total** row adds these amounts without adjusting for inflation, so it differs from the summary amounts when today's dollars is switched on.
 """)
 
     with st.expander("Working Years"):
