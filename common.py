@@ -627,13 +627,13 @@ This calculator operates in annual periods. Within each year:
             ) / 100 + 1
             step_count = st.number_input(
                 "Number of Step Raises",
-                value=0, min_value=0, max_value=20, step=1,
+                value=4, min_value=0, max_value=20, step=1,
                 key="in_step_count",
                 help="How many step raises you get before reaching the top of your pay scale. One raise is applied at the end of each of your first this-many years.",
             )
             first_step_midyear = st.checkbox(
                 "First step raise comes mid-year",
-                value=False,
+                value=True,
                 key="in_step_midyear",
                 help="Check this if your first step raise takes effect partway through Year 1 (for example, after a 6-month probation). Year 1 is then averaged half at your starting step and half at the next step.",
             )
