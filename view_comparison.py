@@ -82,7 +82,14 @@ The account needs a steady return of <strong>{fmt_rate(breakeven_rate)} before i
         if std == 0:
             st.caption("Market swings are set to 0%, so the simulations on the second page repeat this same calculation.")
         else:
-            st.caption(f"With the current market-swing setting ({std:g}%), the account runs short in {runs_out} out of 100 simulated scenarios. These are model results, not a prediction of your personal odds.")
+            if runs_out == "0":
+                swings = "your own account wins in every simulated future."
+            elif runs_out == "100":
+                swings = "the pension wins in every simulated future because your account runs out."
+            else:
+                swings = (f"the pension wins in {runs_out} out of 100 simulated futures because your account runs out. "
+                          "Your own account wins in the rest.")
+            st.caption(f"With market ups and downs ({std:g}% swings), {swings} These are model results, not a prediction of your personal odds.")
     # st.page_link (not an HTML anchor inside the banner) so navigation stays
     # client-side and the visitor's sidebar inputs survive the page switch.
     st.page_link(

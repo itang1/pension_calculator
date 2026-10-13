@@ -47,29 +47,104 @@ def risk_tier(depletion_prob, flat_b_wins):
 
 
 def render_risk_verdict(depletion_prob, current_rate_pct, std_pct, flat_b_wins):
-    """Describe modeled outcomes without recommending a personal choice."""
+    """The page's answer: a traffic-light verdict on the ruin risk.
+
+    The comparison page answers "on average, does your account end with money?"
+    The depletion probability answers "how often does your account run out once
+    returns vary?" Those are different questions, and a favorable flat-rate
+    result can coexist with an unacceptably high chance of ruin. This banner
+    turns the two numbers into a single risk-tiered recommendation, with a
+    ✓/⚠/✗ status so the tier is readable without relying on color alone.
+    The wording depends on which option won at the flat rate, so the banner
+    never claims a flat-rate result the first page did not show.
+    """
     n = out_of_100(depletion_prob)
-    bg, bar = ("#CCFBF1", "#0D9488") if depletion_prob <= 0.10 else ("#E0E7FF", "#4F46E5")
-    symbol = ""
-    if std_pct == 0:
-        verdict = "With market swings at 0%, every simulation repeats the steady-return calculation."
+    r = f"{current_rate_pct:.1f}%"
+    tier = risk_tier(depletion_prob, flat_b_wins)
+
+    if std_pct == 0 and flat_b_wins:
+        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
+        verdict = "With no ups and downs, every future matches page 1: your own account wins."
         body = (
-            f"Each year returns exactly {current_rate_pct:.1f}% before inflation. "
-            + ("Your account cannot cover every payment in any of the 1,000 simulations." if depletion_prob else
-               "Your account covers every payment in all 1,000 simulations.")
+            "The bumpiness slider is at 0%, so every simulated year returns exactly the same amount "
+            "and your account never runs out. Move the slider right to see what market ups and downs do."
         )
-    elif depletion_prob == 0:
-        verdict = "Your account covers every payment in all 1,000 simulations."
-        body = "None of these simulations ran short. This does not guarantee the same result in real markets."
+    elif std_pct == 0:
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
+        verdict = "With no ups and downs, every future matches page 1: the pension wins."
+        body = (
+            f"The bumpiness slider is at 0%, so every simulated year returns exactly {r} and your account "
+            "runs out in every future, just as on page 1. Move the slider right to see what market ups and downs do."
+        )
+    elif tier == "none":
+        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
+        verdict = "No failures in these 1,000 futures."
+        body = (
+            "In all 1,000 possible futures with the ups and downs you chose, your account never ran "
+            "out of money. That is a good sign, though not a guarantee: markets can be worse than "
+            "anything in these simulations."
+        )
+    elif tier == "small":
+        bg, bar, symbol = "#CCFBF1", "#0D9488", "✓"
+        verdict = "Your account usually lasts, with a small risk of running out."
+        body = (
+            f"Your account ran out of money in <strong>{n} out of 100</strong> possible futures. "
+            f"Most futures work out, but an unlucky one would leave you short late in life."
+        )
+    elif tier == "tradeoff":
+        bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
+        verdict = "A real trade-off: neither option is clearly better."
+        body = (
+            f"Your account usually ends with more money, but it ran out in <strong>{n} out of 100</strong> "
+            f"possible futures. The pension can never run out. If running out of money in old age "
+            f"would be a disaster for you, the pension's guarantee may be worth more than your account's "
+            f"extra money."
+        )
+    elif tier == "lean_a":
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
+        verdict = "Your account runs out in a large share of futures, even though page 1 picked it."
+        body = (
+            f"Page 1 assumed a smooth {r} every year. With real ups and downs, your account ran out "
+            f"of money in <strong>{n} out of 100</strong> possible futures. That is close to a coin "
+            f"flip, while the pension pays for life no matter what."
+        )
+    elif tier == "a_safer":
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
+        verdict = "The pension is the safer choice."
+        body = (
+            f"Page 1 said your account wins with a smooth {r} every year. But with real ups and downs, "
+            f"your account ran out of money in <strong>{n} out of 100</strong> possible futures. When "
+            f"most futures end with an empty account, the pension's paycheck for life is the safer bet."
+        )
+    elif tier == "a_close":
+        bg, bar, symbol = "#FEF3C7", "#D97706", "⚠"
+        verdict = "The pension wins, though your account sometimes gets lucky."
+        body = (
+            f"Even with a smooth {r} every year, your account runs out. With real ups and downs it ran "
+            f"out in <strong>{n} out of 100</strong> possible futures, and the rest only made it "
+            f"because they happened to get good years. Choosing your own account here is a bet on luck; "
+            f"the pension is the safer choice."
+        )
+    else:  # a_confirmed
+        bg, bar, symbol = "#E0E7FF", "#4F46E5", ""
+        verdict = "The pension is the safer choice, and bad markets make it clearer."
+        body = (
+            f"Even with a smooth {r} every year, your account runs out. With real ups and downs it ran "
+            f"out in <strong>{n} out of 100</strong> possible futures. The pension's paycheck for "
+            f"life is the more reliable choice."
+        )
+
+    if n == "0":
+        headline = "🏆 Your own account wins in 100 out of 100 futures"
+    elif n == "100":
+        headline = "🏆 The pension wins in 100 out of 100 futures"
+    elif n == "fewer than 1":
+        headline = "Your own account wins in almost every future; the pension wins in fewer than 1 out of 100"
     else:
-        verdict = f"Your account runs short in {n} out of 100 simulated scenarios."
-        body = (
-            "In those scenarios, the account cannot cover at least one full pension payment. "
-            "The modeled pension continues paying. These are results under your assumptions, "
-            "not a prediction of your personal odds."
-        )
+        headline = f"The pension wins in {n} out of 100 futures · Your own account wins in {100 - int(n)}"
     render_html(f"""
 <div style="background-color:{bg}; border-left:5px solid {bar}; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+<div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">{headline}</div>
 <strong>{symbol + " " if symbol else ""}{verdict}</strong><br><br>
 {body}
 </div>
@@ -93,7 +168,7 @@ def render():
     st.markdown(f"""
 The steady-return page assumes investments grow by exactly {index_return_pct:.1f}% every single year before inflation. Real markets don't work that way. Some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
 
-**So this page asks: with simulated ups and downs, how often does your account run short?**
+**So this page asks: with simulated ups and downs, how often does your own account win, and how often does the pension win?**
 
 To find out, we made up **1,000 possible futures** for the stock market. Each one is a different random mix of good and bad years, like rolling dice for every year of your {work_years} working years and {retirement_years} retired years. Then we ran your plan through every one of them.
 """)
