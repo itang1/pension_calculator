@@ -155,8 +155,6 @@ def render():
     inputs = st.session_state["_inputs"]
     res = st.session_state["_results"]
     index_return_pct = res["index_return_pct"]
-    work_years = inputs["work_years"]
-    retirement_years = inputs["retirement_years"]
 
     st.header("What If the Market Has Bad Years?")
     render_html(f"""
@@ -166,11 +164,11 @@ def render():
 """)
     st.space("small")
     st.markdown(f"""
-The steady-return page assumes investments grow by exactly {index_return_pct:.1f}% every single year before inflation. Real markets don't work that way; some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
+Page 1 assumes your investments grow exactly {index_return_pct:.1f}% every year (before inflation). Real markets don't work that way; some years are way up and some are way down (say +18%, −4%, +25%, −12%).
 
-**So this page asks: with simulated ups and downs, how often does your own account win, and how often does the pension win?**
+**This page asks: with ups and downs, how often does your own account win, and how often does the pension win?**
 
-To find out, we made up **1,000 possible futures** for the stock market. Each one is a different random mix of good and bad years, like rolling dice for every year of your {work_years} working years and {retirement_years} retired years. Then we ran your plan through every one of them.
+We tested your plan against 1,000 made-up market futures, each a random mix of good and bad years.
 """)
 
     _mc_std_pct = st.slider(
@@ -186,15 +184,15 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
     )
 
     if _mc_std_pct == 0:
-        st.caption(f"Every year returns exactly {index_return_pct:.1f}% before inflation.")
+        st.markdown(f"**Every year: {index_return_pct:+g}%**")
     else:
         _m = 1 + index_return_pct / 100
         _s = simulation.lognormal_sigma(index_return_pct / 100, _mc_std_pct / 100)
         def _pct(z):
             return f"{(_m * math.exp(z * _s) - 1) * 100:+.0f}%"
-        st.caption(
-            f"With this setting, about 2 out of 3 years return between {_pct(-1)} and {_pct(1)} before inflation. "
-            f"About 1 year in 20 is worse than {_pct(-1.96)} or better than {_pct(1.96)}."
+        st.markdown(
+            f"**Most years (2 in 3): {_pct(-1)} to {_pct(1)}** · "
+            f"Rare years (1 in 20): below {_pct(-1.96)} or above {_pct(1.96)}"
         )
 
     mc = get_monte_carlo(inputs, _mc_std_pct)
