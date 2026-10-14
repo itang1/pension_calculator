@@ -214,7 +214,7 @@ You put the same money into your own investment account instead. It grows or shr
 
         _show_ref_line = st.checkbox(
             "Show the yearly pension payment",
-            value=False,
+            value=True,
             help=(
                 "Adds a purple line showing how much money changes hands each year. "
                 "In retirement, the pension sends you this amount as your pension check. "
