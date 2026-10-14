@@ -1553,10 +1553,6 @@ def render_feedback_form(page_name):
             value=False,
             key=f"feedback_details_{st.session_state.feedback_key}",
         )
-        st.caption(
-            "Feedback is saved to a private Google Sheet that only the site owner can see, along "
-            "with basic visit details."
-        )
         if st.form_submit_button("Submit"):
             # [H-3] Abuse controls: enforce a length cap (belt-and-suspenders with
             # the widget's max_chars) and a per-session cooldown so a single client
