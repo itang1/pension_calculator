@@ -253,29 +253,6 @@ guaranteed {simulation.PLAN_REFUND_INTEREST_PCT:g}% a year, so your account has 
             help="What page 1 says is left at the end, when the market grows by the same amount every year. Compare it with the typical result to the left; the order of returns can change how many payments the account covers.",
         )
 
-    st.subheader("Why ups and downs matter")
-    st.markdown("**Here is the whole idea in one example:**")
-    render_html("""
-<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
-Suppose you have &#36;1,000 and take out &#36;100 at the end of each year. If the market goes <strong>up 20% and then down 10%</strong>, you end with &#36;890. If the same two years come in the other order, <strong>down 10% and then up 20%</strong>, you end with &#36;860. <strong>Same returns, different order, &#36;30 less</strong>, because you sold more while prices were low. Over a long retirement, a few bad years early on can empty an account years sooner. That is why an account that wins with a steady return can still run out in the real world, and why this page exists.
-</div>
-""")
-    st.space("small")
-
-    with st.expander("Why can this page disagree with page 1?"):
-        st.markdown(f"""
-Page 1 uses the same {index_return_pct:.1f}% every year. This page keeps {index_return_pct:.1f}% as a typical year but adds ups and downs.
-
-Bad years early in retirement do lasting damage. You still have to take out money to live on, so you end up selling investments while prices are low, and that money is gone before prices recover. That is why the typical result here is usually worse than page 1, and why some futures run out.
-
-The steady-return page shows one unchanging return. This page explores how different sequences of returns affect the same payments. Neither predicts your actual outcome.
-""")
-
-    if flat_final > 0 and median_final < flat_final:
-        st.markdown(
-            f"Notice that the typical outcome (**\\${median_final:,.0f}**) is smaller than the flat-rate answer (**\\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% typical yearly return before inflation. Changing returns affects both account growth and the impact of withdrawals, so the two ending balances need not match."
-        )
-
     st.header("The range of your account across 1,000 futures")
 
     _show_flat = st.checkbox(
@@ -304,6 +281,20 @@ The steady-return page shows one unchanging return. This page explores how diffe
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the \\$0 mark. Empty accounts stay at \\$0, unpaid payments count as failures, but paying everything and ending at exactly $0 does not.
 """)
+
+    st.header("Why ups and downs matter")
+    st.markdown("**Here is the whole idea in one example:**")
+    render_html("""
+<div style="background-color:#F1F5F9; border-left:5px solid #64748B; padding:0.75rem 1.2rem; border-radius:0.5rem; color:#1e293b;">
+Suppose you have &#36;1,000 and take out &#36;100 at the end of each year. If the market goes <strong>up 20% and then down 10%</strong>, you end with &#36;890. If the same two years come in the other order, <strong>down 10% and then up 20%</strong>, you end with &#36;860. <strong>Same returns, different order, &#36;30 less</strong>, because you sold more while prices were low. Over a long retirement, a few bad years early on can empty an account years sooner. That is why an account that wins with a steady return can still run out in the real world, and why this page exists.
+</div>
+""")
+    st.space("small")
+
+    if flat_final > 0 and median_final < flat_final:
+        st.markdown(
+            f"Notice that the typical outcome (**\\${median_final:,.0f}**) is smaller than the flat-rate answer (**\\${max(flat_final, 0):,.0f}**), even though both use the same {index_return_pct:.1f}% typical yearly return before inflation. Changing returns affects both account growth and the impact of withdrawals, so the two ending balances need not match."
+        )
 
     with st.expander("How this was computed"):
         st.markdown(f"""
