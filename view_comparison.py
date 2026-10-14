@@ -193,7 +193,7 @@ You put the same money into your own investment account instead. It grows or shr
 
         st.space("small")
 
-        st.header("Would Your Account Cover the Pension Payments?")
+        st.header("Would Your Own Account Pay Off as Much as the Pension?")
 
         with st.expander("How to read this chart"):
             st.markdown("""
