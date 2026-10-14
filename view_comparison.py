@@ -16,10 +16,8 @@ from common import (
     CURRENT_YEAR,
     ages_for,
     build_fund_chart,
-    build_rate_curve_chart,
     chart_title,
     fund_chart_title,
-    rate_chart_title,
     fmt_rate,
     get_monte_carlo,
     inputs_summary_html,
@@ -238,12 +236,6 @@ You put the same money into your own investment account instead. It grows or shr
         st.plotly_chart(fig, width="stretch")
         st.caption("Chart amounts: k = thousand; M = million.")
 
-        if res["depletion_year"] is not None:
-            st.metric("Total Income the Account Could Not Pay", f"${-personal_balance:,.0f}",
-                      help="Unpaid pension-equivalent income, not money you owe. Uses the dollar display selected above.")
-        st.markdown(
-            "*Both options aim to pay the same income. Once the account is empty, any payments it cannot cover are counted as unpaid income.*"
-        )
 
         st.space("small")
 
@@ -321,17 +313,6 @@ You put the same money into your own investment account instead. It grows or shr
                 help="The total pension income over all retirement years, including yearly increases. Your own account attempts to match these payments while money remains. With buying power switched on, each year's amount is adjusted to today's prices before adding them up. The difference below shows total income minus total contributions."
             )
 
-        st.subheader("How the answer changes with the return rate")
-        st.markdown(
-            "The break-even rate is where this line leaves \\$0. Slide along it to see how much "
-            "a point of return is worth: above \\$0 your account ends with money to spare; at \\$0 your account "
-            "runs out and the pension wins. All returns on this chart are before inflation."
-        )
-        st.caption(f"Dashed gray: your {index_return_pct:.1f}% assumption. Dotted teal: {fmt_rate(res['breakeven_rate'])} break-even return.")
-        chart_title(rate_chart_title(res))
-        st.plotly_chart(build_rate_curve_chart(inputs, res), width="stretch")
-        st.caption("Chart amounts: k = thousand; M = million.")
-
         st.markdown("""
     **What you leave behind at your death depends on which option you choose:**
     - With **your own account**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
@@ -356,135 +337,10 @@ You put the same money into your own investment account instead. It grows or shr
 
     **Annual, end-of-period timing.** All contributions, deposits, and withdrawals are modeled as single lump sums at the end of each year rather than spread across pay periods. See the *Timing Assumptions* note on the sidebar for the exact ordering used. Contributions and withdrawals follow your inputs exactly with no irregular saving or mid-year deviations.
 
+    **Check your numbers with your plan.** For a pension estimate specific to you, check the rules and figures with your plan's retirement office. You can enter their estimate in the sidebar under "Enter manually."
+
     *Real retirement decisions should involve a licensed financial planner and tax professional who can account for your full situation.*
     """)
-
-    if inputs["plan_status"] == "unvested":
-        _first_tip = (
-            f"- **In this estimate, fewer than {simulation.PLAN_VESTING_YEARS} years of service "
-            f"means a contribution refund instead of a lifetime pension.** The result shows the "
-            f"estimated refund under the assumptions entered."
-        )
-    else:
-        _first_tip = (
-            f"- **The break-even return is {fmt_rate(res['breakeven_rate'])} per year in this "
-            f"scenario.** That is the steady annual return the account would need, under this "
-            f"calculator's assumptions, to last through the retirement period shown. It is a "
-            f"comparison point, not a prediction of future returns."
-        )
-    st.header("Understanding This Estimate")
-    st.markdown(f"""
-This comparison uses the inputs above to show how a pension and a personal account might compare. It does not predict investment results or determine what is right for you. A few points that may help explain the estimate:
-
-{_first_tip}
-- **This comparison assumes the same yearly payment from either option.** It does not include survivor or disability benefits, taxes on actual withdrawals, or other personal circumstances described above.
-- **For a pension estimate specific to you, check the rules and figures with your plan's retirement office.** The manual amount field lets you enter a monthly or yearly payment before taxes; payment timing and annual increases still follow the built-in rules described in the sidebar.
-
-*This calculator is for exploring a scenario. It is not a personal financial recommendation.*
-""")
-
-    st.divider()
-    st.header("Year-Over-Year Breakdown")
-
-    # Tables always show future dollars so each row's arithmetic adds up, and
-    # carry an Age column that matches the chart's age axis.
-    table_data = st.session_state["_results_nominal"]["yearly_data"].copy()
-    table_data.insert(1, "Age", ages_for(inputs)[1:])
-    st.markdown("""
-Each row is one year. The left table tracks **the pension**, while the right tracks **your own account**. Both tables use amounts paid or held in the year shown. The bold **Total** row adds these amounts without adjusting for inflation. To compare these totals with the summary amounts, switch off **Show amounts in today's dollars** above.
-""")
-
-    with st.expander("Working Years"):
-        st.markdown("""
-During your working years, a fixed percentage of your salary is contributed annually. Your salary grows each year from Cost of Living Adjustments (COLA), step increases, and any promotions.
-""")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**The Pension**")
-            st.markdown(f"""
-Each year, {pension_contribution_rate*100:.0f}% of your salary is deducted and paid into the pension. The **Contribution** column shows that deduction. The **Total Contributed** column is a running sum of all contributions to date.
-
-Salary grows each year by your COLA ({cola_pct:.1f}%), plus a step increase ({step_pct:.1f}%) in your first {inputs["step_count"]} years, plus a {promotion_pct:.0f}% bump in any promotion years ({", ".join(str(y) for y in promotion_years) if promotion_years else "none entered"}).{" Year 1 is a special case: it averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months in." if inputs["first_step_midyear"] and inputs["step_count"] else ""}
-""")
-        with col2:
-            st.markdown("**Your Own Account**")
-            st.markdown(f"""
-Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: the **Start Balance** earns **+ Returns** (investment growth at {index_return_pct:.1f}%/year), then the **+ Deposit** (same as the pension contribution) is added, producing the **= Balance** at year-end.
-
-Returns are calculated on the balance at the *start* of the year, before that year's deposit is added.
-""")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.dataframe(
-                render_breakdown_table(
-                    table_data[["Year", "Age", "Salary", "Pension Contribution", "Pension Contribution Total"]],
-                    "W",
-                    {"Pension Contribution": "Contribution", "Pension Contribution Total": "Total Contributed"},
-                ),
-                hide_index=True,
-            )
-        with col2:
-            st.dataframe(
-                render_breakdown_table(
-                    table_data[["Year", "Age", "Start Balance", "Market Returns", "Pension Contribution", "Balance"]],
-                    "W",
-                    {"Market Returns": "+ Returns", "Pension Contribution": "+ Deposit", "Balance": "= Balance"},
-                    balance_col="= Balance",
-                ),
-                hide_index=True,
-            )
-
-    with st.expander("Retirement Years"):
-        if inputs["plan_status"] == "unvested":
-            _pension_start = "There are no pension payments in this scenario. The contribution refund is shown above."
-        elif inputs["deferral_years"]:
-            _pension_start = (
-                f"Once you leave, contributions stop. The pension does not start until age "
-                f"{inputs['retirement_age'] + inputs['deferral_years']}, and then pays the same dollar "
-                f"amount every year (no COLA), so neither option pays anything before that."
-            )
-        else:
-            _pension_start = (
-                "Once you retire, contributions stop. The pension begins paying you a fixed annual "
-                "allowance that grows each year with COLA."
-            )
-        st.markdown(f"""
-{_pension_start} Your account tries to pay the same amount each year and earns returns on its remaining balance. Once it is empty, the **Income Unpaid** column shows payments it could not cover. That is missing income, not debt.
-""")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**The Pension**")
-            st.markdown(f"""
-The pension pays a set annual amount, {f'growing by {res["retiree_cola_pct"]:.1f}% each year (COLA)' if res["retiree_cola_pct"] else 'the same every year (no COLA)'}. **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
-""")
-        with col2:
-            st.markdown("**Your Own Account**")
-            st.markdown(f"""
-The **Start Balance** earns **+ Returns** ({index_return_pct:.1f}%/year before inflation), then the amount actually paid (**− Withdrawal**) is subtracted, leaving **= Balance**. The account cannot pay more than it holds. **Income Unpaid** is the part of the pension payment it could not match.
-""")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.dataframe(
-                render_breakdown_table(
-                    table_data[["Year", "Age", "Pension Redeemed", "Pension Redeemed Total"]],
-                    "R",
-                    {"Pension Redeemed": "Pension Received", "Pension Redeemed Total": "Total Received"},
-                ),
-                hide_index=True,
-            )
-        with col2:
-            st.dataframe(
-                render_breakdown_table(
-                    account_payment_table(table_data)[["Year", "Age", "Start Balance", "Market Returns", "Account Withdrawal", "Income Unpaid", "Balance"]],
-                    "R",
-                    {"Start Balance": "Start Balance",
-                     "Market Returns": "+ Returns",
-                     "Account Withdrawal": "− Withdrawal",
-                     "Balance": "= Balance"},
-                    balance_col="= Balance",
-                ),
-                hide_index=True,
-            )
 
     st.divider()
     st.header("Case Studies")
@@ -608,4 +464,108 @@ Frank is a civil servant who starts at \\$150,000 and earns two sizable promotio
 **Verdict:** His own account wins decisively. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. High contributions paired with strong returns and a modest retirement factor are the clearest case for your own account. Even so, with realistic ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
 """)
 
+    st.divider()
+    st.header("Year-Over-Year Breakdown")
+
+    # Tables always show future dollars so each row's arithmetic adds up, and
+    # carry an Age column that matches the chart's age axis.
+    table_data = st.session_state["_results_nominal"]["yearly_data"].copy()
+    table_data.insert(1, "Age", ages_for(inputs)[1:])
+    st.markdown("""
+Each row is one year. The left table tracks **the pension**, while the right tracks **your own account**. Both tables use amounts paid or held in the year shown. The bold **Total** row adds these amounts without adjusting for inflation. To compare these totals with the summary amounts, switch off **Show amounts in today's dollars** above.
+""")
+
+    with st.expander("Working Years"):
+        st.markdown("""
+During your working years, a fixed percentage of your salary is contributed annually. Your salary grows each year from Cost of Living Adjustments (COLA), step increases, and any promotions.
+""")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**The Pension**")
+            st.markdown(f"""
+Each year, {pension_contribution_rate*100:.0f}% of your salary is deducted and paid into the pension. The **Contribution** column shows that deduction. The **Total Contributed** column is a running sum of all contributions to date.
+
+Salary grows each year by your COLA ({cola_pct:.1f}%), plus a step increase ({step_pct:.1f}%) in your first {inputs["step_count"]} years, plus a {promotion_pct:.0f}% bump in any promotion years ({", ".join(str(y) for y in promotion_years) if promotion_years else "none entered"}).{" Year 1 is a special case: it averages your Step 1 and Step 2 salaries, since the Step 1→2 raise happens 6 months in." if inputs["first_step_midyear"] and inputs["step_count"] else ""}
+""")
+        with col2:
+            st.markdown("**Your Own Account**")
+            st.markdown(f"""
+Instead of paying into the pension, imagine depositing that same amount each year into your own investment account. The column headers show the formula: the **Start Balance** earns **+ Returns** (investment growth at {index_return_pct:.1f}%/year), then the **+ Deposit** (same as the pension contribution) is added, producing the **= Balance** at year-end.
+
+Returns are calculated on the balance at the *start* of the year, before that year's deposit is added.
+""")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.dataframe(
+                render_breakdown_table(
+                    table_data[["Year", "Age", "Salary", "Pension Contribution", "Pension Contribution Total"]],
+                    "W",
+                    {"Pension Contribution": "Contribution", "Pension Contribution Total": "Total Contributed"},
+                ),
+                hide_index=True,
+            )
+        with col2:
+            st.dataframe(
+                render_breakdown_table(
+                    table_data[["Year", "Age", "Start Balance", "Market Returns", "Pension Contribution", "Balance"]],
+                    "W",
+                    {"Market Returns": "+ Returns", "Pension Contribution": "+ Deposit", "Balance": "= Balance"},
+                    balance_col="= Balance",
+                ),
+                hide_index=True,
+            )
+
+    with st.expander("Retirement Years"):
+        if inputs["plan_status"] == "unvested":
+            _pension_start = "There are no pension payments in this scenario. The contribution refund is shown above."
+        elif inputs["deferral_years"]:
+            _pension_start = (
+                f"Once you leave, contributions stop. The pension does not start until age "
+                f"{inputs['retirement_age'] + inputs['deferral_years']}, and then pays the same dollar "
+                f"amount every year (no COLA), so neither option pays anything before that."
+            )
+        else:
+            _pension_start = (
+                "Once you retire, contributions stop. The pension begins paying you a fixed annual "
+                "allowance that grows each year with COLA."
+            )
+        st.markdown(f"""
+{_pension_start} Your account tries to pay the same amount each year and earns returns on its remaining balance. Once it is empty, the **Income Unpaid** column shows payments it could not cover. That is missing income, not debt.
+""")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**The Pension**")
+            st.markdown(f"""
+The pension pays a set annual amount, {f'growing by {res["retiree_cola_pct"]:.1f}% each year (COLA)' if res["retiree_cola_pct"] else 'the same every year (no COLA)'}. **Pension Received** is that year's payment. **Total Received** is the running sum of all payments to date.
+""")
+        with col2:
+            st.markdown("**Your Own Account**")
+            st.markdown(f"""
+The **Start Balance** earns **+ Returns** ({index_return_pct:.1f}%/year before inflation), then the amount actually paid (**− Withdrawal**) is subtracted, leaving **= Balance**. The account cannot pay more than it holds. **Income Unpaid** is the part of the pension payment it could not match.
+""")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.dataframe(
+                render_breakdown_table(
+                    table_data[["Year", "Age", "Pension Redeemed", "Pension Redeemed Total"]],
+                    "R",
+                    {"Pension Redeemed": "Pension Received", "Pension Redeemed Total": "Total Received"},
+                ),
+                hide_index=True,
+            )
+        with col2:
+            st.dataframe(
+                render_breakdown_table(
+                    account_payment_table(table_data)[["Year", "Age", "Start Balance", "Market Returns", "Account Withdrawal", "Income Unpaid", "Balance"]],
+                    "R",
+                    {"Start Balance": "Start Balance",
+                     "Market Returns": "+ Returns",
+                     "Account Withdrawal": "− Withdrawal",
+                     "Balance": "= Balance"},
+                    balance_col="= Balance",
+                ),
+                hide_index=True,
+            )
+
+    st.divider()
     render_feedback_form("comparison")

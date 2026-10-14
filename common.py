@@ -1275,70 +1275,10 @@ def chart_title(text):
     st.markdown(f"**{text}**")
 
 
-def rate_chart_title(res):
-    return f"Money left at the end, by yearly return{dollars_note(res)}"
-
-
 def fund_chart_title(res, title=None):
     if title is None:
         title = f"Your account over time, at a steady {res['index_return_pct']:.1f}% a year"
     return title + dollars_note(res)
-
-
-def build_rate_curve_chart(inputs, res):
-    """Money left at death for your account across flat return rates.
-
-    One line: above $0 your account wins, below it the pension wins. The user's
-    assumed rate and the break-even rate are marked so the single break-even
-    number becomes something you can see.
-    """
-    # Show 0% up to a few points past the larger of the user's rate and the
-    # break-even, so a runaway balance at 15% can't flatten the crossing.
-    current = res["index_return_pct"]
-    be = res["breakeven_rate"]
-    focus = max(current, be if math.isfinite(be) else current)
-    top = min(28.0, max(10.0, math.ceil(focus) + 3))
-    rates = [r / 2 for r in range(0, int(top * 2) + 1)]
-    real = res.get("real_dollars", False)
-    finals = []
-    for r in rates:
-        sim = run_simulation(*_engine_args(inputs), 1 + r / 100, **_engine_kwargs(inputs))
-        final = deflate_results(sim, inputs)["personal_balance"] if real else sim["personal_balance"]
-        finals.append(final)
-    fig = go.Figure(go.Scatter(
-        x=rates, y=[max(v, 0.0) for v in finals], mode="lines",
-        line=dict(color="#0D9488", width=3),
-        customdata=[max(-v, 0.0) for v in finals],
-        hovertemplate="Return before inflation: %{x:.1f}%<br>Money left: $%{y:,.0f}<br>Income unpaid: $%{customdata:,.0f}<extra></extra>",
-    ))
-    ink, muted = "#1e293b", "#64748B"
-    fig.add_vline(x=current, line_width=1.5, line_dash="dash", line_color=muted,
-                  annotation_text=f"Your assumption: {current:.1f}%",
-                  annotation_position="top", annotation_font_color=ink)
-    fig.add_annotation(x=0.01, y=0.88, xref="paper", yref="paper", xanchor="left",
-                       text="Above $0: your account wins (money left over)",
-                       showarrow=False, font=dict(size=12, color=muted))
-    if be > 0:
-        fig.add_annotation(x=0.01, y=0.02, xref="paper", yref="paper", xanchor="left", yanchor="bottom",
-                           text="At $0: the pension wins (your account runs out)",
-                           showarrow=False, font=dict(size=12, color=muted))
-    if 0 < be <= rates[-1]:
-        fig.add_vline(x=be, line_width=1.5, line_dash="dot", line_color="#0D9488")
-        fig.add_trace(go.Scatter(
-            x=[be], y=[0], mode="markers",
-            marker=dict(size=10, color="#0D9488"),
-            hovertemplate=f"Break-even: {be:.1f}% before inflation<extra></extra>",
-        ))
-        fig.add_annotation(x=be, y=0, text=f"Break-even {be:.1f}%", showarrow=True,
-                           arrowhead=0, ax=40, ay=-40, font=dict(size=12, color=ink),
-                           bgcolor="rgba(255,255,255,0.85)")
-    fig.update_layout(
-        xaxis=dict(title="Yearly return before inflation", ticksuffix="%", showgrid=False, range=[0, rates[-1]]),
-        yaxis=dict(title="Money left ($)", tickformat=".2s", rangemode="tozero", gridcolor="#eef0f2"),
-        plot_bgcolor="white", showlegend=False, hovermode="x",
-        margin=dict(l=15, r=15, t=30, b=30), height=350,
-    )
-    return fig
 
 
 def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
