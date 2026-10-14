@@ -171,6 +171,21 @@ Page 1 assumes your investments grow exactly {index_return_pct:.1f}% every year 
 We tested your plan against 1,000 made-up market futures, each a random mix of good and bad years.
 """)
 
+    # The slider's value is already in session_state when the script reruns,
+    # so the range can sit above the slider and still match it.
+    _std_now = st.session_state.get("mc_std", 15.0)
+    if _std_now == 0:
+        st.markdown(f"**Every year: {index_return_pct:+g}%**")
+    else:
+        _m = 1 + index_return_pct / 100
+        _s = simulation.lognormal_sigma(index_return_pct / 100, _std_now / 100)
+        def _pct(z):
+            return f"{(_m * math.exp(z * _s) - 1) * 100:+.0f}%"
+        st.markdown(
+            f"**Most years (2 in 3): {_pct(-1)} to {_pct(1)}** · "
+            f"Rare years (1 in 20): below {_pct(-1.96)} or above {_pct(1.96)}"
+        )
+
     _mc_std_pct = st.slider(
         "How bumpy is the market?",
         min_value=0.0, max_value=30.0, value=15.0, step=0.5, format="%.1f%%",
@@ -182,18 +197,6 @@ We tested your plan against 1,000 made-up market futures, each a random mix of g
             "just like page 1."
         ),
     )
-
-    if _mc_std_pct == 0:
-        st.markdown(f"**Every year: {index_return_pct:+g}%**")
-    else:
-        _m = 1 + index_return_pct / 100
-        _s = simulation.lognormal_sigma(index_return_pct / 100, _mc_std_pct / 100)
-        def _pct(z):
-            return f"{(_m * math.exp(z * _s) - 1) * 100:+.0f}%"
-        st.markdown(
-            f"**Most years (2 in 3): {_pct(-1)} to {_pct(1)}** · "
-            f"Rare years (1 in 20): below {_pct(-1.96)} or above {_pct(1.96)}"
-        )
 
     mc = get_monte_carlo(inputs, _mc_std_pct)
     if res.get("real_dollars"):
