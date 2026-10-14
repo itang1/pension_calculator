@@ -1282,7 +1282,7 @@ def fund_chart_title(res, title=None):
 
 
 def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
-                     verdict_annotation=False):
+                     verdict_annotation=False, show_flat_line=True):
     """Nonnegative account balances, with on-chart labels stating the verdict."""
     years = res["years"]
     personal_fund_values = [max(v, 0.0) for v in res["personal_fund_values"]]
@@ -1303,7 +1303,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
     # is fully visible; the extreme-luck tails (5th/95th) are allowed to clip
     # rather than letting a 20x-lucky path squash the flat line into the
     # bottom of the chart.
-    all_values = [v for v in personal_fund_values if v is not None]
+    all_values = [v for v in personal_fund_values if v is not None] if show_flat_line else [0.0]
     _yearly_payouts = [0.0] + res["yearly_data"]["Pension Redeemed"].tolist()
     if show_ref_line:
         all_values = all_values + _yearly_payouts
@@ -1387,6 +1387,7 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
         mode="lines+markers",
         name=f"Steady {index_return_pct:.1f}% before inflation",
         line=dict(color="#0D9488", width=3),
+        visible=show_flat_line,
         customdata=_personal_customdata,
         hovertemplate=(
             "<b>Age %{x}</b> · %{customdata[4]} (year %{customdata[3]})<br>"

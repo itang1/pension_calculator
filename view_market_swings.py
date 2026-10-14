@@ -277,16 +277,28 @@ The steady-return page shows one unchanging return. This page explores how diffe
 
     st.header("The range of your account across 1,000 futures")
 
+    _show_flat = st.checkbox(
+        "Compare with the steady-return line from page 1",
+        value=False,
+        key="mc_show_flat",
+        help=f"Adds a teal line showing your account if the market grew exactly {index_return_pct:.1f}% every year. It is only a reference point; the shaded bands are this page's answer.",
+    )
     chart_title(fund_chart_title(
-        res, f"Your account: a steady {index_return_pct:.1f}% a year vs. 1,000 possible futures"))
+        res, f"Your account: a steady {index_return_pct:.1f}% a year vs. 1,000 possible futures" if _show_flat
+        else "Your account across 1,000 possible futures"))
     st.caption(f"Retirement starts at age {inputs['retirement_age']} (the red dashed line). Empty accounts stay at $0; unpaid income is not debt.")
-    fig = build_fund_chart(inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"])
-    st.plotly_chart(fig, width="stretch")
-    st.caption("Chart amounts: k = thousand; M = million.")
+    fig = build_fund_chart(inputs, res, show_ref_line=False, mc_pcts=mc["percentiles"], show_flat_line=_show_flat)
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+    st.caption(
+        "Shaded bands show where your account's balance lands across the 1,000 futures. Blue is the most likely range, "
+        "red the unlucky futures, and green the lucky ones."
+        + (f" The teal line is a steady {index_return_pct:.1f}% every year, as on page 1." if _show_flat else "")
+        + " Chart amounts: k = thousand; M = million."
+    )
 
     with st.expander("How to read this chart"):
         st.markdown("""
-- **Bold teal line** = the steady-return answer: your own account if the market grew by the same amount every year.
+- **Bold teal line (optional)** = the steady-return answer: your own account if the market grew by the same amount every year. Turn it on with the checkbox above the chart.
 - **Shaded bands** = at each age, the range your account's balance falls into across the 1,000 futures. Blue = the middle half (the most likely range). Red = the unlucky futures just below that, and green = the lucky ones just above it, which can go off the top of the chart. The very unluckiest and luckiest 5% are left off so the chart stays readable.
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the \\$0 mark. Empty accounts stay at \\$0, unpaid payments count as failures, but paying everything and ending at exactly $0 does not.
