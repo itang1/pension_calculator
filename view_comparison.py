@@ -65,7 +65,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
         title = "Your account covers every payment and finishes with money left."
         body = (
             f"After {int(retirement_years)} years, it has <strong>${personal_balance:,.0f}</strong>{dollars} "
-            "left after covering the same income as the pension. Survivor benefits are not included."
+            "left after covering the same income as the pension. (Survivor benefits are not considered.)"
         )
         bg, bar = "#CCFBF1", "#0D9488"
     render_html(f"""
