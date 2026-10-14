@@ -73,32 +73,22 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
 <div style="font-size:1.4rem; font-weight:700; margin-bottom:0.6rem;">{headline}</div>
 <strong>{title}</strong><br><br>
 This calculation assumes your investments grow by <strong>{current_rate_pct:.1f}% every year before inflation</strong>, with no market ups and downs.<br><br>
-{body}<br><br>
-The account needs a steady return of <strong>{fmt_rate(breakeven_rate)} before inflation</strong> to cover all payments under these assumptions.
+{body}
 </div>
 """)
-    if runs_out is not None:
-        std = st.session_state.get("mc_std", 15.0)
-        if std == 0:
-            st.caption("Market swings are set to 0%, so the simulations on the second page repeat this same calculation.")
+    label = "See how market ups and downs change this result →"
+    std = st.session_state.get("mc_std", 15.0)
+    if runs_out is not None and std != 0:
+        if runs_out == "0":
+            swings = "your own account wins in every simulated future"
+        elif runs_out == "100":
+            swings = "the pension wins in every simulated future"
         else:
-            if runs_out == "0":
-                swings = "your own account wins in every simulated future."
-            elif runs_out == "100":
-                swings = "the pension wins in every simulated future because your account runs out."
-            else:
-                swings = (f"the pension wins in {runs_out} out of 100 simulated futures because your account runs out. "
-                          "Your own account wins in the rest.")
-            st.caption(f"With market ups and downs ({std:g}% swings), {swings} These are model results, not a prediction of your personal odds.")
+            swings = f"the pension wins in {runs_out} out of 100 simulated futures and your own account wins in the rest"
+        label = f"With market ups and downs ({std:g}% swings), {swings}. See how →"
     # st.page_link (not an HTML anchor inside the banner) so navigation stays
     # client-side and the visitor's sidebar inputs survive the page switch.
-    st.page_link(
-        st.session_state["_pages"]["market"],
-        label=(
-            '*See how market ups and downs change this result →*'
-        ),
-        icon="🎢",
-    )
+    st.page_link(st.session_state["_pages"]["market"], label=f"*{label}*", icon="🎢")
 
 
 def render_refund_result(inputs, res):

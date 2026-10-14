@@ -123,7 +123,7 @@ def test_case_study_button_sets_the_swings_its_figures_assume():
     next(b for b in at.button if b.key == "load_alice").click().run()
     at.run()
     assert at.session_state["mc_std"] == 15.0
-    assert any("38 out of 100" in c.value for c in at.caption)
+    assert any("38 out of 100" in e.proto.label for e in at.get("page_link"))
 
 
 def test_loading_a_link_fills_inputs_then_clears_the_address_bar():
