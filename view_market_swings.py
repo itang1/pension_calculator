@@ -7,11 +7,12 @@ methodology expander, not in the main copy) and reports how often your account
 runs out of money, when it happens, and what the typical outcome looks like.
 """
 
+import math
+
 import numpy as np
 import streamlit as st
 
 import simulation
-from plotly import graph_objects as go
 
 from common import (
     build_fund_chart,
@@ -20,7 +21,6 @@ from common import (
     deflate_mc,
     inputs_summary_html,
     out_of_100,
-    dollars_note,
     get_monte_carlo,
     render_feedback_form,
     render_html,
@@ -166,7 +166,7 @@ def render():
 """)
     st.space("small")
     st.markdown(f"""
-The steady-return page assumes investments grow by exactly {index_return_pct:.1f}% every single year before inflation. Real markets don't work that way. Some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
+The steady-return page assumes investments grow by exactly {index_return_pct:.1f}% every single year before inflation. Real markets don't work that way; some years are way up and some are way down (say +18%, −4%, +25%, −12%), even if a typical year is still about {index_return_pct:.1f}%.
 
 **So this page asks: with simulated ups and downs, how often does your own account win, and how often does the pension win?**
 
@@ -184,6 +184,18 @@ To find out, we made up **1,000 possible futures** for the stock market. Each on
             "just like page 1."
         ),
     )
+
+    if _mc_std_pct == 0:
+        st.caption(f"Every year returns exactly {index_return_pct:.1f}% before inflation.")
+    else:
+        _m = 1 + index_return_pct / 100
+        _s = simulation.lognormal_sigma(index_return_pct / 100, _mc_std_pct / 100)
+        def _pct(z):
+            return f"{(_m * math.exp(z * _s) - 1) * 100:+.0f}%"
+        st.caption(
+            f"With this setting, about 2 out of 3 years return between {_pct(-1)} and {_pct(1)} before inflation. "
+            f"About 1 year in 20 is worse than {_pct(-1.96)} or better than {_pct(1.96)}."
+        )
 
     mc = get_monte_carlo(inputs, _mc_std_pct)
     if res.get("real_dollars"):
@@ -279,80 +291,6 @@ The steady-return page shows one unchanging return. This page explores how diffe
 - **Red dashed vertical line** = the year retirement begins.
 - **Horizontal gray line** = the \\$0 mark. Empty accounts stay at \\$0, unpaid payments count as failures, but paying everything and ending at exactly $0 does not.
 """)
-
-    st.header("How the 1,000 futures ended")
-
-    # "Ran out" comes from the engine (a payment went unpaid), so a future
-    # that pays everything and ends at exactly $0 is not counted as a failure.
-    ran_out_mask = mc["depletion_years"] > 0
-    ran_out_count = int(ran_out_mask.sum())
-    survivors = final_balances[~ran_out_mask]
-    _cap = float(np.percentile(final_balances, 95))
-    hist = go.Figure()
-    _w = 1.0
-    if len(survivors) > 0 and _cap > 0:
-        shown = survivors[survivors <= _cap]
-        counts, edges = np.histogram(shown, bins=30, range=(0.0, _cap))
-        _w = _cap / 30
-        centers = (edges[:-1] + edges[1:]) / 2
-        hist.add_trace(go.Bar(
-            x=centers, y=counts, width=_w * 0.92, marker_color="#3B82F6",
-            hovertemplate="Ending balance near $%{x:,.0f}<br>Number of futures: %{y}<extra></extra>",
-        ))
-    elif len(survivors) > 0:
-        _w = max(float(survivors.max()) / 30, 1.0)
-    if ran_out_count > 0:
-        hist.add_trace(go.Bar(
-            x=[-_w / 2], y=[ran_out_count], width=_w * 0.92, marker_color="#DC2626",
-            hovertemplate="Ran out of money ($0)<br>Number of futures: %{y}<extra></extra>",
-        ))
-    hist.update_layout(
-        xaxis_title="Money left at the end of retirement ($)",
-        yaxis_title="Number of futures",
-        xaxis=dict(tickformat=".2s", separatethousands=True),
-        plot_bgcolor="white",
-        barmode="overlay",
-        margin=dict(l=40, r=20, t=90, b=60),
-        showlegend=False,
-    )
-    if 0 < flat_final <= _cap:
-        hist.add_vline(x=flat_final, line_width=2, line_dash="dash", line_color="#0D9488")
-    if median_final > 0:
-        hist.add_vline(x=median_final, line_width=2, line_dash="dot", line_color="#1e293b")
-    st.caption(f"{ran_out_count:,} scenarios could not cover all payments. Dashed teal: steady-return result. Dotted gray: middle result.")
-    chart_title(f"Ending balance, across all 1,000 futures{dollars_note(res)}")
-    st.plotly_chart(hist, width="stretch")
-    st.caption(
-        "The tallest bars show the most common outcomes. The red bar left of $0 counts "
-        "the futures that ran out of money. The luckiest 5% of futures extend beyond "
-        "the right edge of this chart; they are left out so the likely region stays readable."
-    )
-
-    _dep_years = mc["depletion_years"]
-    _dep_years = _dep_years[_dep_years > 0]
-    if len(_dep_years) > 0:
-        st.header("When did the money run out?")
-        st.markdown(f"""
-Of the **{len(_dep_years)} futures** (out of 1,000) where the money ran out, here is *when* it happened. Running out in year {int(np.median(_dep_years))} of a {retirement_years}-year retirement is a very different problem than running out in the final year; this chart shows which one you'd be facing.
-""")
-        # Plotted by age (the age you reach by the end of the year the money
-        # ran out), matching the age axis on the fund chart above.
-        _ret_age = inputs["retirement_age"]
-        timing = go.Figure(go.Histogram(
-            x=_dep_years + _ret_age, xbins=dict(size=1), marker_color="#DC2626",
-            hovertemplate="Ran out by age %{x}<br>Number of futures: %{y}<extra></extra>",
-        ))
-        timing.update_layout(
-            xaxis_title=f"Your age (retirement runs from {_ret_age} to {_ret_age + retirement_years})",
-            yaxis_title="Number of futures",
-            xaxis=dict(range=[_ret_age + 0.5, _ret_age + retirement_years + 0.5]),
-            plot_bgcolor="white",
-            bargap=0.05,
-            margin=dict(l=40, r=20, t=20, b=60),
-            showlegend=False,
-        )
-        chart_title("Age by which the account hit $0")
-        st.plotly_chart(timing, width="stretch")
 
     with st.expander("How this was computed"):
         st.markdown(f"""

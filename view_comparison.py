@@ -66,8 +66,8 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
         body = (
             f"After {span}, it has <strong>${personal_balance:,.0f}</strong>{dollars} "
             "left after covering the same income as the pension. That money is yours to keep, spend, give away, "
-            "or pass on. With the pension, payments stop when you die and nothing is left over. "
-            "(Survivor benefits are not considered.)"
+            "or pass on. By contrast, with the pension, payments stop when you die and nothing is left over "
+            "(although note that survivor benefits, which are not considered as part of this model, might change the verdict)."
         )
         bg, bar = "#CCFBF1", "#0D9488"
     render_html(f"""
