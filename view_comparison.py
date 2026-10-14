@@ -252,26 +252,14 @@ You put the same money into your own investment account instead. It grows or shr
         mc1, mc2, mc3 = st.columns(3)
         with mc1:
             st.metric(
-                label=f"Pension Contributed over {work_years} Years",
-                value=f"${pension_contribution_total:,.0f}",
-                help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. Your own account receives this same amount as deposits."
+                label="Years Your Account Covers",
+                value=f"{_years_covered} / {retirement_years} yrs",
+                delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
+                delta_arrow="off",
+                delta_color="normal" if _depletion_year is None else "inverse",
+                help="How many retirement years your own account can sustain the same annual withdrawal as the pension, out of your total retirement period.",
             )
         with mc2:
-            st.metric(
-                label=f"Pension Received over {retirement_years} Years",
-                value=f"${pension_redeemed_total:,.0f}",
-                delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
-                help="The total pension income over all retirement years, including yearly increases. Your own account attempts to match these payments while money remains. With buying power switched on, each year's amount is adjusted to today's prices before adding them up. The difference below shows total income minus total contributions."
-            )
-        with mc3:
-            st.metric(
-                label=f"Your Account at Retirement (Age {inputs['retirement_age']})",
-                value=f"${personal_fund_values[work_years]:,.0f}",
-                help="The balance of your own (hypothetical) investment account on the day you retire, after years of contributions and market growth."
-            )
-
-        mc4, mc5, mc6 = st.columns(3)
-        with mc4:
             if res["depletion_year"] is None:
                 st.metric(
                     label=f"Your Account at the End (Age {inputs['retirement_age'] + retirement_years})",
@@ -292,7 +280,7 @@ You put the same money into your own investment account instead. It grows or shr
                         f"Over the remaining years, your account would have come up ${-personal_balance:,.0f} short of the same income."
                     ),
                 )
-        with mc5:
+        with mc3:
             st.metric(
                 label="Break-even Return Rate",
                 value=fmt_rate(res["breakeven_rate"]),
@@ -303,14 +291,26 @@ You put the same money into your own investment account instead. It grows or shr
                 delta_color="inverse" if math.isinf(_rate_buffer) else "normal",
                 help="The lowest steady yearly return, before inflation, that keeps your own account from running out before the end of the comparison. If your expected return is above this, your account wins; below it, the pension wins.",
             )
+
+        mc4, mc5, mc6 = st.columns(3)
+        with mc4:
+            st.metric(
+                label=f"Pension Contributed over {work_years} Years",
+                value=f"${pension_contribution_total:,.0f}",
+                help="The total amount automatically deducted from your paychecks and paid into the pension system over your working years. Your own account receives this same amount as deposits."
+            )
+        with mc5:
+            st.metric(
+                label=f"Your Account at Retirement (Age {inputs['retirement_age']})",
+                value=f"${personal_fund_values[work_years]:,.0f}",
+                help="The balance of your own (hypothetical) investment account on the day you retire, after years of contributions and market growth."
+            )
         with mc6:
             st.metric(
-                label="Years Your Account Covers",
-                value=f"{_years_covered} / {retirement_years} yrs",
-                delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
-                delta_arrow="off",
-                delta_color="normal" if _depletion_year is None else "inverse",
-                help="How many retirement years your own account can sustain the same annual withdrawal as the pension, out of your total retirement period.",
+                label=f"Pension Received over {retirement_years} Years",
+                value=f"${pension_redeemed_total:,.0f}",
+                delta=f"${pension_redeemed_total - pension_contribution_total:,.0f} net",
+                help="The total pension income over all retirement years, including yearly increases. Your own account attempts to match these payments while money remains. With buying power switched on, each year's amount is adjusted to today's prices before adding them up. The difference below shows total income minus total contributions."
             )
 
         st.subheader("How the answer changes with the return rate")
