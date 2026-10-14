@@ -164,39 +164,36 @@ def render():
 """)
     st.space("small")
     st.markdown(f"""
-Page 1 assumes your investments grow exactly {index_return_pct:.1f}% every year (before inflation). Real markets don't work that way; some years are way up and some are way down (say +18%, −4%, +25%, −12%).
-
-**This page asks: with ups and downs, how often does your own account win, and how often does the pension win?**
-
-We tested your plan against 1,000 made-up market futures, each a random mix of good and bad years.
+Page 1 assumes your investments grow exactly {index_return_pct:.1f}% every year (before inflation). Real markets don't work that way; some years are way up and some are way down (say +18%, −4%, +25%, −12%). We tested your plan against 1,000 made-up market futures, each a random mix of good and bad years. **This page asks: with ups and downs, how often does your own account win, and how often does the pension win?**
 """)
 
-    # The slider's value is already in session_state when the script reruns,
-    # so the range can sit above the slider and still match it.
-    _std_now = st.session_state.get("mc_std", 15.0)
-    if _std_now == 0:
-        st.markdown(f"**Every year: {index_return_pct:+g}%**")
-    else:
-        _m = 1 + index_return_pct / 100
-        _s = simulation.lognormal_sigma(index_return_pct / 100, _std_now / 100)
-        def _pct(z):
-            return f"{(_m * math.exp(z * _s) - 1) * 100:+.0f}%"
-        st.markdown(
-            f"**Most years (2 in 3): {_pct(-1)} to {_pct(1)}** · "
-            f"Rare years (1 in 20): below {_pct(-1.96)} or above {_pct(1.96)}"
-        )
+    with st.container(border=True):
+        # The slider's value is already in session_state when the script reruns,
+        # so the range can sit above the slider and still match it.
+        _std_now = st.session_state.get("mc_std", 15.0)
+        if _std_now == 0:
+            st.markdown(f":blue-background[**Every year: {index_return_pct:+g}%**]")
+        else:
+            _m = 1 + index_return_pct / 100
+            _s = simulation.lognormal_sigma(index_return_pct / 100, _std_now / 100)
+            def _pct(z):
+                return f"{(_m * math.exp(z * _s) - 1) * 100:+.0f}%"
+            st.markdown(
+                f":blue-background[**Most years (2 in 3): {_pct(-1)} to {_pct(1)}**] · "
+                f"Rare years (1 in 20): below {_pct(-1.96)} or above {_pct(1.96)}"
+            )
 
-    _mc_std_pct = st.slider(
-        "How bumpy is the market?",
-        min_value=0.0, max_value=30.0, value=15.0, step=0.5, format="%.1f%%",
-        key="mc_std",
-        help=(
-            "How widely yearly returns vary. This is the standard deviation, not a maximum loss or gain. "
-            "15% is an example assumption, not a prediction or a recommended investment mix. "
-            "Slide left for a calmer market, right for a wilder one. At 0, every year is the same, "
-            "just like page 1."
-        ),
-    )
+        _mc_std_pct = st.slider(
+            "How bumpy is the market?",
+            min_value=0.0, max_value=30.0, value=15.0, step=0.5, format="%.1f%%",
+            key="mc_std",
+            help=(
+                "How widely yearly returns vary. This is the standard deviation, not a maximum loss or gain. "
+                "15% is an example assumption, not a prediction or a recommended investment mix. "
+                "Slide left for a calmer market, right for a wilder one. At 0, every year is the same, "
+                "just like page 1."
+            ),
+        )
 
     mc = get_monte_carlo(inputs, _mc_std_pct)
     if res.get("real_dollars"):
