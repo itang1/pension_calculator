@@ -205,9 +205,12 @@ You put the same money into your own investment account instead. It grows or shr
     - **"Working Years" and "Retirement Years" labels** mark the two phases of the chart.
     - **Red dashed vertical line** = the year retirement begins.
     - **Horizontal gray line** = the $0 mark. The line stays here once the account is empty. Ending at exactly $0 after paying everything is fully funded.
-
-    *Wondering what happens when the market doesn't return the same rate every year? That's the whole subject of the "What If the Market Has Bad Years?" page.*
     """)
+            st.page_link(
+                st.session_state["_pages"]["market"],
+                label="*Wondering what happens when the market doesn't return the same rate every year? That's the whole subject of the \"What If the Market Has Bad Years?\" page →*",
+                icon="🎢",
+            )
 
         _show_ref_line = st.checkbox(
             "Show the yearly pension payment",
