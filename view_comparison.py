@@ -45,7 +45,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
     short = depletion_year is not None
     dollars = f" in buying power at today's ({CURRENT_YEAR}) prices" if real_dollars else " in the dollars of the final year, without adjusting for inflation"
     if short:
-        headline = "🏆 The pension wins"
+        headline = "🏆 Under your assumptions, the pension wins"
         title = "Your own account runs out of money before retirement ends. The pension keeps paying."
         following = int(retirement_years) - depletion_year
         body = (
@@ -56,12 +56,12 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
         )
         bg, bar = "#E0E7FF", "#4F46E5"
     elif personal_balance <= 0.5:
-        headline = "🤝 It's a tie"
+        headline = "🤝 Under your assumptions, it's a tie"
         title = "Your account covers every payment, with nothing left at the end."
         body = f"Both options cover the same income over the {int(retirement_years)} years shown."
         bg, bar = "#F1F5F9", "#64748B"
     else:
-        headline = "🏆 Your own account wins"
+        headline = "🏆 Under your assumptions, your own account wins"
         title = "Your account covers every payment and finishes with money left."
         body = (
             f"After {int(retirement_years)} years, it has <strong>${personal_balance:,.0f}</strong>{dollars} "
