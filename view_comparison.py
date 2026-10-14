@@ -36,36 +36,40 @@ from common import (
 
 def render_result_banner(personal_balance, retirement_years, depletion_year,
                          breakeven_rate, current_rate_pct, real_dollars=False,
-                         runs_out=None):
+                         runs_out=None, retirement_age=None):
     """The page's answer, before any chart or table.
 
     ``runs_out`` is page 2's count ("N" out of 100 futures), shown here so a
     reader who never opens page 2 still sees the risk behind a smooth-market win.
     """
     short = depletion_year is not None
+    ra, n = int(retirement_age), int(retirement_years)
+    span = f"{n} years of retirement, from retiring at {ra} until death at {ra + n}"
     dollars = f" in buying power at today's ({CURRENT_YEAR}) prices" if real_dollars else " in the dollars of the final year, without adjusting for inflation"
     if short:
-        headline = "🏆 Under your assumptions, the pension wins"
+        headline = "🏆 Under your input assumptions, the pension wins"
         title = "Your own account runs out of money before retirement ends. The pension keeps paying."
         following = int(retirement_years) - depletion_year
         body = (
             f"It fully covers the first {depletion_year - 1} years of the comparison. "
-            f"It cannot cover the full payment in retirement year {depletion_year}. "
+            f"It cannot cover the full payment in retirement year {depletion_year} (age {ra + depletion_year}). "
             + (f"The remaining {following} years are also unfunded. " if following else "")
             + "The modeled pension continues paying for the full period."
         )
         bg, bar = "#E0E7FF", "#4F46E5"
     elif personal_balance <= 0.5:
-        headline = "🤝 Under your assumptions, it's a tie"
+        headline = "🤝 Under your input assumptions, it's a tie"
         title = "Your account covers every payment, with nothing left at the end."
-        body = f"Both options cover the same income over the {int(retirement_years)} years shown."
+        body = f"Both options cover the same income over {span}."
         bg, bar = "#F1F5F9", "#64748B"
     else:
-        headline = "🏆 Under your assumptions, your own account wins"
+        headline = "🏆 Under your input assumptions, your own account wins"
         title = "Your account covers every payment and finishes with money left."
         body = (
-            f"After {int(retirement_years)} years, it has <strong>${personal_balance:,.0f}</strong>{dollars} "
-            "left after covering the same income as the pension. (Survivor benefits are not considered.)"
+            f"After {span}, it has <strong>${personal_balance:,.0f}</strong>{dollars} "
+            "left after covering the same income as the pension. That money is yours to keep, spend, give away, "
+            "or pass on. With the pension, payments stop when you die and nothing is left over. "
+            "(Survivor benefits are not considered.)"
         )
         bg, bar = "#CCFBF1", "#0D9488"
     render_html(f"""
@@ -189,6 +193,7 @@ You put the same money into your own investment account instead. It grows or shr
             personal_balance, retirement_years, res["depletion_year"],
             res["breakeven_rate"], index_return_pct, res.get("real_dollars", False),
             runs_out=out_of_100(get_monte_carlo(inputs, st.session_state.get("mc_std", 15.0))["depletion_prob"]),
+            retirement_age=inputs["retirement_age"],
         )
 
         st.space("small")
@@ -253,11 +258,14 @@ You put the same money into your own investment account instead. It grows or shr
         with mc1:
             st.metric(
                 label="Years Your Account Covers",
-                value=f"{_years_covered} / {retirement_years} yrs",
-                delta="Full retirement covered ✓" if _depletion_year is None else f"Ran out {retirement_years - _years_covered} yrs early ✗",
+                value=f"{_years_covered} of {retirement_years} years",
+                delta=(f"Pays you every year until death at {inputs['retirement_age'] + retirement_years} ✓" if _depletion_year is None
+                       else f"Runs out {retirement_years - _years_covered} years before death at {inputs['retirement_age'] + retirement_years} ✗"),
                 delta_arrow="off",
                 delta_color="normal" if _depletion_year is None else "inverse",
-                help="How many retirement years your own account can sustain the same annual withdrawal as the pension, out of your total retirement period.",
+                help=(f"Years of retirement are the years from retiring at {inputs['retirement_age']} until death at "
+                      f"{inputs['retirement_age'] + retirement_years} (set by Plan Through Age in the sidebar). "
+                      "This counts how many of those years your own account pays the same amount the pension would."),
             )
         with mc2:
             if res["depletion_year"] is None:
@@ -325,9 +333,9 @@ You put the same money into your own investment account instead. It grows or shr
         st.caption("Chart amounts: k = thousand; M = million.")
 
         st.markdown("""
-    **What you leave behind at your death:**
+    **What you leave behind at your death depends on which option you choose:**
     - With **your own account**, whatever the teal line shows at the end of retirement is money you still own (to donate, pass on, etc.)
-    - With **the pension**, payments stop when you die. Survivor benefits depend on your eligibility and the benefit option you choose, and are not included here; for members who qualify, they add value to the pension that this comparison leaves out.
+    - With **the pension**, on the other hand, payments stop when you die. Survivor benefits depend on your eligibility and the benefit option you choose, and are not included here; for members who qualify, they add value to the pension that this comparison leaves out.
     """)
 
         with st.expander("Limitations & Assumptions"):
