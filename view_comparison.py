@@ -233,7 +233,7 @@ You put the same money into your own investment account instead. It grows or shr
             + (f"The first payment the account cannot fully cover is at age {inputs['retirement_age'] + res['depletion_year']}." if res['depletion_year'] else "The account covers all payments through the ending age.")
         )
         fig = build_fund_chart(inputs, res, _show_ref_line, verdict_annotation=True)
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
         st.caption("Chart amounts: k = thousand; M = million.")
 
 
