@@ -37,6 +37,7 @@ def test_fixing_an_input_error_keeps_other_inputs():
     at.number_input(key="in_inflation").set_value(4.0).run()
     at.text_input(key="in_promo_years").set_value("ten").run()
     assert at.error, "expected an input error"
+    assert any("Advanced Assumptions" in e.value for e in at.sidebar.error), "error must show outside the collapsed section"
     at.text_input(key="in_promo_years").set_value("").run()
     assert not at.error and not at.exception
     assert at.session_state["in_returns"] == 9.0

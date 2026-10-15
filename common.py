@@ -684,6 +684,8 @@ def render_sidebar():
                 f"{int(step_count)} step raises, "
                 + (f"promotions after career years {', '.join(map(str, promotion_years))}." if promotion_years else "no promotions.")
             )
+            if "promotions" in problems:
+                st.error("A promotion year under Advanced Assumptions can't be read. Open that section to fix it.")
 
             if _wage_mode == "My wage today":
                 # This calendar year is career year (years_so_far + 1). Undo every
