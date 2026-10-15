@@ -554,8 +554,352 @@ def render_sidebar():
     with st.sidebar:
         st.header("Your Details")
 
-        with st.expander("Timing Assumptions"):
-            st.markdown("""
+        basics = st.container()
+        advanced = st.expander("Advanced Assumptions")
+        with advanced:
+            st.caption("The defaults suit most people. Open this to fine-tune raises, contributions, and inflation.")
+
+        with basics:
+            st.subheader("Career")
+            hire_year = int(st.number_input(
+                "Year You Were Hired",
+                value=CURRENT_YEAR, min_value=CURRENT_YEAR - 60, max_value=CURRENT_YEAR, step=1,
+                key="in_hire_year",
+                help=(
+                    "The year your career (and your pension contributions) started. Leave it at this "
+                    "year to plan a career from scratch. If you were hired years ago, enter that year: "
+                    "the calculator still runs your whole career from day one."
+                ),
+            ))
+            years_so_far = CURRENT_YEAR - hire_year
+            _wage_mode = "My starting wage"
+            if years_so_far > 0:
+                _wage_mode = st.radio(
+                    "Which wage do you know?",
+                    ["My starting wage", "My wage today"],
+                    horizontal=True,
+                    key="in_wage_mode",
+                    help=(
+                        "If you don't remember what you were paid when you started, enter what you make "
+                        "now. The calculator works backward through your raises to estimate your starting wage."
+                    ),
+                )
+            if _wage_mode == "My wage today":
+                current_wage = st.number_input(
+                    "Annual Salary Today, Before Taxes ($)",
+                    value=120000, min_value=0, max_value=10_000_000, step=2500,
+                    key="in_current_wage",
+                    help=f"What you are paid now, in {CURRENT_YEAR}.",
+                )
+            else:
+                starting_wage = st.number_input(
+                    "Starting Annual Salary, Before Taxes ($)",
+                    value=120000, min_value=0, max_value=10_000_000, step=2500,
+                    key="in_wage",
+                    help=f"Your salary in your first year on the job, in {hire_year} dollars (what you were actually paid then).",
+                )
+            hire_age = int(st.number_input(
+                "Age When Hired",
+                value=25, min_value=16, max_value=74, step=1,
+                key="in_hire_age",
+                help="How old you were (or will be) when you started the job.",
+            ))
+            retirement_age = int(st.number_input(
+                "Age at Retirement",
+                value=55, min_value=17, max_value=75, step=1,
+                key="in_retirement_age",
+                help="Your age on the day you expect to retire.",
+            ))
+            # Input problems are collected instead of stopping the script here:
+            # st.stop() mid-sidebar would skip the widgets below, and Streamlit then
+            # forgets their values. Each problem uses a safe stand-in value so the
+            # rest of the sidebar still renders; the entry script withholds results.
+            problems = []
+            work_years = retirement_age - hire_age
+            if work_years < 1:
+                st.error(
+                    f"You retire at {retirement_age} but start at {hire_age}. Make your retirement age "
+                    f"later than the age you were hired to continue."
+                )
+                problems.append("ages")
+                work_years = 1
+            else:
+                st.caption(
+                    f"That is {work_years} years of work: from {hire_year} (age {hire_age}) "
+                    f"to {hire_year + work_years} (age {retirement_age})."
+                )
+            with advanced:
+                st.markdown("**Salary changes (optional)**")
+                cola_increase = st.number_input(
+                    "Yearly Cost-of-Living Raise (%)",
+                    value=3.0, min_value=0.0, max_value=5.5, step=0.1,
+                    key="in_cola",
+                    help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. This is for your salary while working; the pension's own COLA in retirement follows inflation (see Yearly Rise in Prices under Advanced Assumptions)."
+                ) / 100 + 1
+                step_increase = st.number_input(
+                    "Step Increase (%)",
+                    value=5.5, min_value=0., max_value=50.0, step=0.1,
+                    key="in_step",
+                    help="Raise from each step on your pay scale."
+                ) / 100 + 1
+                step_count = st.number_input(
+                    "Number of Step Raises",
+                    value=4, min_value=0, max_value=20, step=1,
+                    key="in_step_count",
+                    help="How many step raises you get before reaching the top of your pay scale. One raise is applied at the end of each of your first this-many years.",
+                )
+                first_step_midyear = st.checkbox(
+                    "First step raise comes mid-year",
+                    value=True,
+                    key="in_step_midyear",
+                    help="Check this if your first step raise takes effect partway through Year 1 (for example, after a 6-month probation). Year 1 is then averaged half at your starting step and half at the next step.",
+                )
+                st.caption("Promotions are optional. Enter 10 for a raise after your tenth working year. Leave blank for none.")
+                promotion_years_input = st.text_input(
+                    "Promotions: Years After You Were Hired",
+                    value="10, 20",
+                    key="in_promo_years",
+                    help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
+                )
+                # Parse promotion years exactly once. Only plain ASCII digits count:
+                # str.isdigit() also accepts characters like "²" that int() rejects.
+                _promo_tokens = [t.strip() for t in promotion_years_input.split(",") if t.strip()]
+                _promo_bad = [t for t in _promo_tokens if not re.fullmatch(r"[0-9]{1,3}", t)]
+                _promo_good = tuple(int(t) for t in _promo_tokens if re.fullmatch(r"[0-9]{1,3}", t))
+                _promo_oob = [y for y in _promo_good if y < 1 or y > int(work_years)]
+                promotion_years = tuple(y for y in _promo_good if 1 <= y <= int(work_years))
+                if _promo_bad:
+                    st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only, then results will update.")
+                    problems.append("promotions")
+                elif _promo_oob and "ages" not in problems:
+                    st.warning(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career, so they are left out.")
+                promotion_increase = st.number_input(
+                    "Promotion Increase (%)",
+                    value=8.0, min_value=0.0, max_value=100.0, step=1.,
+                    key="in_promo_pct",
+                    help="Expected salary bump each time you are promoted."
+                ) / 100 + 1
+            st.caption(
+                f"Salary assumptions: {(cola_increase - 1) * 100:.1f}% yearly raise, "
+                f"{int(step_count)} step raises, "
+                + (f"promotions after career years {', '.join(map(str, promotion_years))}." if promotion_years else "no promotions.")
+            )
+
+            if _wage_mode == "My wage today":
+                # This calendar year is career year (years_so_far + 1). Undo every
+                # raise up to it (COLA, steps, promotions) to recover the starting wage.
+                _year_now = years_so_far + 1
+                if _year_now > int(work_years):
+                    if "ages" not in problems:
+                        st.error(
+                            f"Hired in {hire_year}, you would have finished your {int(work_years)}-year career "
+                            f"already. Pick a later retirement age, or enter your starting wage instead."
+                        )
+                    problems.append("wage")
+                    starting_wage = current_wage
+                else:
+                    _growth = simulation.salary_schedule(
+                        1.0, _year_now, cola_increase, step_increase, promotion_years,
+                        promotion_increase, int(step_count), first_step_midyear)[-1]
+                    starting_wage = current_wage / _growth
+                    st.caption(
+                        f"That works out to a starting wage of about ${starting_wage:,.0f} in {hire_year}, "
+                        f"using the raises you entered above."
+                    )
+
+            st.subheader("Pension")
+            st.caption(
+                f"Pension estimates follow the plan's rules for members hired in "
+                f"{simulation.PLAN_FIRST_HIRE_YEAR} or later."
+            )
+            with st.expander("Check the pension rules used here"):
+                st.markdown("""
+    - Members contribute **10% of pay**. Final average salary uses the **highest 3 consecutive years**.
+    - With at least 5 years of service, the annual factor is **1.5% at age 60** or **2% at age 63**.
+    - With at least 30 years of service, the factor is **2%**, rising to **2.1% at age 63**. Payments are unreduced from age 55. Earlier payments are reduced using an age-based table.
+    - The benefit is capped at **80% of final average salary**.
+    - Leaving before age 60 with 5 to 29 years of service means payments start at **60**, using the **1.5%** factor, with **no yearly increases**.
+    - With fewer than 5 years, there is **no lifetime pension**. Contributions are refunded with **6.5% annual interest**.
+    - For eligible pensions, yearly increases follow inflation, capped at **2%**. Salary raises are separate.
+
+    These rules do not cover every public pension. Entering a manual amount changes only the payment amount, not these eligibility or increase rules.
+    """)
+            if hire_year < simulation.PLAN_FIRST_HIRE_YEAR:
+                st.warning(
+                    f"This calculator is designed for members hired in or after "
+                    f"{simulation.PLAN_FIRST_HIRE_YEAR}. It does not model the pension rules for members "
+                    f"hired earlier. Entering a manual pension amount does not change when payments start "
+                    f"or how they increase, so the results may not match your pension."
+                )
+            with advanced:
+                pension_contribution_rate = st.number_input(
+                    "Pension Contribution Rate (%)",
+                    value=10.0, min_value=0.0, max_value=100.0, step=1.,
+                    key="in_contrib",
+                    help="Percentage of your salary automatically deducted and contributed to the pension system each year."
+                ) / 100
+                if abs(pension_contribution_rate * 100 - simulation.PLAN_CONTRIBUTION_PCT) > 1e-9:
+                    st.caption(
+                        f"Members of this plan contribute {simulation.PLAN_CONTRIBUTION_PCT:g}%. A different rate "
+                        f"changes what goes into your own account, but not the pension formula."
+                    )
+
+            st.markdown("**Your Pension**")
+
+            _allowance_mode = st.radio(
+                "How to set allowance",
+                ["Estimate for me", "Enter manually"],
+                horizontal=True,
+                key="in_allowance_mode",
+                label_visibility="collapsed",
+            )
+            manual_override = (_allowance_mode == "Enter manually")
+
+            # Inflation drives the retiree COLA and the today's-dollars views, so it
+            # is read before the allowance captions that use it (widget in Retirement).
+            inflation = 1 + st.session_state.get("in_inflation", 2.5) / 100
+
+            # The plan's eligibility rules apply in both modes. Entering the amount
+            # by hand replaces only the dollar figure, never when payments start or
+            # whether they get a COLA.
+            _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
+                               promotion_years, promotion_increase,
+                               int(step_count), first_step_midyear)
+            plan = simulation.plan_benefit(int(work_years), int(retirement_age), _fas)
+            # Payments are made at the end of each year, like every other cash flow
+            # here, so the first one lands at the end of the first year it is due.
+            # This is the one timing used for every today's-dollars conversion.
+            _first_pay_year = hire_year + int(work_years) + plan["deferral_years"]
+            _years_to_first_pay = int(work_years) + plan["deferral_years"] + 1 - years_so_far
+
+            if not manual_override:
+                starting_allowance = plan["allowance"]
+                # The value is pushed through session_state (not ``value=``) so a
+                # keyed, disabled widget always shows the freshly computed figure.
+                st.session_state["allowance_formula"] = round(starting_allowance)
+                st.number_input(
+                    f"Yearly Pension in {_first_pay_year} Dollars ($)",
+                    min_value=0,
+                    step=500,
+                    disabled=True,
+                    key="allowance_formula",
+                    help=(
+                        "Years of Service × Final Average Salary (highest 3 consecutive years) "
+                        "× Retirement Factor × Early Retirement Reduction Factor, capped at 80% of "
+                        "Final Average Salary. The factor and any reduction follow the plan's rules "
+                        "for your age and years of service. Switch to 'Enter manually' to override."
+                    ),
+                )
+            else:
+                st.session_state.setdefault("_allowance_previous_period", st.session_state.get("in_allowance_period", "Yearly"))
+                period = st.radio(
+                    "Enter a monthly or yearly pension amount",
+                    ["Yearly", "Monthly"], horizontal=True,
+                    key="in_allowance_period", on_change=convert_manual_period,
+                )
+                manual_allowance = st.number_input(
+                    "Pension Payment Before Taxes ($)",
+                    value=70000.0 if period == "Yearly" else 70000.0 / 12,
+                    min_value=0.0,
+                    max_value=10_000_000.0 if period == "Yearly" else 10_000_000.0 / 12,
+                    step=100.0,
+                    format="%.2f",
+                    key="allowance_manual",
+                    help=(
+                        "Your pension payment in its first year, before taxes. Find this from your plan's retirement "
+                        "estimator. When payments start and how they grow still follow the plan's rules."
+                    ),
+                )
+                if period == "Monthly":
+                    manual_allowance *= 12
+                st.caption(f"That is ${manual_allowance:,.0f} a year, or ${manual_allowance / 12:,.0f} a month, before taxes.")
+                _basis = st.radio(
+                    "This amount is in",
+                    ["Today's dollars", "Dollars at retirement"],
+                    format_func=lambda o: f"Buying power at today's ({CURRENT_YEAR}) prices" if o == "Today's dollars" else f"Amount paid when payments start ({_first_pay_year})",
+                    key="in_allowance_basis",
+                    help=(
+                        "Check how your pension estimate labels its amount. Choose buying power if it says "
+                        "today's dollars or inflation-adjusted. Choose amount paid if it gives the payment "
+                        "expected in the year payments start. If the estimate does not say, check with your plan. "
+                        "This choice describes your input; the display switch above only changes how results are shown."
+                    ),
+                )
+                if _basis == "Today's dollars":
+                    starting_allowance = simulation.to_retirement_dollars(
+                        manual_allowance, _years_to_first_pay, inflation)
+                    if plan["status"] != "unvested":
+                        st.caption(f"To have that buying power, the first year's payments would total about ${starting_allowance:,.0f} in {_first_pay_year}, using your inflation assumption.")
+                else:
+                    starting_allowance = manual_allowance
+
+            if plan["status"] == "unvested":
+                _refund = simulation.refund_with_interest(
+                    [s * pension_contribution_rate for s in simulation.salary_schedule(
+                        starting_wage, int(work_years), cola_increase, step_increase,
+                        promotion_years, promotion_increase, int(step_count), first_step_midyear)])
+                st.warning(
+                    f"With {int(work_years)} years of service you would not vest, so there is no "
+                    f"lifetime pension{' (the amount above is not used)' if manual_override else ''}. "
+                    f"Instead your contributions are refunded with "
+                    f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% interest a year: about ${_refund:,.0f} when you leave."
+                )
+                starting_allowance = 0.0
+            else:
+                _start_age = int(retirement_age) + plan["deferral_years"]
+                _cola_pct = (min((inflation - 1) * 100, simulation.PLAN_RETIREE_COLA_CAP_PCT)
+                             if plan["cola_applies"] else 0.0)
+                if not manual_override:
+                    _rule = f"{plan['factor_pct']:g}% per year of service"
+                    if plan["reduction"] < 1:
+                        _rule += f", reduced to {plan['reduction'] * 100:.1f}% for retiring before 55"
+                    if plan["capped"]:
+                        _rule += ", capped at 80% of your final average salary"
+                    _today = starting_allowance / inflation ** _years_to_first_pay
+                    st.caption(f"{_rule}. The first year's pension would buy about what ${_today:,.0f} buys today ({CURRENT_YEAR} prices).")
+                else:
+                    st.caption(
+                        f"Under the plan's rules, payments start at age {_start_age} and "
+                        + (f"rise {_cola_pct:.1f}% a year." if _cola_pct else "stay the same each year (no COLA).")
+                    )
+                if plan["status"] == "deferred":
+                    st.warning(
+                        f"Without 30 years of service you can't start a pension before age "
+                        f"{simulation.PLAN_FULL_AGE}. Leaving at {int(retirement_age)} gives a deferred pension "
+                        f"from age {simulation.PLAN_FULL_AGE} with no COLA, so neither option pays anything for "
+                        f"your first {plan['deferral_years']} years of retirement."
+                    )
+
+            st.subheader("Retirement")
+            st.session_state.setdefault("in_plan_age", retirement_age + st.session_state.get("in_retirement_years", 30))
+            plan_age = st.number_input(
+                "Plan Through Age",
+                min_value=18, max_value=135, step=1,
+                key="in_plan_age",
+                help="How long should this comparison cover? This is a planning assumption, not a prediction of how long you will live."
+            )
+            retirement_years = int(plan_age) - retirement_age
+            if not 1 <= retirement_years <= 60:
+                st.error(f"Choose an ending age from {retirement_age + 1} to {min(135, retirement_age + 60)} to model 1 to 60 years of retirement.")
+                problems.append("horizon")
+                retirement_years = min(60, max(1, retirement_years))
+            st.session_state["in_retirement_years"] = retirement_years
+            st.caption(f"This comparison covers {retirement_years} years of retirement, from age {retirement_age} to {int(plan_age)}.")
+            with advanced:
+                inflation_pct = st.number_input(
+                    "Yearly Rise in Prices (Inflation %)",
+                    value=2.5, min_value=0.0, max_value=10.0, step=0.1,
+                    key="in_inflation",
+                    help=(
+                        "How much you assume prices rise each year. For example, at 2.5%, a $100 grocery bill "
+                        "becomes $102.50 next year. Eligible pension payments rise with this rate, capped at "
+                        f"{simulation.PLAN_RETIREE_COLA_CAP_PCT:g}% a year. It also converts amounts to today's buying power. "
+                        "Salary raises are entered separately."
+                    ),
+                )
+
+                with st.popover("Timing Assumptions"):
+                    st.markdown("""
 This calculator operates in annual periods. Within each year:
 - **Contributions & deposits**: Made at the end of the year.
 - **Withdrawals**: Made at the end of the year.
@@ -565,377 +909,43 @@ This calculator operates in annual periods. Within each year:
 - **Promotions**: Applied at the end of the year you specify, taking effect the following year.
 """)
 
-        st.subheader("Career")
-        hire_year = int(st.number_input(
-            "Year You Were Hired",
-            value=CURRENT_YEAR, min_value=CURRENT_YEAR - 60, max_value=CURRENT_YEAR, step=1,
-            key="in_hire_year",
-            help=(
-                "The year your career (and your pension contributions) started. Leave it at this "
-                "year to plan a career from scratch. If you were hired years ago, enter that year: "
-                "the calculator still runs your whole career from day one."
-            ),
-        ))
-        years_so_far = CURRENT_YEAR - hire_year
-        _wage_mode = "My starting wage"
-        if years_so_far > 0:
-            _wage_mode = st.radio(
-                "Which wage do you know?",
-                ["My starting wage", "My wage today"],
-                horizontal=True,
-                key="in_wage_mode",
-                help=(
-                    "If you don't remember what you were paid when you started, enter what you make "
-                    "now. The calculator works backward through your raises to estimate your starting wage."
-                ),
-            )
-        if _wage_mode == "My wage today":
-            current_wage = st.number_input(
-                "Annual Salary Today, Before Taxes ($)",
-                value=120000, min_value=0, max_value=10_000_000, step=2500,
-                key="in_current_wage",
-                help=f"What you are paid now, in {CURRENT_YEAR}.",
-            )
-        else:
-            starting_wage = st.number_input(
-                "Starting Annual Salary, Before Taxes ($)",
-                value=120000, min_value=0, max_value=10_000_000, step=2500,
-                key="in_wage",
-                help=f"Your salary in your first year on the job, in {hire_year} dollars (what you were actually paid then).",
-            )
-        hire_age = int(st.number_input(
-            "Age When Hired",
-            value=25, min_value=16, max_value=74, step=1,
-            key="in_hire_age",
-            help="How old you were (or will be) when you started the job.",
-        ))
-        retirement_age = int(st.number_input(
-            "Age at Retirement",
-            value=55, min_value=17, max_value=75, step=1,
-            key="in_retirement_age",
-            help="Your age on the day you expect to retire.",
-        ))
-        # Input problems are collected instead of stopping the script here:
-        # st.stop() mid-sidebar would skip the widgets below, and Streamlit then
-        # forgets their values. Each problem uses a safe stand-in value so the
-        # rest of the sidebar still renders; the entry script withholds results.
-        problems = []
-        work_years = retirement_age - hire_age
-        if work_years < 1:
-            st.error(
-                f"You retire at {retirement_age} but start at {hire_age}. Make your retirement age "
-                f"later than the age you were hired to continue."
-            )
-            problems.append("ages")
-            work_years = 1
-        else:
+            st.markdown("**Try an example yearly return (before inflation):**")
+            for col, (value, name, why) in zip(st.columns(len(RETURN_PICKS)), RETURN_PICKS):
+                col.button(f"{value:g}%", key=f"pick_{value:g}", on_click=_set_returns, help=f"{name}: {why}",
+                           args=(value,), width="stretch")
             st.caption(
-                f"That is {work_years} years of work: from {hire_year} (age {hire_age}) "
-                f"to {hire_year + work_years} (age {retirement_age})."
+                "The starting 10% is an example, not a forecast. Try 5%, 7%, and 10% to see how much the result changes. "
+                "All are before inflation, not investment recommendations. "
+                "The buttons change only the return. Market swings are set separately on the second page."
             )
-        with st.expander("Salary changes (optional)"):
-            cola_increase = st.number_input(
-                "Yearly Cost-of-Living Raise (%)",
-                value=3.0, min_value=0.0, max_value=5.5, step=0.1,
-                key="in_cola",
-                help="Annual salary adjustment, typically between 2-3.5%. Set to 0 for plans with no COLA. This is for your salary while working; the pension's own COLA in retirement follows inflation (see Expected Inflation below)."
-            ) / 100 + 1
-            step_increase = st.number_input(
-                "Step Increase (%)",
-                value=5.5, min_value=0., max_value=50.0, step=0.1,
-                key="in_step",
-                help="Raise from each step on your pay scale."
-            ) / 100 + 1
-            step_count = st.number_input(
-                "Number of Step Raises",
-                value=4, min_value=0, max_value=20, step=1,
-                key="in_step_count",
-                help="How many step raises you get before reaching the top of your pay scale. One raise is applied at the end of each of your first this-many years.",
-            )
-            first_step_midyear = st.checkbox(
-                "First step raise comes mid-year",
-                value=True,
-                key="in_step_midyear",
-                help="Check this if your first step raise takes effect partway through Year 1 (for example, after a 6-month probation). Year 1 is then averaged half at your starting step and half at the next step.",
-            )
-            st.caption("Promotions are optional. Enter 10 for a raise after your tenth working year. Leave blank for none.")
-            promotion_years_input = st.text_input(
-                "Promotions: Years After You Were Hired",
-                value="10, 20",
-                key="in_promo_years",
-                help="Comma-separated year numbers within your career when you expect a promotion (e.g. 10, 20). Leave blank if none."
-            )
-            # Parse promotion years exactly once. Only plain ASCII digits count:
-            # str.isdigit() also accepts characters like "²" that int() rejects.
-            _promo_tokens = [t.strip() for t in promotion_years_input.split(",") if t.strip()]
-            _promo_bad = [t for t in _promo_tokens if not re.fullmatch(r"[0-9]{1,3}", t)]
-            _promo_good = tuple(int(t) for t in _promo_tokens if re.fullmatch(r"[0-9]{1,3}", t))
-            _promo_oob = [y for y in _promo_good if y < 1 or y > int(work_years)]
-            promotion_years = tuple(y for y in _promo_good if 1 <= y <= int(work_years))
-            if _promo_bad:
-                st.error(f"Can't parse promotion year(s): {', '.join(_promo_bad)}. Enter whole numbers only, then results will update.")
-                problems.append("promotions")
-            elif _promo_oob and "ages" not in problems:
-                st.warning(f"Promotion year(s) {', '.join(str(y) for y in _promo_oob)} fall outside your {int(work_years)}-year career, so they are left out.")
-            promotion_increase = st.number_input(
-                "Promotion Increase (%)",
-                value=8.0, min_value=0.0, max_value=100.0, step=1.,
-                key="in_promo_pct",
-                help="Expected salary bump each time you are promoted."
-            ) / 100 + 1
-        st.caption(
-            f"Salary assumptions: {(cola_increase - 1) * 100:.1f}% yearly raise, "
-            f"{int(step_count)} step raises, "
-            + (f"promotions after career years {', '.join(map(str, promotion_years))}." if promotion_years else "no promotions.")
-        )
-
-        if _wage_mode == "My wage today":
-            # This calendar year is career year (years_so_far + 1). Undo every
-            # raise up to it (COLA, steps, promotions) to recover the starting wage.
-            _year_now = years_so_far + 1
-            if _year_now > int(work_years):
-                if "ages" not in problems:
-                    st.error(
-                        f"Hired in {hire_year}, you would have finished your {int(work_years)}-year career "
-                        f"already. Pick a later retirement age, or enter your starting wage instead."
-                    )
-                problems.append("wage")
-                starting_wage = current_wage
-            else:
-                _growth = simulation.salary_schedule(
-                    1.0, _year_now, cola_increase, step_increase, promotion_years,
-                    promotion_increase, int(step_count), first_step_midyear)[-1]
-                starting_wage = current_wage / _growth
+            _show_real = st.session_state.get("in_real", True)
+            if _show_real:
+                _after = [simulation.purchasing_power_return(1 + v / 100, 1 + inflation_pct / 100) * 100
+                          for v, _, _ in RETURN_PICKS]
                 st.caption(
-                    f"That works out to a starting wage of about ${starting_wage:,.0f} in {hire_year}, "
-                    f"using the raises you entered above."
+                    f"After {inflation_pct:.1f}% inflation, those are about "
+                    + ", ".join(f"{a:.1f}%" for a in _after[:-1]) + f", and {_after[-1]:.1f}% a year."
                 )
-
-        st.subheader("Pension")
-        st.caption(
-            f"Pension estimates follow the plan's rules for members hired in "
-            f"{simulation.PLAN_FIRST_HIRE_YEAR} or later."
-        )
-        with st.expander("Check the pension rules used here"):
-            st.markdown("""
-- Members contribute **10% of pay**. Final average salary uses the **highest 3 consecutive years**.
-- With at least 5 years of service, the annual factor is **1.5% at age 60** or **2% at age 63**.
-- With at least 30 years of service, the factor is **2%**, rising to **2.1% at age 63**. Payments are unreduced from age 55. Earlier payments are reduced using an age-based table.
-- The benefit is capped at **80% of final average salary**.
-- Leaving before age 60 with 5 to 29 years of service means payments start at **60**, using the **1.5%** factor, with **no yearly increases**.
-- With fewer than 5 years, there is **no lifetime pension**. Contributions are refunded with **6.5% annual interest**.
-- For eligible pensions, yearly increases follow inflation, capped at **2%**. Salary raises are separate.
-
-These rules do not cover every public pension. Entering a manual amount changes only the payment amount, not these eligibility or increase rules.
-""")
-        if hire_year < simulation.PLAN_FIRST_HIRE_YEAR:
-            st.warning(
-                f"This calculator is designed for members hired in or after "
-                f"{simulation.PLAN_FIRST_HIRE_YEAR}. It does not model the pension rules for members "
-                f"hired earlier. Entering a manual pension amount does not change when payments start "
-                f"or how they increase, so the results may not match your pension."
-            )
-        pension_contribution_rate = st.number_input(
-            "Pension Contribution Rate (%)",
-            value=10.0, min_value=0.0, max_value=100.0, step=1.,
-            key="in_contrib",
-            help="Percentage of your salary automatically deducted and contributed to the pension system each year."
-        ) / 100
-        if abs(pension_contribution_rate * 100 - simulation.PLAN_CONTRIBUTION_PCT) > 1e-9:
-            st.caption(
-                f"Members of this plan contribute {simulation.PLAN_CONTRIBUTION_PCT:g}%. A different rate "
-                f"changes what goes into your own account, but not the pension formula."
-            )
-
-        st.markdown("**Your Pension**")
-
-        _allowance_mode = st.radio(
-            "How to set allowance",
-            ["Estimate for me", "Enter manually"],
-            horizontal=True,
-            key="in_allowance_mode",
-            label_visibility="collapsed",
-        )
-        manual_override = (_allowance_mode == "Enter manually")
-
-        # Inflation drives the retiree COLA and the today's-dollars views, so it
-        # is read before the allowance captions that use it (widget in Retirement).
-        inflation = 1 + st.session_state.get("in_inflation", 2.5) / 100
-
-        # The plan's eligibility rules apply in both modes. Entering the amount
-        # by hand replaces only the dollar figure, never when payments start or
-        # whether they get a COLA.
-        _fas = compute_fas(starting_wage, int(work_years), cola_increase, step_increase,
-                           promotion_years, promotion_increase,
-                           int(step_count), first_step_midyear)
-        plan = simulation.plan_benefit(int(work_years), int(retirement_age), _fas)
-        # Payments are made at the end of each year, like every other cash flow
-        # here, so the first one lands at the end of the first year it is due.
-        # This is the one timing used for every today's-dollars conversion.
-        _first_pay_year = hire_year + int(work_years) + plan["deferral_years"]
-        _years_to_first_pay = int(work_years) + plan["deferral_years"] + 1 - years_so_far
-
-        if not manual_override:
-            starting_allowance = plan["allowance"]
-            # The value is pushed through session_state (not ``value=``) so a
-            # keyed, disabled widget always shows the freshly computed figure.
-            st.session_state["allowance_formula"] = round(starting_allowance)
-            st.number_input(
-                f"Yearly Pension in {_first_pay_year} Dollars ($)",
-                min_value=0,
-                step=500,
-                disabled=True,
-                key="allowance_formula",
-                help=(
-                    "Years of Service × Final Average Salary (highest 3 consecutive years) "
-                    "× Retirement Factor × Early Retirement Reduction Factor, capped at 80% of "
-                    "Final Average Salary. The factor and any reduction follow the plan's rules "
-                    "for your age and years of service. Switch to 'Enter manually' to override."
-                ),
-            )
-        else:
-            st.session_state.setdefault("_allowance_previous_period", st.session_state.get("in_allowance_period", "Yearly"))
-            period = st.radio(
-                "Enter a monthly or yearly pension amount",
-                ["Yearly", "Monthly"], horizontal=True,
-                key="in_allowance_period", on_change=convert_manual_period,
-            )
-            manual_allowance = st.number_input(
-                "Pension Payment Before Taxes ($)",
-                value=70000.0 if period == "Yearly" else 70000.0 / 12,
-                min_value=0.0,
-                max_value=10_000_000.0 if period == "Yearly" else 10_000_000.0 / 12,
-                step=100.0,
-                format="%.2f",
-                key="allowance_manual",
-                help=(
-                    "Your pension payment in its first year, before taxes. Find this from your plan's retirement "
-                    "estimator. When payments start and how they grow still follow the plan's rules."
-                ),
-            )
-            if period == "Monthly":
-                manual_allowance *= 12
-            st.caption(f"That is ${manual_allowance:,.0f} a year, or ${manual_allowance / 12:,.0f} a month, before taxes.")
-            _basis = st.radio(
-                "This amount is in",
-                ["Today's dollars", "Dollars at retirement"],
-                format_func=lambda o: f"Buying power at today's ({CURRENT_YEAR}) prices" if o == "Today's dollars" else f"Amount paid when payments start ({_first_pay_year})",
-                key="in_allowance_basis",
-                help=(
-                    "Check how your pension estimate labels its amount. Choose buying power if it says "
-                    "today's dollars or inflation-adjusted. Choose amount paid if it gives the payment "
-                    "expected in the year payments start. If the estimate does not say, check with your plan. "
-                    "This choice describes your input; the display switch above only changes how results are shown."
-                ),
-            )
-            if _basis == "Today's dollars":
-                starting_allowance = simulation.to_retirement_dollars(
-                    manual_allowance, _years_to_first_pay, inflation)
-                if plan["status"] != "unvested":
-                    st.caption(f"To have that buying power, the first year's payments would total about ${starting_allowance:,.0f} in {_first_pay_year}, using your inflation assumption.")
-            else:
-                starting_allowance = manual_allowance
-
-        if plan["status"] == "unvested":
-            _refund = simulation.refund_with_interest(
-                [s * pension_contribution_rate for s in simulation.salary_schedule(
-                    starting_wage, int(work_years), cola_increase, step_increase,
-                    promotion_years, promotion_increase, int(step_count), first_step_midyear)])
-            st.warning(
-                f"With {int(work_years)} years of service you would not vest, so there is no "
-                f"lifetime pension{' (the amount above is not used)' if manual_override else ''}. "
-                f"Instead your contributions are refunded with "
-                f"{simulation.PLAN_REFUND_INTEREST_PCT:g}% interest a year: about ${_refund:,.0f} when you leave."
-            )
-            starting_allowance = 0.0
-        else:
-            _start_age = int(retirement_age) + plan["deferral_years"]
-            _cola_pct = (min((inflation - 1) * 100, simulation.PLAN_RETIREE_COLA_CAP_PCT)
-                         if plan["cola_applies"] else 0.0)
-            if not manual_override:
-                _rule = f"{plan['factor_pct']:g}% per year of service"
-                if plan["reduction"] < 1:
-                    _rule += f", reduced to {plan['reduction'] * 100:.1f}% for retiring before 55"
-                if plan["capped"]:
-                    _rule += ", capped at 80% of your final average salary"
-                _today = starting_allowance / inflation ** _years_to_first_pay
-                st.caption(f"{_rule}. The first year's pension would buy about what ${_today:,.0f} buys today ({CURRENT_YEAR} prices).")
-            else:
-                st.caption(
-                    f"Under the plan's rules, payments start at age {_start_age} and "
-                    + (f"rise {_cola_pct:.1f}% a year." if _cola_pct else "stay the same each year (no COLA).")
+            index_returns_rate = (
+                st.number_input(
+                    "Yearly Investment Return Before Inflation (%)",
+                    value=10.0,
+                    min_value=0.0,
+                    max_value=25.0,
+                    step=0.5,
+                    key="in_returns",
+                    help=(
+                        "The growth you assume before adjusting for rising prices. Do not subtract inflation here. "
+                        "The first page uses this exact return every year. The market-swings page uses it as the "
+                        "middle yearly return, with good and bad years around it. It is not a guaranteed return."
+                    ),
                 )
-            if plan["status"] == "deferred":
-                st.warning(
-                    f"Without 30 years of service you can't start a pension before age "
-                    f"{simulation.PLAN_FULL_AGE}. Leaving at {int(retirement_age)} gives a deferred pension "
-                    f"from age {simulation.PLAN_FULL_AGE} with no COLA, so neither option pays anything for "
-                    f"your first {plan['deferral_years']} years of retirement."
-                )
-
-        st.subheader("Retirement")
-        st.session_state.setdefault("in_plan_age", retirement_age + st.session_state.get("in_retirement_years", 30))
-        plan_age = st.number_input(
-            "Plan Through Age",
-            min_value=18, max_value=135, step=1,
-            key="in_plan_age",
-            help="How long should this comparison cover? This is a planning assumption, not a prediction of how long you will live."
-        )
-        retirement_years = int(plan_age) - retirement_age
-        if not 1 <= retirement_years <= 60:
-            st.error(f"Choose an ending age from {retirement_age + 1} to {min(135, retirement_age + 60)} to model 1 to 60 years of retirement.")
-            problems.append("horizon")
-            retirement_years = min(60, max(1, retirement_years))
-        st.session_state["in_retirement_years"] = retirement_years
-        st.caption(f"This comparison covers {retirement_years} years of retirement, from age {retirement_age} to {int(plan_age)}.")
-        inflation_pct = st.number_input(
-            "Yearly Rise in Prices (Inflation %)",
-            value=2.5, min_value=0.0, max_value=10.0, step=0.1,
-            key="in_inflation",
-            help=(
-                "How much you assume prices rise each year. For example, at 2.5%, a $100 grocery bill "
-                "becomes $102.50 next year. Eligible pension payments rise with this rate, capped at "
-                f"{simulation.PLAN_RETIREE_COLA_CAP_PCT:g}% a year. It also converts amounts to today's buying power. "
-                "Salary raises are entered separately."
-            ),
-        )
-        st.markdown("**Try an example yearly return (before inflation):**")
-        for col, (value, name, why) in zip(st.columns(len(RETURN_PICKS)), RETURN_PICKS):
-            col.button(f"{value:g}%", key=f"pick_{value:g}", on_click=_set_returns, help=f"{name}: {why}",
-                       args=(value,), width="stretch")
-        st.caption(
-            "The starting 10% is an example, not a forecast. Try 5%, 7%, and 10% to see how much the result changes. "
-            "All are before inflation, not investment recommendations. "
-            "The buttons change only the return. Market swings are set separately on the second page."
-        )
-        _show_real = st.session_state.get("in_real", True)
-        if _show_real:
-            _after = [simulation.purchasing_power_return(1 + v / 100, 1 + inflation_pct / 100) * 100
-                      for v, _, _ in RETURN_PICKS]
-            st.caption(
-                f"After {inflation_pct:.1f}% inflation, those are about "
-                + ", ".join(f"{a:.1f}%" for a in _after[:-1]) + f", and {_after[-1]:.1f}% a year."
+                / 100
+                + 1
             )
-        index_returns_rate = (
-            st.number_input(
-                "Yearly Investment Return Before Inflation (%)",
-                value=10.0,
-                min_value=0.0,
-                max_value=25.0,
-                step=0.5,
-                key="in_returns",
-                help=(
-                    "The growth you assume before adjusting for rising prices. Do not subtract inflation here. "
-                    "The first page uses this exact return every year. The market-swings page uses it as the "
-                    "middle yearly return, with good and bad years around it. It is not a guaranteed return."
-                ),
-            )
-            / 100
-            + 1
-        )
-        if _show_real:
-            _real_return = simulation.purchasing_power_return(index_returns_rate, 1 + inflation_pct / 100) * 100
-            st.caption(f"About {_real_return:.1f}% a year after {inflation_pct:.1f}% inflation.")
+            if _show_real:
+                _real_return = simulation.purchasing_power_return(index_returns_rate, 1 + inflation_pct / 100) * 100
+                st.caption(f"About {_real_return:.1f}% a year after {inflation_pct:.1f}% inflation.")
 
     retiree_cola_pct = min(inflation_pct, simulation.PLAN_RETIREE_COLA_CAP_PCT)
     if not plan["cola_applies"]:
