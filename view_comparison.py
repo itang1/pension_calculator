@@ -37,7 +37,7 @@ def render_result_banner(personal_balance, retirement_years, depletion_year,
                          runs_out=None, retirement_age=None):
     """The page's answer, before any chart or table.
 
-    ``runs_out`` is page 2's count ("N" out of 100 futures), shown here so a
+    ``runs_out`` is page 2's count ("N" out of 100 outcomes), shown here so a
     reader who never opens page 2 still sees the risk behind a smooth-market win.
     """
     short = depletion_year is not None
@@ -82,11 +82,11 @@ This calculation assumes your investments grow by <strong>{current_rate_pct:.1f}
     std = st.session_state.get("mc_std", 15.0)
     if runs_out is not None and std != 0:
         if runs_out == "0":
-            swings = "your own account wins in every simulated future"
+            swings = "your own account wins in every possible outcome"
         elif runs_out == "100":
-            swings = "the pension wins in every simulated future"
+            swings = "the pension wins in every possible outcome"
         else:
-            swings = f"the pension wins in {runs_out} out of 100 simulated futures and your own account wins in the rest"
+            swings = f"the pension wins in {runs_out} out of 100 possible outcomes and your own account wins in the rest"
         label = f"With market ups and downs ({std:g}% swings), {swings}. See how →"
     # st.page_link (not an HTML anchor inside the banner) so navigation stays
     # client-side and the visitor's sidebar inputs survive the page switch.
@@ -349,7 +349,7 @@ You put the same money into your own investment account instead. It grows or shr
         st.button("Restore my previous inputs", key="restore_example_inputs", on_click=restore_previous_inputs)
 
     st.markdown("""
-The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above). Each button also sets the market-swings slider on the second page to 15%, which the "out of 100 possible futures" figures below assume.
+The examples below each show a scenario where one option wins. To see the full charts and tables for any of them, click its **Try this scenario** button (or copy the listed settings into the calculator above). Each button also sets the market-swings slider on the second page to 15%, which the "out of 100 possible outcomes" figures below assume.
 """)
 
     with st.expander("Case Study A: Your Own Account Wins"):
@@ -367,7 +367,7 @@ Alice is a civil servant who starts at \\$120,000. Across a 30-year career, her 
 
 **Her own account:** Now suppose she had put those same contributions into an account earning 10% a year instead. By retirement it would hold about **\\$3.2 million**. She then withdraws the same amount the pension would have paid each year. Since 10% growth outpaces what she takes out, the balance keeps climbing through retirement and finishes close to **\\$10 million**.
 
-**Verdict:** Her own account wins, and it is worth being clear about why. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. Her own account still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. It is also a narrow win: at a flat 9.2% or less, the pension comes out ahead. And it assumes a steady 10% every single year. With realistic ups and downs, Alice's fund runs out in about 38 out of 100 possible futures (see the *What If the Market Has Bad Years?* page).
+**Verdict:** Her own account wins, and it is worth being clear about why. Both options pay Alice the exact same income every year she is retired. The pension never hands her an extra dollar. The whole difference is what is left at the end. Her own account still holds close to \\$10 million that she owns and can pass to her family, while the pension leaves nothing once she dies. It is also a narrow win: at a flat 9.2% or less, the pension comes out ahead. And it assumes a steady 10% every single year. With realistic ups and downs, Alice's fund runs out in about 38 out of 100 possible outcomes (see the *What If the Market Has Bad Years?* page).
 
 This is also the scenario people misread most often. They see "\\$9.7 million in pension income" and assume the pension came out ahead, but that number is just the running total of Alice's annual payments; keep in mind that her own account paid out that same amount! The \\$10 million is *extra* that she gets to keep (donate, pass on, etc.), on top of the \\$9.7 million that she already withdrew and spent during her life.
 """)
@@ -407,7 +407,7 @@ Carol is a civil servant who starts at \\$80,000 and works a long 35-year career
 
 **Her own account:** Those same contributions, growing at 9% a year, would hold about **\\$2.9 million** by the time she retires. She then withdraws the same amount the pension would have paid each year. Because 9% growth stays ahead of what she takes out, the balance keeps rising through retirement and finishes above **\\$5.2 million**.
 
-**Verdict:** Her own account wins. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that her own account still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with realistic ups and downs, her fund runs out in about 34 out of 100 possible futures.
+**Verdict:** Her own account wins. Both options pay Carol the identical \\$6.4 million of income across her retirement; the difference is that her own account still holds over \\$5.2 million she owns and can pass on, while the pension leaves nothing once she dies. A long career and a return comfortably above the withdrawal pace are what tip it her way. The catch is the word *steady*: with realistic ups and downs, her fund runs out in about 34 out of 100 possible outcomes.
 """)
 
     with st.expander("Case Study D: Pension Wins"):
@@ -443,7 +443,7 @@ Grace changes careers and is hired at 50, starting at \\$90,000 with no promotio
 
 **Her own account:** Those same contributions, growing at 7% a year, would hold only about **\\$251,000** when she retires. Once she starts withdrawing \\$40,100 a year (rising 2% annually), the account runs dry in **year 8**, leaving nothing for her final 17 years.
 
-**Verdict:** The pension wins by the widest margin of any case here. A short, late career gives her own account too little time to grow, while the pension still pays for life. Her own account would need a steady 12.5% a year just to break even, and with realistic ups and downs it runs out in about 97 out of 100 possible futures. For late hires the pension is very hard to beat, and working until 63 instead of 60 makes it even better.
+**Verdict:** The pension wins by the widest margin of any case here. A short, late career gives her own account too little time to grow, while the pension still pays for life. Her own account would need a steady 12.5% a year just to break even, and with realistic ups and downs it runs out in about 97 out of 100 possible outcomes. For late hires the pension is very hard to beat, and working until 63 instead of 60 makes it even better.
 """)
 
     with st.expander("Case Study F: Your Own Account Wins"):
@@ -461,7 +461,7 @@ Frank is a civil servant who starts at \\$150,000 and earns two sizable promotio
 
 **His own account:** Those same contributions, growing at 10% a year, would hold about **\\$2.4 million** by retirement. He then withdraws the same amount the pension would have paid. With 10% growth running well ahead of his withdrawals, the balance climbs throughout retirement and finishes above **\\$6.5 million**.
 
-**Verdict:** His own account wins decisively. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. High contributions paired with strong returns and a modest retirement factor are the clearest case for your own account. Even so, with realistic ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible futures.
+**Verdict:** His own account wins decisively. The \\$5.3 million of pension income is matched dollar for dollar by his own account, which then leaves over \\$6.5 million on top for Frank to keep or pass on. High contributions paired with strong returns and a modest retirement factor are the clearest case for your own account. Even so, with realistic ups and downs instead of a steady 10%, his fund runs out in about 31 out of 100 possible outcomes.
 """)
 
     st.divider()

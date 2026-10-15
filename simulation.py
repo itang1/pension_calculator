@@ -368,7 +368,7 @@ def run_monte_carlo(starting_wage, work_years, cola_increase, step_increase,
     pcts = np.percentile(history, [5, 25, 75, 95], axis=1)
     median_path = np.percentile(history, 50, axis=1)
 
-    # Share of simulated futures that came up short before the end of retirement.
+    # Share of possible outcomes that came up short before the end of retirement.
     # A path that pays everything and ends at exactly $0 is fully funded.
     depletion_prob = float((depletion_years > 0).mean())
 

@@ -307,7 +307,7 @@ def fmt_rate(pct):
 
 
 def fmt_share(prob):
-    """Format a share of futures (0-1) as a percent that never rounds a real risk to 0%."""
+    """Format a share of outcomes (0-1) as a percent that never rounds a real risk to 0%."""
     pct = prob * 100
     if 0 < pct < 1:
         return f"{pct:.1f}%"
@@ -337,7 +337,7 @@ def inputs_summary_html(inputs, res):
 
 
 def out_of_100(prob):
-    """A share of futures as a plain count out of 100 that never hides a real risk."""
+    """A share of outcomes as a plain count out of 100 that never hides a real risk."""
     if 0 < prob < 0.005:
         return "fewer than 1"
     return f"{round(prob * 100)}"
@@ -1348,21 +1348,21 @@ def build_fund_chart(inputs, res, show_ref_line, mc_pcts=None, title=None,
             y=list(mc_pcts[0]) + list(mc_pcts[1])[::-1],
             fill="toself", fillcolor="rgba(220,38,38,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="Unlucky futures", hoverinfo="skip",
+            name="Unlucky outcomes", hoverinfo="skip",
         ))
         fig.add_trace(go.Scatter(
             x=_xf + _xr,
             y=list(mc_pcts[1]) + list(mc_pcts[2])[::-1],
             fill="toself", fillcolor="rgba(59,130,246,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="Middle half of futures (most likely)", hoverinfo="skip",
+            name="Middle half of outcomes (most likely)", hoverinfo="skip",
         ))
         fig.add_trace(go.Scatter(
             x=_xf + _xr,
             y=list(mc_pcts[2]) + list(mc_pcts[3])[::-1],
             fill="toself", fillcolor="rgba(22,163,74,0.18)",
             line=dict(color="rgba(0,0,0,0)"),
-            name="Lucky futures", hoverinfo="skip",
+            name="Lucky outcomes", hoverinfo="skip",
         ))
 
     # Hover arrays

@@ -252,7 +252,7 @@ def test_zero_swings_never_claims_bad_markets(depleted, monkeypatch):
     html = []
     monkeypatch.setattr(view_market_swings, "render_html", html.append)
     view_market_swings.render_risk_verdict(depleted, 7.0, 0.0, flat_b_wins=not depleted)
-    assert "every future matches page 1" in html[0]
+    assert "every outcome matches page 1" in html[0]
     assert "bad markets" not in html[0] and "real ups and downs" not in html[0]
     assert ("the pension wins" in html[0]) == bool(depleted)
 
