@@ -587,14 +587,14 @@ def render_sidebar():
             if _wage_mode == "My wage today":
                 current_wage = st.number_input(
                     "Annual Salary Today, Before Taxes ($)",
-                    value=120000, min_value=0, max_value=10_000_000, step=2500,
+                    value=50000, min_value=0, max_value=10_000_000, step=2500,
                     key="in_current_wage",
                     help=f"What you are paid now, in {CURRENT_YEAR}.",
                 )
             else:
                 starting_wage = st.number_input(
                     "Starting Annual Salary, Before Taxes ($)",
-                    value=120000, min_value=0, max_value=10_000_000, step=2500,
+                    value=50000, min_value=0, max_value=10_000_000, step=2500,
                     key="in_wage",
                     help=f"Your salary in your first year on the job, in {hire_year} dollars (what you were actually paid then).",
                 )
@@ -799,7 +799,7 @@ def render_sidebar():
                 )
                 manual_allowance = st.number_input(
                     "Pension Payment Before Taxes ($)",
-                    value=70000.0 if period == "Yearly" else 70000.0 / 12,
+                    value=45000.0 if period == "Yearly" else 45000.0 / 12,
                     min_value=0.0,
                     max_value=10_000_000.0 if period == "Yearly" else 10_000_000.0 / 12,
                     step=100.0,

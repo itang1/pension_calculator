@@ -137,7 +137,7 @@ def test_share_link_is_made_on_request_with_only_active_inputs():
     assert not at.code  # nothing until asked
     next(b for b in at.button if b.key == "make_share_link").click().run()
     link = at.code[0].value
-    assert "wage=120000" in link and "hire_age=25" in link
+    assert "wage=50000" in link and "hire_age=25" in link
     assert "allowance_manual" not in link and "current_wage" not in link
     at.radio(key="in_allowance_mode").set_value("Enter manually").run()
     assert "allowance_manual=" in at.code[0].value
